@@ -1236,7 +1236,7 @@
         <item quantity="other">%d chapters</item>
     </plurals>
     <string name="download_folder">Save downloads as music files</string>
-    <string name="download_folder_off">Off. Tap to choose a folder; new downloads are also saved there as normal audio files</string>
+    <string name="download_folder_off">Off. Tap to choose a folder; new downloads are also saved there as .m4a audio files</string>
     <string name="download_folder_save_existing">Save existing downloads to folder</string>
     <string name="download_folder_saving">Saving downloads…</string>
     <string name="download_folder_stop">Stop saving to folder</string>

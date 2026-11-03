@@ -23,6 +23,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.File
 import java.io.IOException
 
 /**
@@ -59,29 +60,54 @@ class DownloadExporter(
         val song = database.getSongByIdBlocking(songId) ?: return false
         val resolver = context.contentResolver
         return try {
-            val extension = sniffExtension(songId)
+            val sourceExtension = sniffExtension(songId)
                 ?: downloadFileExtension(database.format(songId).first()?.mimeType)
             val artist = song.artists.joinToString(", ") { it.name }
             val title = if (artist.isBlank()) song.song.title else "$artist - ${song.song.title}"
-            val displayName = "${sanitizeFileName(title, songId)}.$extension"
-            if (displayName in existing) return true
+            val baseName = sanitizeFileName(title, songId)
+            val m4aName = "$baseName.m4a"
+            if (m4aName in existing || "$baseName.$sourceExtension" in existing) return true
 
-            val parent = DocumentsContract.buildDocumentUriUsingTree(
-                treeUri,
-                DocumentsContract.getTreeDocumentId(treeUri),
-            )
-            // octet-stream stops providers from appending their own extension to the name
-            val target = DocumentsContract.createDocument(
-                resolver, parent, "application/octet-stream", displayName,
-            ) ?: return false
+            val workDir = File(context.cacheDir, "download_export").apply { mkdirs() }
+            val safeId = songId.replace(Regex("[^A-Za-z0-9_-]"), "_")
+            val source = File(workDir, "$safeId.$sourceExtension")
+            val converted = File(workDir, "$safeId.m4a.tmp")
             try {
-                copyFromCache(songId, target)
-            } catch (e: Exception) {
-                runCatching { DocumentsContract.deleteDocument(resolver, target) }
-                throw e
+                openCache(songId).use { input -> source.outputStream().use { input.copyTo(it) } }
+                val (fileToSave, displayName) = if (sourceExtension == "m4a") {
+                    source to m4aName
+                } else {
+                    runCatching {
+                        AacTranscoder.transcode(source, converted)
+                        converted to m4aName
+                    }.getOrElse { error ->
+                        Timber.tag(TAG).w(error, "Could not convert $songId to m4a, saving original format")
+                        source to "$baseName.$sourceExtension"
+                    }
+                }
+
+                val parent = DocumentsContract.buildDocumentUriUsingTree(
+                    treeUri,
+                    DocumentsContract.getTreeDocumentId(treeUri),
+                )
+                // octet-stream stops providers from appending their own extension to the name
+                val target = DocumentsContract.createDocument(
+                    resolver, parent, "application/octet-stream", displayName,
+                ) ?: return false
+                try {
+                    val output = resolver.openOutputStream(target)
+                        ?: throw IOException("Could not open $target for writing")
+                    output.use { out -> fileToSave.inputStream().use { it.copyTo(out) } }
+                } catch (e: Exception) {
+                    runCatching { DocumentsContract.deleteDocument(resolver, target) }
+                    throw e
+                }
+                existing += displayName
+                true
+            } finally {
+                source.delete()
+                converted.delete()
             }
-            existing += displayName
-            true
         } catch (e: Exception) {
             Timber.tag(TAG).w(e, "Failed to save $songId to download folder")
             false
@@ -111,14 +137,6 @@ class DownloadExporter(
             CacheDataSource(downloadCache, null),
             DataSpec.Builder().setUri(songId).setKey(songId).build(),
         )
-
-    private fun copyFromCache(songId: String, target: Uri) {
-        val output = context.contentResolver.openOutputStream(target)
-            ?: throw IOException("Could not open $target for writing")
-        output.use { out ->
-            openCache(songId).use { input -> input.copyTo(out) }
-        }
-    }
 
     private fun sniffExtension(songId: String): String? = runCatching {
         val header = ByteArray(12)
