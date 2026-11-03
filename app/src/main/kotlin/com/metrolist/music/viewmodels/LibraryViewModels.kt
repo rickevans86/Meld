@@ -465,7 +465,11 @@ constructor(
     @ApplicationContext context: Context,
     private val database: MusicDatabase,
     private val syncUtils: SyncUtils,
+    podcastDirectory: com.metrolist.music.podcasts.PodcastDirectory,
 ) : ViewModel() {
+    // Shows followed from Find podcasts (played from their public feeds)
+    val followedFeeds = podcastDirectory.followed
+
     // Subscribed podcast channels synced from YT Music
     val subscribedChannels = database.subscribedPodcasts()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

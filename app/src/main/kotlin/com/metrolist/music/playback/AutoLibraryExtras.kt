@@ -43,6 +43,7 @@ constructor(
     private val audiobooks: AudiobookRepository,
     private val audiobookshelf: AbsRepository,
     private val localMusicFolders: LocalMusicFolders,
+    private val podcastFeeds: com.metrolist.music.podcasts.PodcastDirectory,
 ) {
     fun isBrowsable(mediaId: String): Boolean =
         mediaId == LOCAL_FILES ||
@@ -50,7 +51,8 @@ constructor(
             mediaId == ABS_ALL ||
             mediaId == PODCASTS ||
             mediaId == SAVED_EPISODES ||
-            (mediaId.startsWith("$PODCAST_CHANNEL/") && mediaId.count { it == '/' } == 2)
+            (mediaId.startsWith("$PODCAST_CHANNEL/") && mediaId.count { it == '/' } == 2) ||
+            (mediaId.startsWith("$PODCAST_FEED/") && mediaId.count { it == '/' } == 2)
 
     fun rootItem(section: String): MediaItem = when (section) {
         LOCAL_FILES -> folder(LOCAL_FILES, context.getString(R.string.local_files), null, icon(R.drawable.folder), MediaMetadata.MEDIA_TYPE_PLAYLIST)
@@ -69,6 +71,7 @@ constructor(
         parentId == PODCASTS -> podcastFolders()
         parentId == SAVED_EPISODES -> savedEpisodes().map { it.toAutoItem(SAVED_EPISODES) }
         parentId.startsWith("$PODCAST_CHANNEL/") -> channelEpisodes(parentId)
+        parentId.startsWith("$PODCAST_FEED/") -> feedEpisodes(parentId)
         else -> null
     }
 
@@ -175,8 +178,27 @@ constructor(
         val channels = database.subscribedPodcasts().first().map { podcast ->
             folder("$PODCAST_CHANNEL/${podcast.id}", podcast.title, podcast.author, podcast.thumbnailUrl?.toUri())
         }
-        return listOf(saved) + channels
+        val feeds = podcastFeeds.followed.value.map { show ->
+            folder("$PODCAST_FEED/${feedKey(show.feedUrl)}", show.title, show.author, show.artworkUrl?.toUri())
+        }
+        return listOf(saved) + channels + feeds
     }
+
+    private fun followedFeed(key: String) =
+        podcastFeeds.followed.value.firstOrNull { feedKey(it.feedUrl) == key }
+
+    private suspend fun feedEpisodes(parentId: String): List<MediaItem> {
+        val show = followedFeed(parentId.removePrefix("$PODCAST_FEED/").substringBefore('/')) ?: return emptyList()
+        val feed = withTimeoutOrNull(NETWORK_TIMEOUT_MS) { runCatching { podcastFeeds.feed(show) }.getOrNull() }
+            ?: return emptyList()
+        return feed.episodes.map { episode ->
+            playable("$parentId/${episode.id}", episode.title, feed.show.title, (episode.imageUrl ?: feed.show.artworkUrl)?.toUri())
+        }
+    }
+
+    private fun feedKey(feedUrl: String): String =
+        java.security.MessageDigest.getInstance("SHA-1").digest(feedUrl.toByteArray())
+            .joinToString("") { "%02x".format(it) }.take(16)
 
     private suspend fun savedEpisodes(): List<Song> = database.savedPodcastEpisodesByCreateDateAsc().first()
 
@@ -202,6 +224,21 @@ constructor(
                 episodes.indexOfFirst { it.id == id }.coerceAtLeast(0),
                 C.TIME_UNSET,
             )
+        }
+        "feed" -> {
+            val show = path.getOrNull(2)?.let(::followedFeed)
+            val episodeId = path.getOrNull(3)
+            val feed = show?.let { runCatching { podcastFeeds.feed(it) }.getOrNull() }
+            if (feed == null) {
+                null
+            } else {
+                val songs = podcastFeeds.prepare(feed)
+                MediaItemsWithStartPosition(
+                    songs.map { it.toMediaItem() },
+                    feed.episodes.indexOfFirst { it.id == episodeId }.coerceAtLeast(0),
+                    C.TIME_UNSET,
+                )
+            }
         }
         "channel" -> {
             val podcastId = path.getOrNull(2)
@@ -281,6 +318,7 @@ constructor(
         private const val ABS_ALL = "$AUDIOBOOKS/abs_all"
         private const val SAVED_EPISODES = "$PODCASTS/saved"
         private const val PODCAST_CHANNEL = "$PODCASTS/channel"
+        private const val PODCAST_FEED = "$PODCASTS/feed"
         private const val SHUFFLE = "__shuffle__"
     }
 }

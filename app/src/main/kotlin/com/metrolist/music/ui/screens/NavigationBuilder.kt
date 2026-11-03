@@ -401,8 +401,20 @@ fun NavGraphBuilder.navigationBuilder(
         LocalMusicFoldersSettings(navController)
     }
 
-    composable("podcast_directory") {
-        com.metrolist.music.ui.screens.podcast.PodcastDirectoryScreen(navController)
+    composable(
+        route = "podcast_directory?feed={feed}",
+        arguments = listOf(
+            navArgument("feed") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+        ),
+    ) { backStackEntry ->
+        com.metrolist.music.ui.screens.podcast.PodcastDirectoryScreen(
+            navController = navController,
+            initialFeedUrl = backStackEntry.arguments?.getString("feed"),
+        )
     }
 
     composable("settings/privacy") {

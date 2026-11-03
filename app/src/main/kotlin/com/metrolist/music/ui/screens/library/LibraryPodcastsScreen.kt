@@ -119,6 +119,7 @@ fun LibraryPodcastsScreen(
     val (sortDescending, onSortDescendingChange) = rememberPreference(SongSortDescendingKey, true)
 
     val subscribedChannels by viewModel.subscribedChannels.collectAsStateWithLifecycle()
+    val followedFeeds by viewModel.followedFeeds.collectAsStateWithLifecycle()
     val downloadedEpisodes by viewModel.downloadedEpisodes.collectAsStateWithLifecycle()
     val savedEpisodes by viewModel.savedEpisodes.collectAsStateWithLifecycle()
     val sePlaylist by viewModel.sePlaylist.collectAsStateWithLifecycle()
@@ -270,6 +271,28 @@ fun LibraryPodcastsScreen(
                                     )
                                 }
                             },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .animateItem(),
+                        )
+                    }
+
+                    // Shows followed from Find podcasts
+                    itemsIndexed(
+                        items = followedFeeds,
+                        key = { _, show -> "feed:${show.feedUrl}" },
+                        contentType = { _, _ -> CONTENT_TYPE_SONG },
+                    ) { _, show ->
+                        PodcastEpisodePlaylistItem(
+                            podcast = PodcastEntity(
+                                id = show.feedUrl,
+                                title = show.title,
+                                author = show.author,
+                                thumbnailUrl = show.artworkUrl,
+                            ),
+                            onClick = { navController.navigate("podcast_directory?feed=${android.net.Uri.encode(show.feedUrl)}") },
+                            onMenuClick = null,
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -573,7 +596,7 @@ private fun AutoPlaylistCard(
 private fun PodcastEpisodePlaylistItem(
     podcast: PodcastEntity,
     onClick: () -> Unit,
-    onMenuClick: () -> Unit,
+    onMenuClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -631,11 +654,13 @@ private fun PodcastEpisodePlaylistItem(
             }
         }
 
-        IconButton(onClick = onMenuClick) {
-            Icon(
-                painter = painterResource(R.drawable.more_vert),
-                contentDescription = stringResource(R.string.more_options),
-            )
+        if (onMenuClick != null) {
+            IconButton(onClick = onMenuClick) {
+                Icon(
+                    painter = painterResource(R.drawable.more_vert),
+                    contentDescription = stringResource(R.string.more_options),
+                )
+            }
         }
     }
 }

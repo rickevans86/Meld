@@ -77,6 +77,7 @@ import com.metrolist.music.viewmodels.ShowPage
 @Composable
 fun PodcastDirectoryScreen(
     navController: NavController,
+    initialFeedUrl: String? = null,
     viewModel: PodcastDirectoryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -92,7 +93,12 @@ fun PodcastDirectoryScreen(
     var query by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    BackHandler(enabled = page != null) { viewModel.close() }
+    // Opened straight onto a followed show: back returns to where the user came from
+    val openedDirectly = initialFeedUrl != null
+    LaunchedEffect(initialFeedUrl) {
+        if (initialFeedUrl != null && viewModel.page.value == null) viewModel.openFeed(initialFeedUrl)
+    }
+    BackHandler(enabled = page != null && !openedDirectly) { viewModel.close() }
     LaunchedEffect(page?.title) { listState.scrollToItem(0) }
     LaunchedEffect(message) {
         message?.let {
@@ -193,14 +199,14 @@ fun PodcastDirectoryScreen(
     TopAppBar(
         title = {
             Text(
-                page?.title ?: stringResource(R.string.podcast_directory),
+                page?.title?.ifBlank { null } ?: stringResource(R.string.podcast_directory),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         },
         navigationIcon = {
             IconButton(
-                onClick = { if (page != null) viewModel.close() else navController.navigateUp() },
+                onClick = { if (page != null && !openedDirectly) viewModel.close() else navController.navigateUp() },
                 onLongClick = navController::backToMain,
             ) {
                 Icon(painterResource(R.drawable.arrow_back), contentDescription = null)

@@ -93,6 +93,11 @@ constructor(
 
     fun open(show: PodcastShow) = load(show.title) { show }
 
+    fun openFeed(feedUrl: String) {
+        val show = followed.value.firstOrNull { it.feedUrl == feedUrl } ?: PodcastShow(feedUrl, title = "")
+        open(show)
+    }
+
     fun openSpotify(show: SpotifyShow) = load(show.name) {
         directory.findFeed(show.name, show.publisher)
     }
