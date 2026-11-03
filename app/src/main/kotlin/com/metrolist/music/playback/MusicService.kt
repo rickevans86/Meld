@@ -4509,6 +4509,7 @@ class MusicService :
                 }
                 if (localPath != null) {
                     if (isAbsTrackId(mediaId)) {
+                        absRepository.offlineUri(mediaId)?.let { return@Factory dataSpec.withUri(it) }
                         return@Factory dataSpec.withUri(localPath.toUri())
                             .withAdditionalHeaders(absRepository.streamHeaders())
                     }

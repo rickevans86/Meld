@@ -20,6 +20,7 @@ import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.get
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -53,6 +54,20 @@ internal data class AbsTrackInfo(
 
 data class PreparedAbsBook(val book: AbsBook, val songs: List<Song>, val startIndex: Int)
 
+@Serializable
+internal data class AbsLocalPosition(
+    val currentTimeSec: Double,
+    val updatedAt: Long,
+    val finished: Boolean = false,
+)
+
+/** A book saved for offline listening: [progress] runs 0..1 while downloading. */
+data class AbsDownloadState(
+    val progress: Float,
+    val done: Boolean,
+    val failed: Boolean = false,
+)
+
 /**
  * Audiobookshelf connection: sign-in, browsing, preparing a book for the player and
  * syncing the listening position back to the server.
@@ -76,6 +91,13 @@ constructor(
     private val tracks = ConcurrentHashMap<String, AbsTrackInfo>()
     private val lastReport = ConcurrentHashMap<String, Long>()
     private val pendingReport = ConcurrentHashMap<String, Double>()
+    private val downloadsDir = File(context.filesDir, "audiobookshelf")
+    private val positionsFile = File(context.filesDir, "audiobookshelf_positions.json")
+    private val localPositions = ConcurrentHashMap<String, AbsLocalPosition>()
+    private val downloadJobs = ConcurrentHashMap<String, Job>()
+
+    private val _downloads = MutableStateFlow<Map<String, AbsDownloadState>>(emptyMap())
+    val downloads = _downloads.asStateFlow()
 
     private val _session = MutableStateFlow<AbsSession?>(null)
     val session = _session.asStateFlow()
@@ -86,7 +108,11 @@ constructor(
 
     init {
         _session.value = authStore.load()
-        scope.launch { loadTracks() }
+        scope.launch {
+            loadTracks()
+            loadPositions()
+            _downloads.value = downloadedIds().associateWith { AbsDownloadState(1f, done = true) }
+        }
     }
 
     fun selectedLibraryId(): String? = context.dataStore[AbsLibraryKey]
@@ -114,8 +140,11 @@ constructor(
         context.dataStore.edit { it.remove(AbsLibraryKey) }
     }
 
-    fun coverUrl(itemId: String): String? =
-        _session.value?.let { "${it.serverUrl}/api/items/$itemId/cover?token=${Uri.encode(it.accessToken)}" }
+    fun coverUrl(itemId: String): String? {
+        val cached = coverFile(itemId)
+        if (cached.exists()) return Uri.fromFile(cached).toString()
+        return _session.value?.let { "${it.serverUrl}/api/items/$itemId/cover?token=${Uri.encode(it.accessToken)}" }
+    }
 
     suspend fun libraries() = authed { s -> client.libraries(s.serverUrl, s.accessToken) }
 
@@ -129,7 +158,15 @@ constructor(
 
     suspend fun allProgress() = authed { s -> client.allProgress(s.serverUrl, s.accessToken) }
 
-    suspend fun book(itemId: String) = authed { s -> client.book(s.serverUrl, s.accessToken, itemId) }
+    /** The book from the server, or from its download when the server can't be reached. */
+    suspend fun book(itemId: String): AbsBook =
+        try {
+            authed { s -> client.book(s.serverUrl, s.accessToken, itemId) }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            if (e is AbsHttpException && e.code != 401) throw e
+            downloadedBook(itemId) ?: throw e
+        }
 
     suspend fun progress(itemId: String) = authed { s -> client.progress(s.serverUrl, s.accessToken, itemId) }
 
@@ -142,7 +179,7 @@ constructor(
         val book = book(itemId)
         if (book.tracks.isEmpty()) throw IllegalStateException("This book has no audio files")
 
-        val target = startAtSec ?: progress(itemId)?.takeIf { !it.isFinished }?.currentTimeSec ?: 0.0
+        val target = startAtSec ?: resumePosition(itemId)
         val startIndex = book.tracks.indexOfLast { it.startOffsetSec <= target + 0.5 }.coerceAtLeast(0)
         val cover = cacheCover(itemId)
         val multiFile = book.tracks.size > 1
@@ -150,7 +187,8 @@ constructor(
         book.tracks.forEachIndexed { position, track ->
             val songId = "$ABS_TRACK_ID_PREFIX$itemId:${track.index}"
             tracks[songId] = AbsTrackInfo(itemId, track.startOffsetSec, book.durationSec, position == book.tracks.lastIndex)
-            val path = session.serverUrl + track.contentUrl
+            val path = downloadedTrack(itemId, track.index)?.let { Uri.fromFile(it).toString() }
+                ?: (session.serverUrl + track.contentUrl)
             val title = if (multiFile) track.title.substringBeforeLast('.').ifBlank { book.title } else book.title
             val existing = database.getSongById(songId)?.song
             with(database) {
@@ -194,6 +232,7 @@ constructor(
     fun reportPosition(trackId: String, positionMs: Long) {
         val info = tracks[trackId] ?: return
         val currentTime = info.startOffsetSec + positionMs / 1000.0
+        localPositions[info.itemId] = AbsLocalPosition(currentTime, System.currentTimeMillis())
         val alreadyQueued = pendingReport.put(info.itemId, currentTime) != null
         if (alreadyQueued) return
         scope.launch {
@@ -201,6 +240,7 @@ constructor(
             if (wait > 0) delay(wait)
             val latest = pendingReport.remove(info.itemId) ?: return@launch
             lastReport[info.itemId] = System.currentTimeMillis()
+            savePositions()
             runCatching {
                 authed { s ->
                     client.updateProgress(
@@ -218,7 +258,9 @@ constructor(
         val info = tracks[trackId] ?: return
         if (!info.isLast) return
         pendingReport.remove(info.itemId)
+        localPositions[info.itemId] = AbsLocalPosition(info.bookDurationSec, System.currentTimeMillis(), finished = true)
         scope.launch {
+            savePositions()
             runCatching {
                 authed { s ->
                     client.updateProgress(
@@ -230,6 +272,137 @@ constructor(
                 }
             }.onFailure { Timber.tag(TAG).w(it, "Could not mark ${info.itemId} finished") }
         }
+    }
+
+    fun download(itemId: String) {
+        if (downloadJobs[itemId]?.isActive == true) return
+        setDownload(itemId, AbsDownloadState(0f, done = false))
+        downloadJobs[itemId] = scope.launch {
+            try {
+                val book = authed { s -> client.book(s.serverUrl, s.accessToken, itemId) }
+                val dir = File(downloadsDir, itemId).apply { mkdirs() }
+                File(dir, COMPLETE_MARKER).delete()
+                val totalSec = book.tracks.sumOf { it.durationSec }.coerceAtLeast(1.0)
+                var doneSec = 0.0
+                for (track in book.tracks) {
+                    val target = File(dir, trackFileName(track))
+                    if (!target.exists()) {
+                        val partial = File(dir, target.name + ".part")
+                        authed { s ->
+                            client.downloadTo(s.serverUrl + track.contentUrl, s.accessToken, partial) { written, total ->
+                                val fraction = if (total > 0) written.toDouble() / total else 0.0
+                                val overall = ((doneSec + track.durationSec * fraction) / totalSec).toFloat()
+                                val current = _downloads.value[itemId]?.progress ?: 0f
+                                if (overall - current >= 0.01f) setDownload(itemId, AbsDownloadState(overall, done = false))
+                            }
+                        }
+                        if (!partial.renameTo(target)) throw java.io.IOException("Could not save ${target.name}")
+                    }
+                    doneSec += track.durationSec
+                    setDownload(itemId, AbsDownloadState((doneSec / totalSec).toFloat(), done = false))
+                }
+                cacheCover(itemId)
+                File(dir, BOOK_FILE).writeText(json.encodeToString(AbsBook.serializer(), book))
+                File(dir, COMPLETE_MARKER).writeText(System.currentTimeMillis().toString())
+                setDownload(itemId, AbsDownloadState(1f, done = true))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.tag(TAG).w(e, "Download of $itemId failed")
+                setDownload(itemId, AbsDownloadState(_downloads.value[itemId]?.progress ?: 0f, done = false, failed = true))
+            } finally {
+                downloadJobs.remove(itemId)
+            }
+        }
+    }
+
+    /** Stops a download in progress, or deletes a finished one. */
+    fun removeDownload(itemId: String) {
+        downloadJobs.remove(itemId)?.cancel()
+        _downloads.value = _downloads.value - itemId
+        scope.launch { File(downloadsDir, itemId).deleteRecursively() }
+    }
+
+    fun isDownloaded(itemId: String): Boolean = File(File(downloadsDir, itemId), COMPLETE_MARKER).exists()
+
+    fun downloadedBooks(): List<AbsBook> = downloadedIds().mapNotNull(::downloadedBook)
+
+    /** The downloaded file for a track id, when the book has been saved. */
+    fun offlineUri(trackId: String): Uri? {
+        val (itemId, index) = parseTrackId(trackId) ?: return null
+        return downloadedTrack(itemId, index)?.let(Uri::fromFile)
+    }
+
+    /**
+     * Where to resume: the newer of the server's position and the one recorded on this phone,
+     * which covers listening while offline. A newer local position is pushed to the server.
+     */
+    private suspend fun resumePosition(itemId: String): Double {
+        val server = runCatching { progress(itemId) }
+        val remote = server.getOrNull()
+        val local = localPositions[itemId]
+        if (local != null && (remote == null || local.updatedAt > remote.lastUpdate)) {
+            if (server.isSuccess) {
+                scope.launch {
+                    runCatching {
+                        authed { s ->
+                            val duration = remote?.durationSec?.takeIf { it > 0 }
+                                ?: tracks.values.firstOrNull { it.itemId == itemId }?.bookDurationSec ?: 0.0
+                            client.updateProgress(s.serverUrl, s.accessToken, itemId, local.currentTimeSec, duration, local.finished)
+                        }
+                    }
+                }
+            }
+            return if (local.finished) 0.0 else local.currentTimeSec
+        }
+        return remote?.takeIf { !it.isFinished }?.currentTimeSec ?: 0.0
+    }
+
+    private fun setDownload(itemId: String, state: AbsDownloadState) {
+        _downloads.value = _downloads.value + (itemId to state)
+    }
+
+    private fun downloadedIds(): List<String> =
+        downloadsDir.listFiles()?.filter { File(it, COMPLETE_MARKER).exists() }?.map { it.name }.orEmpty()
+
+    private fun downloadedBook(itemId: String): AbsBook? {
+        if (!isDownloaded(itemId)) return null
+        return runCatching {
+            json.decodeFromString(AbsBook.serializer(), File(File(downloadsDir, itemId), BOOK_FILE).readText())
+        }.getOrNull()
+    }
+
+    private fun downloadedTrack(itemId: String, index: Int): File? {
+        if (!isDownloaded(itemId)) return null
+        val dir = File(downloadsDir, itemId)
+        return dir.listFiles()?.firstOrNull { it.name.substringBefore('.') == index.toString() && !it.name.endsWith(".part") }
+    }
+
+    private fun trackFileName(track: AbsTrack): String {
+        val extension = track.title.substringAfterLast('.', "").lowercase().takeIf { it.length in 2..4 } ?: "audio"
+        return "${track.index}.$extension"
+    }
+
+    private fun parseTrackId(trackId: String): Pair<String, Int>? {
+        if (!trackId.startsWith(ABS_TRACK_ID_PREFIX)) return null
+        val rest = trackId.removePrefix(ABS_TRACK_ID_PREFIX)
+        val index = rest.substringAfterLast(':').toIntOrNull() ?: return null
+        return rest.substringBeforeLast(':') to index
+    }
+
+    private fun coverFile(itemId: String) = File(File(context.cacheDir, "artwork"), "abs_$itemId.jpg")
+
+    private fun loadPositions() {
+        runCatching {
+            if (positionsFile.exists()) {
+                localPositions.putAll(json.decodeFromString(positionMapSerializer, positionsFile.readText()))
+            }
+        }.onFailure { Timber.tag(TAG).w(it, "Could not read local positions") }
+    }
+
+    private fun savePositions() {
+        runCatching { positionsFile.writeText(json.encodeToString(positionMapSerializer, HashMap(localPositions))) }
+            .onFailure { Timber.tag(TAG).w(it, "Could not save local positions") }
     }
 
     /** Headers the player sends when streaming; refreshes the token first if it is about to expire. */
@@ -279,7 +452,7 @@ constructor(
     }
 
     private suspend fun cacheCover(itemId: String): String? {
-        val file = File(File(context.cacheDir, "artwork").apply { mkdirs() }, "abs_$itemId.jpg")
+        val file = coverFile(itemId).also { it.parentFile?.mkdirs() }
         if (file.exists()) return Uri.fromFile(file).toString()
         val session = _session.value ?: return null
         return runCatching {
@@ -313,6 +486,9 @@ constructor(
         const val TAG = "Audiobookshelf"
         const val REPORT_INTERVAL_MS = 10_000L
         val trackMapSerializer = MapSerializer(String.serializer(), AbsTrackInfo.serializer())
+        val positionMapSerializer = MapSerializer(String.serializer(), AbsLocalPosition.serializer())
+        const val BOOK_FILE = "book.json"
+        const val COMPLETE_MARKER = ".complete"
 
         fun normalizeServer(input: String): String {
             val trimmed = input.trim().trimEnd('/')

@@ -67,6 +67,7 @@ import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
 import com.metrolist.music.audiobooks.abs.AbsBook
 import com.metrolist.music.audiobooks.abs.AbsBookSummary
+import com.metrolist.music.audiobooks.abs.AbsDownloadState
 import com.metrolist.music.audiobooks.abs.AbsProgress
 import com.metrolist.music.constants.isAbsTrackId
 import com.metrolist.music.extensions.toMediaItem
@@ -98,6 +99,8 @@ fun AudiobookshelfContent(
     val error by viewModel.error.collectAsState()
     val openBookId by viewModel.openBookId.collectAsState()
     val openBook by viewModel.openBook.collectAsState()
+    val downloads by viewModel.downloads.collectAsState()
+    val downloadedBooks by viewModel.downloadedBooks.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -182,8 +185,11 @@ fun AudiobookshelfContent(
                     coverUrl = viewModel.coverUrl(book.id),
                     isThisBookPlaying = isPlaying && playingItemId == book.id,
                     busy = busy,
+                    download = downloads[book.id],
                     onBack = viewModel::close,
                     onPlay = { startAt -> play(book.id, startAt) },
+                    onDownload = { viewModel.download(book.id) },
+                    onRemoveDownload = { viewModel.removeDownload(book.id) },
                 )
             }
             return@LazyColumn
@@ -264,15 +270,22 @@ fun AudiobookshelfContent(
                 item(key = "no_results") { EmptyText(stringResource(R.string.abs_no_results)) }
             }
             items(results, key = { "search:${it.id}" }) { summary ->
-                AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id)) { viewModel.open(summary.id) }
+                AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id), downloads[summary.id]?.done == true) { viewModel.open(summary.id) }
             }
             return@LazyColumn
+        }
+
+        if (downloadedBooks.isNotEmpty()) {
+            item(key = "downloaded_title") { SectionTitle(stringResource(R.string.abs_downloaded)) }
+            items(downloadedBooks, key = { "downloaded:${it.id}" }) { summary ->
+                AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id), true) { viewModel.open(summary.id) }
+            }
         }
 
         if (inProgress.isNotEmpty()) {
             item(key = "continue_title") { SectionTitle(stringResource(R.string.abs_continue_listening)) }
             items(inProgress, key = { "continue:${it.id}" }) { summary ->
-                AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id)) { viewModel.open(summary.id) }
+                AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id), downloads[summary.id]?.done == true) { viewModel.open(summary.id) }
             }
         }
 
@@ -288,7 +301,7 @@ fun AudiobookshelfContent(
             }
         }
         items(books, key = { "book:${it.id}" }) { summary ->
-            AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id)) { viewModel.open(summary.id) }
+            AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id), downloads[summary.id]?.done == true) { viewModel.open(summary.id) }
         }
         if (books.size < totalBooks) {
             item(key = "more") {
@@ -417,8 +430,11 @@ private fun LazyListScope.bookDetail(
     coverUrl: String?,
     isThisBookPlaying: Boolean,
     busy: Boolean,
+    download: AbsDownloadState?,
     onBack: () -> Unit,
     onPlay: (Double?) -> Unit,
+    onDownload: () -> Unit,
+    onRemoveDownload: () -> Unit,
 ) {
     val started = progress != null && progress.currentTimeSec > 0 && !progress.isFinished
     item(key = "abs_book_header") {
@@ -485,6 +501,7 @@ private fun LazyListScope.bookDetail(
                     )
                 }
             }
+            DownloadControls(download, onDownload, onRemoveDownload)
             if (book.chapters.isNotEmpty() || book.tracks.size > 1) {
                 SectionTitle(stringResource(R.string.audiobook_chapters))
             }
@@ -516,7 +533,71 @@ private fun LazyListScope.bookDetail(
 }
 
 @Composable
-private fun AbsBookRow(summary: AbsBookSummary, progress: AbsProgress?, coverUrl: String?, onClick: () -> Unit) {
+private fun DownloadControls(state: AbsDownloadState?, onDownload: () -> Unit, onRemove: () -> Unit) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        when {
+            state == null -> OutlinedButton(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                Icon(painterResource(R.drawable.download), contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.abs_download))
+            }
+            state.done -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painterResource(R.drawable.offline),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.abs_downloaded_offline),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onRemove) { Text(stringResource(R.string.abs_remove_download)) }
+            }
+            state.failed -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.abs_download_failed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onDownload) { Text(stringResource(R.string.abs_retry)) }
+            }
+            else -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.abs_downloading, (state.progress * 100).roundToInt()),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onRemove) { Text(stringResource(R.string.abs_cancel_download)) }
+                }
+                LinearProgressIndicator(
+                    progress = { state.progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AbsBookRow(
+    summary: AbsBookSummary,
+    progress: AbsProgress?,
+    coverUrl: String?,
+    downloaded: Boolean,
+    onClick: () -> Unit,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -544,7 +625,11 @@ private fun AbsBookRow(summary: AbsBookSummary, progress: AbsProgress?, coverUrl
                 )
             }
             Text(
-                progressText(progress, summary.durationSec),
+                if (downloaded) {
+                    stringResource(R.string.abs_downloaded_prefix, progressText(progress, summary.durationSec))
+                } else {
+                    progressText(progress, summary.durationSec)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

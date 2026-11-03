@@ -1234,6 +1234,17 @@
     <string name="abs_continue_from">Continue from %s</string>
     <string name="abs_chapter_n">Chapter %d</string>
     <string name="abs_progress">%1$d%% · %2$s left</string>
+    <string name="abs_download">Download for offline listening</string>
+    <string name="abs_downloading">Downloading %d%%</string>
+    <string name="abs_cancel_download">Cancel</string>
+    <string name="abs_downloaded_offline">Downloaded. Plays without a connection</string>
+    <string name="abs_remove_download">Remove</string>
+    <string name="abs_download_failed">Download stopped. Check your connection.</string>
+    <string name="abs_retry">Try again</string>
+    <string name="abs_downloaded">Downloaded</string>
+    <string name="abs_downloaded_prefix">Downloaded · %s</string>
+    <string name="auto_all_audiobookshelf_books">All Audiobookshelf books</string>
+    <string name="auto_saved_episodes">Saved episodes</string>
     <string name="music_folders">Music folders</string>
     <string name="music_folders_desc">Choose which folders on your phone show up in Local files</string>
     <string name="music_folders_intro">Ticked folders show up in Local files. Folders with songs are ticked to start with; tick any other folder to add it.</string>

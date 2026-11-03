@@ -88,6 +88,7 @@ constructor(
     @ApplicationContext val context: Context,
     val database: MusicDatabase,
     val downloadUtil: DownloadUtil,
+    private val autoExtras: AutoLibraryExtras,
 ) : MediaLibrarySession.Callback {
     private val scope = CoroutineScope(Dispatchers.Main) + Job()
     lateinit var service: MusicService
@@ -174,7 +175,14 @@ constructor(
                             .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
                             .build(),
                     ).build(),
-                params,
+                MediaLibraryService.LibraryParams.Builder()
+                    .setExtras(
+                        Bundle().apply {
+                            params?.extras?.let { putAll(it) }
+                            // Tells Android Auto to show its search button
+                            putBoolean("android.media.browse.SEARCH_SUPPORTED", true)
+                        },
+                    ).build(),
             ),
         )
 
@@ -185,7 +193,7 @@ constructor(
         params: MediaLibraryService.LibraryParams?,
     ): ListenableFuture<LibraryResult<Void>> =
         Futures.immediateFuture(
-            if (isBrowsableMediaId(parentId)) {
+            if (isBrowsableMediaId(parentId) || autoExtras.isBrowsable(parentId)) {
                 LibraryResult.ofVoid(params)
             } else {
                 LibraryResult.ofError(SessionError.ERROR_BAD_VALUE, params)
@@ -202,6 +210,10 @@ constructor(
     ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> =
         scope.future(Dispatchers.IO) {
             try {
+                autoExtras.children(parentId)?.let { children ->
+                    return@future LibraryResult.ofItemList(children.paginate(page, pageSize), params)
+                }
+
                 loadLocalChildren(parentId, page, pageSize)?.let { children ->
                     return@future LibraryResult.ofItemList(children, params)
                 }
@@ -277,6 +289,9 @@ constructor(
                                         drawableUri(R.drawable.spotify),
                                         MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS,
                                     )
+                                    AndroidAutoSection.LOCAL_FILES -> autoExtras.rootItem(AutoLibraryExtras.LOCAL_FILES)
+                                    AndroidAutoSection.AUDIOBOOKS -> autoExtras.rootItem(AutoLibraryExtras.AUDIOBOOKS)
+                                    AndroidAutoSection.PODCASTS -> autoExtras.rootItem(AutoLibraryExtras.PODCASTS)
                                 }
                             }
                     }
@@ -767,6 +782,8 @@ constructor(
             } else {
                 mediaItems.firstOrNull()?.mediaId?.split("/")
             } ?: return@future defaultResult
+
+            autoExtras.playback(path)?.let { return@future it }
 
             when (path.firstOrNull()) {
                 MusicService.SONG -> {

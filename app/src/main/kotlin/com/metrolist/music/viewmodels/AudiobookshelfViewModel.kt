@@ -15,11 +15,13 @@ import com.metrolist.music.audiobooks.abs.AbsProgress
 import com.metrolist.music.audiobooks.abs.AbsRepository
 import com.metrolist.music.audiobooks.abs.PreparedAbsBook
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.net.UnknownHostException
 import javax.inject.Inject
 
@@ -67,12 +69,28 @@ constructor(
 
     val openBookId = MutableStateFlow<String?>(null)
 
+    val downloads = repository.downloads
+
+    private val _downloadedBooks = MutableStateFlow<List<AbsBookSummary>>(emptyList())
+    val downloadedBooks = _downloadedBooks.asStateFlow()
+
     private var page = 0
     private var searchJob: Job? = null
 
     init {
         if (session.value != null) refreshAll()
+        viewModelScope.launch {
+            downloads.collect { states ->
+                _downloadedBooks.value = withContext(Dispatchers.IO) { repository.downloadedBooks() }
+                    .filter { states[it.id]?.done == true }
+                    .map { AbsBookSummary(it.id, it.title, it.author, it.durationSec) }
+            }
+        }
     }
+
+    fun download(itemId: String) = repository.download(itemId)
+
+    fun removeDownload(itemId: String) = repository.removeDownload(itemId)
 
     fun coverUrl(itemId: String): String? = repository.coverUrl(itemId)
 

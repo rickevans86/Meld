@@ -6,7 +6,9 @@
 package com.metrolist.music.audiobooks.abs
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -23,6 +25,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -35,6 +38,7 @@ data class AbsBookSummary(
     val durationSec: Double,
 )
 
+@Serializable
 data class AbsTrack(
     val index: Int,
     val title: String,
@@ -43,8 +47,10 @@ data class AbsTrack(
     val contentUrl: String,
 )
 
+@Serializable
 data class AbsChapter(val title: String, val startSec: Double, val endSec: Double)
 
+@Serializable
 data class AbsBook(
     val id: String,
     val title: String,
@@ -203,6 +209,35 @@ internal class AbsClient {
                 .patch(body)
                 .build(),
         )
+    }
+
+    /** Streams [url] into [target], reporting bytes written and the total size when the server sends it. */
+    suspend fun downloadTo(
+        url: String,
+        token: String,
+        target: File,
+        onProgress: (written: Long, total: Long) -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(url).header("Authorization", "Bearer $token").build()
+        http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw AbsHttpException(response.code, "HTTP ${response.code}")
+            val body = response.body ?: throw IOException("Empty download")
+            val total = body.contentLength()
+            body.byteStream().use { input ->
+                target.outputStream().use { output ->
+                    val buffer = ByteArray(256 * 1024)
+                    var written = 0L
+                    while (true) {
+                        ensureActive()
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        written += read
+                        onProgress(written, total)
+                    }
+                }
+            }
+        }
     }
 
     suspend fun download(url: String, token: String): ByteArray = withContext(Dispatchers.IO) {
