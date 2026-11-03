@@ -1331,6 +1331,11 @@
     <string name="discord_information_warning">Meld uses Discord\'s public OAuth2 and Gateway APIs to share what you\'re listening to. Authorization happens through a local browser session that closes itself after capturing the code — nothing is sent to third-party servers. Your token is stored on this device in encrypted preferences and is never shared. Meld connects directly to wss://gateway.discord.gg to publish your activity, and only requests the minimum scope required (sdk.social_layer_presence).</string>
     <!-- Wavelength: side menu, News tab, internet radio, Navidrome / Subsonic -->
     <string name="open_menu">Open menu</string>
+    <string name="home_spotify">Spotify</string>
+    <string name="home_youtube">YouTube</string>
+    <string name="home_spotify_sign_in">Sign in to Spotify to see your Spotify home. Tap here to open Spotify settings.</string>
+    <string name="spotify_default_home">Spotify as default home</string>
+    <string name="spotify_default_home_description">On: the Home tab shows Spotify and YouTube is in the side menu. Off: the Home tab shows YouTube and Spotify is in the side menu.</string>
     <string name="news_tab">News</string>
     <string name="news_latest_bulletins">Latest bulletins</string>
     <string name="news_refresh">Refresh</string>

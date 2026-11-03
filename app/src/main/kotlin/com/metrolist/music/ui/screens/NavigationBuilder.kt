@@ -106,6 +106,14 @@ fun NavGraphBuilder.navigationBuilder(
         LibraryScreen()
     }
 
+    // The home that isn't the default one (YouTube or Spotify), opened from the side menu
+    composable(
+        route = "home_alt",
+        arguments = listOf(navArgument("alt") { type = NavType.BoolType; defaultValue = true }),
+    ) {
+        HomeScreen(snackbarHostState = snackbarHostState)
+    }
+
     composable(Screens.Podcasts.route) {
         com.metrolist.music.ui.screens.library.LibraryPodcastsScreen(navController, onDeselect = null)
     }

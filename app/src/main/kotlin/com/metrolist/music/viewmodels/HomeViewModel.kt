@@ -37,6 +37,8 @@ import com.metrolist.music.constants.SpotifyAccessTokenKey
 import com.metrolist.music.utils.SpotifyTokenManager
 import com.metrolist.music.constants.SpotifyTokenExpiryKey
 import com.metrolist.music.constants.UseSpotifyHomeKey
+import com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
+import com.metrolist.music.constants.homeSource
 import com.metrolist.music.constants.WrappedSeenKey
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.Album
@@ -75,6 +77,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -116,7 +119,14 @@ class HomeViewModel @Inject constructor(
     val wrappedManager: WrappedManager,
     private val wrappedAudioService: WrappedAudioService,
     private val networkConnectivity: NetworkConnectivityObserver,
+    savedStateHandle: androidx.lifecycle.SavedStateHandle,
 ) : ViewModel() {
+    /** True for the side-menu home ("home_alt"), which shows whichever source isn't the default. */
+    private val isAlternateHome: Boolean = savedStateHandle.get<Boolean>("alt") ?: false
+
+    private fun androidx.datastore.preferences.core.Preferences.isSpotifyPage(): Boolean =
+        homeSource(isAlternateHome) == HOME_SOURCE_SPOTIFY
+
     val isRefreshing = MutableStateFlow(false)
     val isLoading = MutableStateFlow(false)
     val isRandomizing = MutableStateFlow(false)
@@ -275,19 +285,15 @@ class HomeViewModel @Inject constructor(
 
     // Spotify home sections: populated when UseSpotifyHomeKey is enabled
     val spotifyHomeSections = MutableStateFlow<List<SpotifyHomeSection>?>(null)
+    // The Spotify home page shows only Spotify; the YouTube home page shows no Spotify sections
     val useSpotifyHome: StateFlow<Boolean> = context.dataStore.data.map { prefs ->
         val enabled = prefs[EnableSpotifyKey] ?: false
-        val useForHome = prefs[UseSpotifyHomeKey] ?: false
         val hasToken = (prefs[SpotifyAccessTokenKey] ?: "").isNotEmpty()
-        enabled && useForHome && hasToken
+        enabled && hasToken && prefs.isSpotifyPage()
     }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     val spotifyHomeOnly: StateFlow<Boolean> = context.dataStore.data.map { prefs ->
-        val enabled = prefs[EnableSpotifyKey] ?: false
-        val useForHome = prefs[UseSpotifyHomeKey] ?: false
-        val homeOnly = prefs[SpotifyHomeOnlyKey] ?: false
-        val hasToken = (prefs[SpotifyAccessTokenKey] ?: "").isNotEmpty()
-        enabled && useForHome && homeOnly && hasToken
+        prefs.isSpotifyPage()
     }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     /** Set of speed dial item ids (used to show Pin/Unpin for Spotify playlists in home section). */
@@ -519,11 +525,10 @@ class HomeViewModel @Inject constructor(
         // Read Spotify preferences directly from DataStore to avoid StateFlow race condition
         val prefs = context.dataStore.data.first()
         val spotifyEnabled = prefs[EnableSpotifyKey] ?: false
-        val spotifyUseForHome = prefs[UseSpotifyHomeKey] ?: false
-        val spotifyHomeOnlyPref = prefs[SpotifyHomeOnlyKey] ?: false
+        val spotifyPage = prefs.isSpotifyPage()
         val spotifyHasToken = (prefs[SpotifyAccessTokenKey] ?: "").isNotEmpty()
-        val isSpotifyHome = spotifyEnabled && spotifyUseForHome && spotifyHasToken
-        val isSpotifyOnly = isSpotifyHome && spotifyHomeOnlyPref
+        val isSpotifyHome = spotifyEnabled && spotifyPage && spotifyHasToken
+        val isSpotifyOnly = spotifyPage
 
         // Local play history — always loaded regardless of Spotify mode
         recentlyPlayed.value = database.events().first()
@@ -967,6 +972,11 @@ class HomeViewModel @Inject constructor(
     }
 
     init {
+        // Reload when the default home switches between YouTube and Spotify
+        viewModelScope.launch {
+            context.dataStore.data.map { it.isSpotifyPage() }.distinctUntilChanged().drop(1).collect { refresh() }
+        }
+
         // Run sync in separate coroutine with cooldown to avoid blocking UI
         viewModelScope.launch(Dispatchers.IO) {
             syncUtils.tryAutoSync()

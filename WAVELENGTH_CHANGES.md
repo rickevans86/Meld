@@ -79,6 +79,18 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   bottom bar on drawer-only routes), `LibraryScreen.kt`, `LibraryPodcastsScreen.kt` (`onDeselect` nullable),
   `AppearanceSettings.kt`
 
+### 0b. Separate YouTube and Spotify homes
+- Home is split: the default source is the Home tab (`home`); the other is in the side menu as "YouTube" or
+  "Spotify" (`home_alt`, a second `HomeScreen` with nav argument `alt = true`).
+- Setting: Settings → Integrations → Spotify → **Spotify as default home** (`DefaultHomeSourceKey`, values
+  `youtube` / `spotify`). It replaces Meld's "Use Spotify for home" and "Spotify home only" switches; people who
+  had "Use Spotify for home" on start with Spotify as default (`constants/HomeSource.kt`).
+- The Spotify page shows only Spotify sections (or a sign-in hint); the YouTube page shows no Spotify sections.
+  `HomeViewModel` reads `alt` from its SavedStateHandle and reloads when the default changes.
+- New file: `constants/HomeSource.kt`
+- Edited: `HomeViewModel.kt` (`useSpotifyHome` / `spotifyHomeOnly` / `load()` gating), `HomeScreen.kt` (sign-in
+  hint), `SpotifySettings.kt`, `WavelengthDrawer.kt`, `NavigationBuilder.kt`, `MainActivity.kt` (title)
+
 ### 1. Local files: folder view and music folders
 - The Local files tab can switch between a song list and a folder view.
 - **Settings → Storage → Music folders** (`settings/local_folders`) can include or exclude MediaStore folders,
@@ -236,6 +248,8 @@ These are the files that can conflict during a merge, and what to re-apply in ea
 | `playback/MediaLibrarySessionCallback.kt` | `autoExtras` injection, search-supported extra, new section routing |
 | `playback/MusicService.kt` | Audiobook and ABS repos, `remembersPosition()`, ABS headers, `isOnDeviceMediaId` in resolver and precache, extra extractors |
 | `ui/menu/SongMenu.kt` | `isFromYouTube` guards |
+| `viewmodels/HomeViewModel.kt`, `ui/screens/HomeScreen.kt` | YouTube/Spotify home split (see 0b) |
+| `ui/screens/settings/integrations/SpotifySettings.kt` | "Spotify as default home" switch replaces Meld's two home switches |
 | `ui/screens/Screens.kt` | Podcasts, News and Audiobooks screens; bottom tab list |
 | `ui/screens/AccountScreen.kt` | New episodes card opens `new_episodes` |
 | `playback/AutoLibraryExtras.kt` (Wavelength file) | Radio and Navidrome sections |
@@ -287,3 +301,4 @@ To see the exact diff at any time:
 - 2026-11-03: Radio: add stations from pasted stream links; links to StreamURL.link and FMSTREAM.
 - 2026-11-03: Radio: TuneIn and region/genre search; in-app station finder for StreamURL.link and FMSTREAM.
 - 2026-11-03: Navidrome: download whole albums/playlists/starred; exports into `Navidrome - ` folders.
+- 2026-11-04: Separate YouTube and Spotify homes, with a setting for which one is the Home tab.

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
@@ -2611,6 +2612,21 @@ fun HomeScreen(
                                 }
                             }
                         }
+                    }
+                }
+
+                // Spotify home page without a Spotify sign-in: say how to fix it
+                if (isSpotifyHomeOnly && !isSpotifyHome) {
+                    item(key = "spotify_sign_in_hint") {
+                        Text(
+                            text = stringResource(R.string.home_spotify_sign_in),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { navController.navigate("settings/integrations/spotify") }
+                                .padding(24.dp),
+                        )
                     }
                 }
 

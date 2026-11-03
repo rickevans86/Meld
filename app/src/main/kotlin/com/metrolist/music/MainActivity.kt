@@ -788,6 +788,7 @@ class MainActivity : FragmentActivity() {
                             Screens.Podcasts.route,
                             Screens.Audiobooks.route,
                             Screens.News.route,
+                            "home_alt",
                             "local_files",
                             "radio",
                             "subsonic",
@@ -1027,8 +1028,9 @@ class MainActivity : FragmentActivity() {
                     onDispose { removeOnNewIntentListener(listener) }
                 }
 
+                val defaultHomeSource = com.metrolist.music.constants.rememberDefaultHomeSource()
                 val currentTitleRes =
-                    remember(navBackStackEntry) {
+                    remember(navBackStackEntry, defaultHomeSource) {
                         when (navBackStackEntry?.destination?.route) {
                             Screens.Home.route -> R.string.home
                             Screens.Search.route -> R.string.search
@@ -1036,6 +1038,8 @@ class MainActivity : FragmentActivity() {
                             Screens.Podcasts.route -> R.string.filter_podcasts
                             Screens.Audiobooks.route -> R.string.filter_audiobooks
                             Screens.News.route -> R.string.news_tab
+                            "home_alt" ->
+                                if (defaultHomeSource == com.metrolist.music.constants.HOME_SOURCE_SPOTIFY) R.string.home_youtube else R.string.home_spotify
                             "local_files" -> R.string.filter_local_files
                             "radio" -> R.string.radio_tab
                             "subsonic" -> R.string.subsonic_tab

@@ -39,8 +39,14 @@ data class DrawerDestination(
 )
 
 object WavelengthDrawer {
-    val listen = listOf(
+    /** Home is the default source; the other source's home sits under its own name. */
+    fun listen(alternateIsSpotify: Boolean) = listOf(
         DrawerDestination("home", R.string.home, R.drawable.home_outlined),
+        if (alternateIsSpotify) {
+            DrawerDestination(ALT_HOME_ROUTE, R.string.home_spotify, R.drawable.spotify)
+        } else {
+            DrawerDestination(ALT_HOME_ROUTE, R.string.home_youtube, R.drawable.home_outlined)
+        },
         DrawerDestination("search_input", R.string.search, R.drawable.search),
         DrawerDestination("library", R.string.filter_library, R.drawable.library_music_outlined),
     )
@@ -60,7 +66,9 @@ object WavelengthDrawer {
     )
 
     /** Screens only reachable from the side menu; they still show the top and bottom bars. */
-    val drawerOnlyRoutes = setOf("audiobooks", "radio", "subsonic", "local_files")
+    val drawerOnlyRoutes = setOf("audiobooks", "radio", "subsonic", "local_files", "home_alt")
+
+    const val ALT_HOME_ROUTE = "home_alt"
 }
 
 @Composable
@@ -68,6 +76,8 @@ fun WavelengthDrawerSheet(
     currentRoute: String?,
     onSelect: (DrawerDestination) -> Unit,
 ) {
+    val alternateIsSpotify = com.metrolist.music.constants.rememberDefaultHomeSource() !=
+        com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
     ModalDrawerSheet {
         Column(
             modifier = Modifier
@@ -79,7 +89,7 @@ fun WavelengthDrawerSheet(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp),
             )
-            listOf(WavelengthDrawer.listen, WavelengthDrawer.browse, WavelengthDrawer.more).forEachIndexed { index, group ->
+            listOf(WavelengthDrawer.listen(alternateIsSpotify), WavelengthDrawer.browse, WavelengthDrawer.more).forEachIndexed { index, group ->
                 if (index > 0) HorizontalDivider(modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp))
                 group.forEach { destination ->
                     NavigationDrawerItem(

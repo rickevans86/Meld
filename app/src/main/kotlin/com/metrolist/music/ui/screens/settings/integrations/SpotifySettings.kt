@@ -71,8 +71,8 @@ import com.metrolist.music.constants.SpotifySyncLikesKey
 import com.metrolist.music.constants.SpotifyTokenExpiryKey
 import com.metrolist.music.constants.SpotifyUserIdKey
 import com.metrolist.music.constants.SpotifyUsernameKey
-import com.metrolist.music.constants.SpotifyHomeOnlyKey
-import com.metrolist.music.constants.UseSpotifyHomeKey
+import androidx.datastore.preferences.core.edit
+import com.metrolist.music.utils.dataStore
 import com.metrolist.music.constants.UseSpotifySearchKey
 import com.metrolist.music.models.MediaMetadata
 import com.metrolist.music.playback.SpotifyMetadataRegistry
@@ -198,14 +198,10 @@ fun SpotifySettings(
                 key = UseSpotifySearchKey,
                 defaultValue = false,
             )
-            val (useSpotifyHome, onUseSpotifyHomeChange) = rememberPreference(
-                key = UseSpotifyHomeKey,
-                defaultValue = false,
-            )
-            val (spotifyHomeOnly, onSpotifyHomeOnlyChange) = rememberPreference(
-                key = SpotifyHomeOnlyKey,
-                defaultValue = false,
-            )
+            // Home is split into a YouTube home and a Spotify home; this picks which is the Home tab
+            val defaultHomeSource = com.metrolist.music.constants.rememberDefaultHomeSource()
+            val settingsScope = androidx.compose.runtime.rememberCoroutineScope()
+            val settingsContext = androidx.compose.ui.platform.LocalContext.current
 
             SwitchPreference(
                 title = { Text(stringResource(R.string.spotify_use_for_search)) },
@@ -215,20 +211,18 @@ fun SpotifySettings(
             )
 
             SwitchPreference(
-                title = { Text(stringResource(R.string.spotify_use_for_home)) },
-                description = stringResource(R.string.spotify_use_for_home_description),
-                checked = useSpotifyHome,
-                onCheckedChange = onUseSpotifyHomeChange,
+                title = { Text(stringResource(R.string.spotify_default_home)) },
+                description = stringResource(R.string.spotify_default_home_description),
+                checked = defaultHomeSource == com.metrolist.music.constants.HOME_SOURCE_SPOTIFY,
+                onCheckedChange = { spotify ->
+                    settingsScope.launch {
+                        settingsContext.dataStore.edit {
+                            it[com.metrolist.music.constants.DefaultHomeSourceKey] =
+                                if (spotify) com.metrolist.music.constants.HOME_SOURCE_SPOTIFY else com.metrolist.music.constants.HOME_SOURCE_YOUTUBE
+                        }
+                    }
+                },
             )
-
-            if (useSpotifyHome) {
-                SwitchPreference(
-                    title = { Text(stringResource(R.string.spotify_home_only)) },
-                    description = stringResource(R.string.spotify_home_only_description),
-                    checked = spotifyHomeOnly,
-                    onCheckedChange = onSpotifyHomeOnlyChange,
-                )
-            }
 
             val (syncLikes, onSyncLikesChange) = rememberPreference(
                 key = SpotifySyncLikesKey,
