@@ -4950,10 +4950,20 @@ class MusicService :
         // Live radio skips the caches entirely: a never-ending stream would fill them, and a
         // cached copy would replay old audio. Default extractors cover ICY, AAC, MP3, Ogg and HLS.
         live = DefaultMediaSourceFactory(
-            DefaultDataSource.Factory(
-                this,
-                OkHttpDataSource.Factory(OkHttpClient.Builder().build()).setUserAgent("Wavelength"),
-            ),
+            // TuneIn and playlist (.pls / .m3u) links are turned into the real stream while loading
+            ResolvingDataSource.Factory(
+                DefaultDataSource.Factory(
+                    this,
+                    OkHttpDataSource.Factory(OkHttpClient.Builder().build()).setUserAgent("Wavelength"),
+                ),
+            ) { spec ->
+                val url = spec.uri.toString()
+                if (radioDirectory.needsResolving(url)) {
+                    runCatching { radioDirectory.resolveStream(url) }.getOrNull()?.let { spec.withUri(it.toUri()) } ?: spec
+                } else {
+                    spec
+                }
+            },
         ),
         streamFor = { id -> radioDirectory.stream(id) },
     )

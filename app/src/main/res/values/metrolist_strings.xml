@@ -1337,7 +1337,7 @@
     <string name="news_loading_one">Loading…</string>
     <string name="news_no_recent">No bulletin in the last two days</string>
     <string name="radio_tab">Radio</string>
-    <string name="radio_search_hint">Search radio stations</string>
+    <string name="radio_search_hint">Search stations, cities or genres</string>
     <string name="radio_favourites">Favourites</string>
     <string name="radio_popular">Popular near you</string>
     <string name="radio_now_playing">Now playing on %1$s</string>
@@ -1349,8 +1349,12 @@
     <string name="radio_stream_link">Stream link</string>
     <string name="radio_station_name">Station name (optional)</string>
     <string name="radio_add">Add</string>
+    <string name="radio_play">Play</string>
+    <string name="radio_saved">Saved to your favourite stations</string>
+    <string name="radio_found_stream">Radio stream found</string>
+    <string name="radio_open_in_browser">Open in browser</string>
     <string name="radio_add_this_link">Add this link as a radio station</string>
-    <string name="radio_find_online">Can\'t find a station? Look it up on these sites, copy its stream link and add it here.</string>
+    <string name="radio_find_online">Can\'t find a station? Browse these sites here and tap a station\'s stream to play or save it.</string>
     <string name="subsonic_tab">Navidrome</string>
     <string name="subsonic_sign_in_title">Connect your music server</string>
     <string name="subsonic_sign_in_intro">Works with Navidrome and other Subsonic-compatible servers such as Airsonic and Gonic. Your password is stored encrypted on this phone.</string>

@@ -167,6 +167,14 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   Everything else uses the normal cached factory. ICY "now playing" titles come in through `onMetadata` and show
   on the Radio screen (the player notification shows them automatically).
 - Radio can't be downloaded (SongMenu hides it; DownloadUtil refuses it). Plays are reported to Radio Browser.
+- Search covers several sources at once (`RadioDirectory.search`): Radio Browser by name, region (`state`) and
+  genre tag, plus TuneIn's public OPML search (`opml.radiotime.com/Search.ashx`, ids `radio:tunein-<guide_id>`).
+  Results are merged with name matches first and duplicates dropped. TuneIn and playlist links are turned into
+  the real stream (`resolveStream`): the chosen station before playing (so HLS is detected), the others by a
+  `ResolvingDataSource` in the live player factory.
+- In-app station finder (`radio_web?url=`, `RadioWebScreen.kt`): StreamURL.link and FMSTREAM open in a WebView;
+  tapped stream links, background player requests, audio downloads and long-pressed links are caught
+  (`looksLikeStream`) and offered as Play / Add station.
 - Add station: paste a stream link (`RadioDirectory.addCustom`, id `radio:custom-<hash>`); .pls/.m3u playlist links
   are opened to find the stream. The screen links out to StreamURL.link and FMSTREAM for finding links (neither
   has a public API, and FMSTREAM blocks automated access, so they aren't searched in-app).
@@ -272,3 +280,4 @@ To see the exact diff at any time:
 - 2026-11-03: Podcasts and Audiobooks moved from Library chips to their own bottom tabs.
 - 2026-11-03: Side menu; News as its own tab; internet radio; Navidrome / Subsonic; combined New episodes.
 - 2026-11-03: Radio: add stations from pasted stream links; links to StreamURL.link and FMSTREAM.
+- 2026-11-03: Radio: TuneIn and region/genre search; in-app station finder for StreamURL.link and FMSTREAM.

@@ -16,6 +16,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -53,6 +55,8 @@ data class RadioStation(
     val codec: String? = null,
     val bitrate: Int = 0,
     val hls: Boolean = false,
+    /** Where it came from when not Radio Browser, e.g. "TuneIn" or "Added by you". */
+    val source: String? = null,
 ) {
     val songId get() = RADIO_ID_PREFIX + id
 
@@ -63,6 +67,7 @@ data class RadioStation(
             tags?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.take(3)?.joinToString(", ")?.takeIf { it.isNotEmpty() },
             listOfNotNull(codec?.takeIf { it.isNotBlank() && it != "UNKNOWN" }, bitrate.takeIf { it > 0 }?.let { "${it}k" })
                 .joinToString(" ").takeIf { it.isNotEmpty() },
+            source,
         ).joinToString(" · ")
 }
 
@@ -85,6 +90,7 @@ constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val favouritesFile = File(context.filesDir, "radio_favourites.json")
     private val known = ConcurrentHashMap<String, RadioStation>()
+    private val resolved = ConcurrentHashMap<String, Pair<String, Boolean>>()
 
     private val _favourites = MutableStateFlow(loadFavourites())
     val favourites = _favourites.asStateFlow()
@@ -100,8 +106,59 @@ constructor(
     /** Country used for "Popular near you": the phone's region, or Australia. */
     val homeCountry: String = Locale.getDefault().country.takeIf { it.length == 2 } ?: "AU"
 
-    suspend fun search(name: String): List<RadioStation> =
-        query("/json/stations/search", "name" to name, "limit" to "80")
+    /**
+     * Searches every directory at once: Radio Browser by name, region (state) and genre tag, plus
+     * TuneIn (which also matches cities). Name matches come first; duplicates are dropped.
+     */
+    suspend fun search(text: String): List<RadioStation> = coroutineScope {
+        val byName = async { runCatching { query("/json/stations/search", "name" to text, "limit" to "60") }.getOrNull() }
+        val byState = async { runCatching { query("/json/stations/search", "state" to text, "limit" to "40") }.getOrNull() }
+        val byTag = async { runCatching { query("/json/stations/search", "tag" to text.lowercase(Locale.ROOT), "limit" to "40") }.getOrNull() }
+        val tuneIn = async { runCatching { tuneInSearch(text) }.onFailure { Timber.tag(TAG).w(it, "TuneIn search failed") }.getOrNull() }
+        val results = listOf(byName.await(), tuneIn.await(), byState.await(), byTag.await())
+        if (results.all { it == null }) throw IOException("Radio directories unavailable")
+        val seen = HashSet<String>()
+        results.flatMap { it.orEmpty() }.filter { seen.add(normalize(it.name)) }
+    }
+
+    /** TuneIn's public station search (the same one many open-source radio apps use). */
+    private suspend fun tuneInSearch(text: String): List<RadioStation> = withContext(Dispatchers.IO) {
+        val url = "$TUNEIN/Search.ashx".toHttpUrl().newBuilder()
+            .addQueryParameter("render", "json")
+            .addQueryParameter("types", "station")
+            .addQueryParameter("query", text)
+            .build()
+        val body = http.newCall(Request.Builder().url(url).header("User-Agent", USER_AGENT).build()).execute().use {
+            if (!it.isSuccessful) throw IOException("TuneIn error ${it.code}")
+            it.body?.string().orEmpty()
+        }
+        val items = (json.parseToJsonElement(body) as? JsonObject)?.get("body") as? kotlinx.serialization.json.JsonArray
+            ?: return@withContext emptyList()
+        flatten(items)
+            .filter { it.string("type") == "audio" && it.string("guide_id")?.startsWith("s") == true }
+            .mapNotNull { item ->
+                val guideId = item.string("guide_id") ?: return@mapNotNull null
+                RadioStation(
+                    id = "tunein-$guideId",
+                    name = item.string("text")?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null,
+                    streamUrl = "$TUNEIN/Tune.ashx?id=$guideId",
+                    favicon = item.string("image")?.takeIf { it.startsWith("http") }?.replaceFirst("http://", "https://"),
+                    tags = item.string("subtext"),
+                    codec = item.string("formats")?.uppercase(Locale.ROOT),
+                    bitrate = item.string("bitrate")?.toIntOrNull() ?: 0,
+                    source = "TuneIn",
+                )
+            }
+            .onEach { known[it.songId] = it }
+    }
+
+    private fun flatten(items: kotlinx.serialization.json.JsonArray): List<JsonObject> =
+        items.mapNotNull { it as? JsonObject }.flatMap { item ->
+            val children = item["children"] as? kotlinx.serialization.json.JsonArray
+            if (children != null) flatten(children) else listOf(item)
+        }
+
+    private fun normalize(name: String) = name.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }
 
     suspend fun popular(countryCode: String = homeCountry): List<RadioStation> =
         query("/json/stations/search", "countrycode" to countryCode, "limit" to "100")
@@ -157,6 +214,7 @@ constructor(
 
     /** Where to stream a station from, and whether it's HLS; falls back to the saved song. */
     fun stream(songId: String): Pair<String, Boolean>? {
+        resolved[songId]?.let { return it }
         known[songId]?.let { return it.streamUrl to it.hls }
         val url = kotlinx.coroutines.runBlocking(Dispatchers.IO) { database.getSongById(songId)?.song?.localPath }
             ?: return null
@@ -178,8 +236,8 @@ constructor(
      * Adds a station from a pasted stream link (e.g. found on StreamURL.link or FMSTREAM) and saves it
      * to favourites. Playlist links (.pls / .m3u) are opened to find the actual stream.
      */
-    suspend fun addCustom(name: String, link: String): RadioStation = withContext(Dispatchers.IO) {
-        val url = streamFromPlaylist(link.trim()) ?: link.trim()
+    suspend fun addCustom(name: String, link: String, favourite: Boolean = true): RadioStation = withContext(Dispatchers.IO) {
+        val url = runCatching { resolveStream(link.trim()) }.getOrNull() ?: link.trim()
         if (url.toHttpUrlOrNull() == null) throw IOException("That doesn't look like a stream link.")
         val station = RadioStation(
             id = "custom-" + java.security.MessageDigest.getInstance("SHA-1").digest(url.toByteArray())
@@ -187,24 +245,59 @@ constructor(
             name = name.trim().ifEmpty { url.toHttpUrlOrNull()?.host ?: "Radio stream" },
             streamUrl = url,
             hls = url.contains(".m3u8", ignoreCase = true),
+            source = "Added by you",
         )
         known[station.songId] = station
-        setFavourite(station, true)
+        if (favourite) setFavourite(station, true)
         station
     }
 
-    /** For .pls and .m3u playlist links, the first stream inside; null for anything else. */
+    /**
+     * Before playing a station picked from a list: works out its real stream (TuneIn and playlist
+     * links point at a list of streams), so the player knows if it's HLS. Others resolve while loading.
+     */
+    suspend fun resolveForPlay(station: RadioStation) = withContext(Dispatchers.IO) {
+        if (!needsResolving(station.streamUrl)) return@withContext
+        runCatching { resolveStream(station.streamUrl) }.getOrNull()?.let { url ->
+            resolved[station.songId] = url to (station.hls || url.contains(".m3u8", ignoreCase = true))
+        }
+    }
+
+    fun needsResolving(url: String): Boolean {
+        val path = url.substringBefore('?').lowercase(Locale.ROOT)
+        return url.contains("radiotime.com/Tune.ashx", ignoreCase = true) ||
+            path.endsWith(".pls") || path.endsWith(".asx") || (path.endsWith(".m3u") && !path.endsWith(".m3u8"))
+    }
+
+    /** Turns a TuneIn or playlist link into a playable stream URL (blocking; call off the main thread). */
+    fun resolveStream(link: String): String {
+        var url = link
+        if (url.contains("radiotime.com/Tune.ashx", ignoreCase = true)) {
+            val tuneUrl = url.toHttpUrl().newBuilder().setQueryParameter("render", "json").build()
+            val body = http.newCall(Request.Builder().url(tuneUrl).header("User-Agent", USER_AGENT).build()).execute().use {
+                if (!it.isSuccessful) throw IOException("TuneIn error ${it.code}")
+                it.body?.string().orEmpty()
+            }
+            val streams = ((json.parseToJsonElement(body) as? JsonObject)?.get("body") as? kotlinx.serialization.json.JsonArray)
+                ?.mapNotNull { it as? JsonObject }.orEmpty()
+            val best = streams.firstOrNull { it.string("is_direct") == "true" } ?: streams.firstOrNull()
+            url = best?.string("url") ?: throw IOException("TuneIn has no stream for this station")
+        }
+        return streamFromPlaylist(url) ?: url
+    }
+
+    /** For .pls, .m3u and .asx playlist links, the first stream inside; null for anything else. */
     private fun streamFromPlaylist(link: String): String? {
         val path = link.substringBefore('?').lowercase()
-        if (!path.endsWith(".pls") && !(path.endsWith(".m3u") && !path.endsWith(".m3u8"))) return null
+        if (!path.endsWith(".pls") && !path.endsWith(".asx") && !(path.endsWith(".m3u") && !path.endsWith(".m3u8"))) return null
         return runCatching {
             val body = http.newCall(Request.Builder().url(link).header("User-Agent", USER_AGENT).build()).execute().use {
                 if (!it.isSuccessful) return null
                 it.body?.string().orEmpty()
             }
             body.lineSequence()
-                .map { it.trim().substringAfter('=', it.trim()).trim() }
-                .firstOrNull { it.startsWith("http://") || it.startsWith("https://") }
+                .map { line -> line.trim().let { Regex("https?://[^\\s\"'<>]+").find(it)?.value.orEmpty() } }
+                .firstOrNull { it.isNotEmpty() }
         }.getOrNull()
     }
 
@@ -270,6 +363,7 @@ constructor(
         private const val TAG = "RadioDirectory"
         const val ALBUM_NAME = "Internet radio"
         private const val USER_AGENT = "Wavelength/1.0"
+        private const val TUNEIN = "https://opml.radiotime.com"
         private val SERVERS = listOf(
             "https://de1.api.radio-browser.info",
             "https://nl1.api.radio-browser.info",

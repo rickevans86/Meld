@@ -29,7 +29,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -68,7 +67,7 @@ import com.metrolist.music.viewmodels.RadioViewModel
 /** Internet radio: favourites, popular stations near you, genres and search. */
 @Composable
 fun RadioScreen(
-    @Suppress("UNUSED_PARAMETER") navController: NavController,
+    navController: NavController,
     viewModel: RadioViewModel = hiltViewModel(),
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -81,7 +80,6 @@ fun RadioScreen(
     val current by playerConnection.mediaMetadata.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     var addDialogLink by rememberSaveable { mutableStateOf<String?>(null) }
-    val uriHandler = LocalUriHandler.current
     val shown = if (list is RadioList.Favourites) favourites else stations
     val pastedLink = com.metrolist.music.podcasts.PodcastDirectory.linkIn(query)
 
@@ -178,8 +176,12 @@ fun RadioScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { uriHandler.openUri("https://streamurl.link/") }) { Text("StreamURL.link") }
-                        TextButton(onClick = { uriHandler.openUri("https://fmstream.org/") }) { Text("FMSTREAM") }
+                        TextButton(onClick = { navController.navigate("radio_web?url=" + android.net.Uri.encode("https://streamurl.link/")) }) {
+                            Text("StreamURL.link")
+                        }
+                        TextButton(onClick = { navController.navigate("radio_web?url=" + android.net.Uri.encode("https://fmstream.org/")) }) {
+                            Text("FMSTREAM")
+                        }
                         TextButton(onClick = { addDialogLink = "" }) { Text(stringResource(R.string.radio_add_station)) }
                     }
                 }
@@ -251,13 +253,14 @@ fun RadioScreen(
 }
 
 @Composable
-private fun AddStationDialog(
+internal fun AddStationDialog(
     initialLink: String,
+    initialName: String = "",
     onDismiss: () -> Unit,
     onAdd: (name: String, link: String, onError: (String) -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
-    var name by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf(initialName) }
     var link by rememberSaveable { mutableStateOf(initialLink) }
     var adding by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }

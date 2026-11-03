@@ -96,6 +96,16 @@ constructor(
         }
     }
 
+    /** Plays a stream link found while browsing a station website, without saving it. */
+    fun playLink(name: String, link: String, onReady: (Song) -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                val station = directory.addCustom(name, link, favourite = false)
+                directory.prepare(listOf(station)).first()
+            }.onSuccess(onReady).onFailure { onError(it.message ?: "Couldn't play that stream.") }
+        }
+    }
+
     fun isFavourite(station: RadioStation) = favourites.value.any { it.id == station.id }
 
     fun toggleFavourite(station: RadioStation) = directory.setFavourite(station, !isFavourite(station))
@@ -103,6 +113,7 @@ constructor(
     /** Queues the shown stations so next/previous flip between them, starting at [index]. */
     fun play(stations: List<RadioStation>, index: Int, onReady: (List<Song>, Int) -> Unit) {
         viewModelScope.launch {
+            directory.resolveForPlay(stations[index])
             val songs = runCatching { directory.prepare(stations) }.getOrDefault(emptyList())
             val start = songs.indexOfFirst { it.id == stations[index].songId }
             if (start >= 0) onReady(songs, start)

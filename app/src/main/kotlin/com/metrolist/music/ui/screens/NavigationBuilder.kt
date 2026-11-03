@@ -126,6 +126,21 @@ fun NavGraphBuilder.navigationBuilder(
         com.metrolist.music.ui.screens.radio.RadioScreen(navController)
     }
 
+    composable(
+        route = "radio_web?url={url}",
+        arguments = listOf(
+            navArgument("url") {
+                type = NavType.StringType
+                defaultValue = "https://streamurl.link/"
+            },
+        ),
+    ) { backStackEntry ->
+        com.metrolist.music.ui.screens.radio.RadioWebScreen(
+            navController,
+            startUrl = backStackEntry.arguments?.getString("url") ?: "https://streamurl.link/",
+        )
+    }
+
     composable("subsonic") {
         com.metrolist.music.ui.screens.subsonic.SubsonicScreen(navController)
     }
