@@ -207,6 +207,12 @@ fun LibraryPodcastsScreen(
                     onValueUpdate = { podcastFilter = it },
                     modifier = Modifier.weight(1f),
                 )
+                IconButton(onClick = { navController.navigate("podcast_directory") }) {
+                    Icon(
+                        painter = painterResource(R.drawable.search),
+                        contentDescription = stringResource(R.string.podcast_directory),
+                    )
+                }
             }
         }
 

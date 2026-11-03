@@ -1245,6 +1245,16 @@
     <string name="abs_downloaded_prefix">Downloaded · %s</string>
     <string name="auto_all_audiobookshelf_books">All Audiobookshelf books</string>
     <string name="auto_saved_episodes">Saved episodes</string>
+    <string name="podcast_directory">Find podcasts</string>
+    <string name="podcast_search_hint">Search all podcasts</string>
+    <string name="podcast_no_results">No podcasts match that search.</string>
+    <string name="podcast_following">Following</string>
+    <string name="podcast_spotify_shows">Your Spotify podcasts</string>
+    <string name="podcast_directory_intro">Search nearly every public podcast. Shows you follow, and the podcasts saved in your Spotify library, appear here.</string>
+    <string name="podcast_episode_count">%d episodes</string>
+    <string name="podcast_play_latest">Play latest</string>
+    <string name="podcast_follow">Follow</string>
+    <string name="podcast_unfollow">Following</string>
     <string name="music_folders">Music folders</string>
     <string name="music_folders_desc">Choose which folders on your phone show up in Local files</string>
     <string name="music_folders_intro">Ticked folders show up in Local files. Folders with songs are ticked to start with; tick any other folder to add it.</string>

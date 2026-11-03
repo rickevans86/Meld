@@ -14,6 +14,14 @@ fun isAbsTrackId(mediaId: String?): Boolean = mediaId?.startsWith(ABS_TRACK_ID_P
 
 fun isAudiobookId(mediaId: String?): Boolean = mediaId?.startsWith(AUDIOBOOK_ID_PREFIX) == true
 
-/** Media played straight from a file on the device rather than streamed. */
+/** Podcast episodes played from their public feed: "podcast:<episode hash>". */
+const val PODCAST_EPISODE_ID_PREFIX = "podcast:"
+
+/**
+ * Media whose stored path is played directly (a file on the device, an Audiobookshelf file
+ * or a podcast feed's audio URL) rather than resolved through YouTube.
+ */
 fun isOnDeviceMediaId(mediaId: String): Boolean =
-    mediaId.startsWith("local:") || mediaId.startsWith(AUDIOBOOK_ID_PREFIX)
+    mediaId.startsWith("local:") ||
+        mediaId.startsWith(AUDIOBOOK_ID_PREFIX) ||
+        mediaId.startsWith(PODCAST_EPISODE_ID_PREFIX)

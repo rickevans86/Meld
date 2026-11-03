@@ -401,6 +401,10 @@ fun NavGraphBuilder.navigationBuilder(
         LocalMusicFoldersSettings(navController)
     }
 
+    composable("podcast_directory") {
+        com.metrolist.music.ui.screens.podcast.PodcastDirectoryScreen(navController)
+    }
+
     composable("settings/privacy") {
         PrivacySettings(navController)
     }

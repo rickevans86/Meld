@@ -681,6 +681,66 @@ object Spotify {
         )
     }
 
+    // ── Library podcasts (GQL: libraryV3 with Podcasts filter) ──────────
+
+    /** Podcasts saved in the user's library. Uses the existing libraryV3 operation, so no new hash. */
+    suspend fun myShows(
+        limit: Int = 50,
+        offset: Int = 0,
+    ): Result<SpotifyPaging<com.metrolist.spotify.models.SpotifyShow>> =
+        runCatching {
+            val vars =
+                buildJsonObject {
+                    putJsonArray("filters") { add("Podcasts") }
+                    put("order", null as String?)
+                    put("textFilter", "")
+                    putJsonArray("features") {
+                        add("LIKED_SONGS")
+                        add("YOUR_EPISODES_V2")
+                        add("PRERELEASES")
+                        add("EVENTS")
+                    }
+                    put("limit", limit)
+                    put("offset", offset)
+                    put("flatten", true)
+                    putJsonArray("expandedFolders") {}
+                    put("folderUri", null as String?)
+                    put("includeFoldersWhenFlattening", false)
+                }
+
+            val libraryData =
+                graphqlPost(operationName = "libraryV3", variables = vars)
+                    .obj("data")?.obj("me")?.obj("libraryV3")
+                    ?: throw SpotifyException(500, "Invalid libraryV3 response")
+
+            val shows =
+                libraryData.arr("items").orEmpty().mapNotNull { itemElem ->
+                    val wrapper = itemElem.jsonObject.obj("item") ?: return@mapNotNull null
+                    val typeName = wrapper.str("__typename") ?: ""
+                    if (!typeName.contains("Podcast", ignoreCase = true) &&
+                        !typeName.contains("Show", ignoreCase = true)
+                    ) return@mapNotNull null
+                    val data = wrapper.obj("data") ?: return@mapNotNull null
+                    val uri = wrapper.str("_uri") ?: data.str("uri") ?: return@mapNotNull null
+                    if (!uri.contains(":show:")) return@mapNotNull null
+                    val cover = (data.obj("coverArt") ?: data.obj("images"))?.arr("sources")
+                    com.metrolist.spotify.models.SpotifyShow(
+                        id = uri.substringAfterLast(":"),
+                        name = data.str("name") ?: return@mapNotNull null,
+                        publisher = data.obj("publisher")?.str("name") ?: data.str("publisher"),
+                        imageUrl = parseGqlImages(cover).maxByOrNull { it.width ?: 0 }?.url,
+                        uri = uri,
+                    )
+                }
+
+            SpotifyPaging(
+                items = shows,
+                total = libraryData.int("totalCount") ?: shows.size,
+                limit = limit,
+                offset = offset,
+            )
+        }
+
     // ── Library Artists (GQL: libraryV3 with Artists filter) ───────────
 
     suspend fun myArtists(
