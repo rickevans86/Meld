@@ -39,6 +39,7 @@ import com.metrolist.music.ui.component.ReleaseNotesCard
 import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.utils.Updater
 import androidx.compose.runtime.remember
+import com.metrolist.music.utils.UpdateInstaller
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -254,7 +255,7 @@ fun SettingsScreen(
                                     )
                                 },
                                 showBadge = true,
-                                onClick = { uriHandler.openUri(downloadUrl) }
+                                onClick = { UpdateInstaller.start(context, downloadUrl) }
                             )
                         )
                     }

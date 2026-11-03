@@ -45,11 +45,14 @@ import com.metrolist.music.ui.component.IconButton
 import com.metrolist.music.ui.component.Material3SettingsGroup
 import com.metrolist.music.ui.component.Material3SettingsItem
 import com.metrolist.music.ui.utils.backToMain
+import com.metrolist.music.utils.UpdateDownloadState
+import com.metrolist.music.utils.UpdateInstaller
 import com.metrolist.music.utils.Updater
 import com.metrolist.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.collectAsState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -215,7 +218,27 @@ fun UpdaterScreen(
         }
 
         if (updateAvailable && latestVersion != null) {
+            val downloadState by UpdateInstaller.state.collectAsState()
+            val downloadUrl = Updater.getCachedLatestRelease()?.let { Updater.getDownloadUrlForCurrentVariant(it) }
             Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { downloadUrl?.let { UpdateInstaller.start(context, it) } },
+                enabled = downloadUrl != null && downloadState !is UpdateDownloadState.Downloading,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+            ) {
+                val state = downloadState
+                Text(
+                    if (state is UpdateDownloadState.Downloading) {
+                        stringResource(R.string.update_downloading, (state.progress * 100).toInt())
+                    } else {
+                        stringResource(R.string.update_install)
+                    },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
             Button(
                 onClick = { showChangelog = !showChangelog },
                 modifier =

@@ -229,6 +229,7 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
+import com.metrolist.music.utils.UpdateInstaller
 
 private data class AvailableUpdate(
     val release: ReleaseInfo,
@@ -1505,7 +1506,7 @@ class MainActivity : FragmentActivity() {
                                     TextButton(
                                         onClick = {
                                             dismissUpdate()
-                                            startActivity(Intent(Intent.ACTION_VIEW, update.downloadUrl.toUri()))
+                                            UpdateInstaller.start(this@MainActivity, update.downloadUrl)
                                         },
                                     ) {
                                         Text(

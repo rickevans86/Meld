@@ -91,6 +91,7 @@ jobs:
           }
         env:
           PULL_REQUEST: "false"
+          METROLIST_APP_NAME: Wavelength
 
       - name: Collect APK
         run: |
