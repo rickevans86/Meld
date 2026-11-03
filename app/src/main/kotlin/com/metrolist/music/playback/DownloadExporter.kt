@@ -14,6 +14,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
 import com.metrolist.music.constants.DownloadExportFolderKey
+import com.metrolist.music.constants.DownloadPlaylistFoldersKey
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.get
@@ -40,23 +41,24 @@ class DownloadExporter(
     fun folderUri(): Uri? =
         context.dataStore[DownloadExportFolderKey]?.takeIf { it.isNotBlank() }?.toUri()
 
+    /** Whether saved files go into one folder per playlist (a copy in each playlist the song is in). */
+    fun sortsByPlaylist(): Boolean = context.dataStore[DownloadPlaylistFoldersKey] ?: true
+
     suspend fun export(songId: String): Boolean = withContext(Dispatchers.IO) {
         val treeUri = folderUri() ?: return@withContext false
-        lock.withLock {
-            exportTo(treeUri, songId, existingNames(treeUri))
-        }
+        lock.withLock { exportTo(songId, FolderCache(treeUri)) }
     }
 
     /** Returns how many songs are now present in the folder. */
     suspend fun exportAll(songIds: Collection<String>): Int = withContext(Dispatchers.IO) {
         val treeUri = folderUri() ?: return@withContext 0
         lock.withLock {
-            val existing = existingNames(treeUri)
-            songIds.count { exportTo(treeUri, it, existing) }
+            val cache = FolderCache(treeUri)
+            songIds.count { exportTo(it, cache) }
         }
     }
 
-    private suspend fun exportTo(treeUri: Uri, songId: String, existing: MutableSet<String>): Boolean {
+    private suspend fun exportTo(songId: String, folders: FolderCache): Boolean {
         val song = database.getSongByIdBlocking(songId) ?: return false
         val resolver = context.contentResolver
         return try {
@@ -66,7 +68,22 @@ class DownloadExporter(
             val title = if (artist.isBlank()) song.song.title else "$artist - ${song.song.title}"
             val baseName = sanitizeFileName(title, songId)
             val m4aName = "$baseName.m4a"
-            if (m4aName in existing || "$baseName.$sourceExtension" in existing) return true
+
+            val folderNames = if (sortsByPlaylist()) {
+                database.playlistNamesForSong(songId)
+                    .map { sanitizeFileName(it, "Playlist") }
+                    .distinct()
+                    .ifEmpty { listOf("") }
+            } else {
+                listOf("")
+            }
+            val targets = folderNames
+                .mapNotNull(folders::directoryId)
+                .filter { dirId ->
+                    val names = folders.names(dirId)
+                    m4aName !in names && "$baseName.$sourceExtension" !in names
+                }
+            if (targets.isEmpty()) return true
 
             val workDir = File(context.cacheDir, "download_export").apply { mkdirs() }
             val safeId = songId.replace(Regex("[^A-Za-z0-9_-]"), "_")
@@ -86,23 +103,22 @@ class DownloadExporter(
                     }
                 }
 
-                val parent = DocumentsContract.buildDocumentUriUsingTree(
-                    treeUri,
-                    DocumentsContract.getTreeDocumentId(treeUri),
-                )
-                // octet-stream stops providers from appending their own extension to the name
-                val target = DocumentsContract.createDocument(
-                    resolver, parent, "application/octet-stream", displayName,
-                ) ?: return false
-                try {
-                    val output = resolver.openOutputStream(target)
-                        ?: throw IOException("Could not open $target for writing")
-                    output.use { out -> fileToSave.inputStream().use { it.copyTo(out) } }
-                } catch (e: Exception) {
-                    runCatching { DocumentsContract.deleteDocument(resolver, target) }
-                    throw e
+                for (dirId in targets) {
+                    val parent = DocumentsContract.buildDocumentUriUsingTree(folders.treeUri, dirId)
+                    // octet-stream stops providers from appending their own extension to the name
+                    val target = DocumentsContract.createDocument(
+                        resolver, parent, "application/octet-stream", displayName,
+                    ) ?: continue
+                    try {
+                        val output = resolver.openOutputStream(target)
+                            ?: throw IOException("Could not open $target for writing")
+                        output.use { out -> fileToSave.inputStream().use { it.copyTo(out) } }
+                    } catch (e: Exception) {
+                        runCatching { DocumentsContract.deleteDocument(resolver, target) }
+                        throw e
+                    }
+                    folders.names(dirId).add(displayName)
                 }
-                existing += displayName
                 true
             } finally {
                 source.delete()
@@ -114,22 +130,55 @@ class DownloadExporter(
         }
     }
 
-    private fun existingNames(treeUri: Uri): MutableSet<String> {
-        val names = HashSet<String>()
-        runCatching {
-            val children = DocumentsContract.buildChildDocumentsUriUsingTree(
-                treeUri,
-                DocumentsContract.getTreeDocumentId(treeUri),
-            )
-            context.contentResolver.query(
-                children,
-                arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
-                null, null, null,
-            )?.use { cursor ->
-                while (cursor.moveToNext()) cursor.getString(0)?.let(names::add)
+    /** Folder ids and file names inside the chosen tree, read once per export run. */
+    private inner class FolderCache(val treeUri: Uri) {
+        private val rootId = DocumentsContract.getTreeDocumentId(treeUri)
+        private val namesByDir = HashMap<String, MutableSet<String>>()
+        private val subfolders: MutableMap<String, String> by lazy {
+            HashMap<String, String>().also { map ->
+                listChildren(rootId) { id, name, mime ->
+                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) map[name] = id
+                }
             }
-        }.onFailure { Timber.tag(TAG).w(it, "Could not list download folder") }
-        return names
+        }
+
+        /** The root for "", otherwise the named subfolder, created when missing. */
+        fun directoryId(name: String): String? {
+            if (name.isEmpty()) return rootId
+            subfolders[name]?.let { return it }
+            return runCatching {
+                val created = DocumentsContract.createDocument(
+                    context.contentResolver,
+                    DocumentsContract.buildDocumentUriUsingTree(treeUri, rootId),
+                    DocumentsContract.Document.MIME_TYPE_DIR,
+                    name,
+                ) ?: return null
+                DocumentsContract.getDocumentId(created).also { subfolders[name] = it }
+            }.onFailure { Timber.tag(TAG).w(it, "Could not create folder $name") }.getOrNull()
+        }
+
+        fun names(dirId: String): MutableSet<String> = namesByDir.getOrPut(dirId) {
+            HashSet<String>().also { set -> listChildren(dirId) { _, name, _ -> set += name } }
+        }
+
+        private fun listChildren(dirId: String, onChild: (id: String, name: String, mime: String) -> Unit) {
+            runCatching {
+                context.contentResolver.query(
+                    DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, dirId),
+                    arrayOf(
+                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                        DocumentsContract.Document.COLUMN_MIME_TYPE,
+                    ),
+                    null, null, null,
+                )?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getString(0) ?: continue
+                        onChild(id, cursor.getString(1).orEmpty(), cursor.getString(2).orEmpty())
+                    }
+                }
+            }.onFailure { Timber.tag(TAG).w(it, "Could not list download folder") }
+        }
     }
 
     private fun openCache(songId: String) =

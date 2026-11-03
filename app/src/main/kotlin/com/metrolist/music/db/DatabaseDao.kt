@@ -284,6 +284,20 @@ interface DatabaseDao {
     )
     fun songsInBookmarkedPlaylists(): Flow<List<Song>>
 
+    @Query(
+        """
+        SELECT DISTINCT playlist.name
+        FROM playlist
+        JOIN playlist_song_map ON playlist_song_map.playlistId = playlist.id
+        WHERE playlist_song_map.songId = :songId
+        ORDER BY playlist.name
+        """,
+    )
+    fun playlistNamesForSong(songId: String): List<String>
+
+    @Query("SELECT COUNT(*) FROM playlist_song_map")
+    fun playlistSongMapCount(): Flow<Int>
+
     @Transaction
     @Query(
         "SELECT song.* FROM song_artist_map JOIN song ON song_artist_map.songId = song.id WHERE artistId = :artistId AND inLibrary IS NOT NULL ORDER BY inLibrary",

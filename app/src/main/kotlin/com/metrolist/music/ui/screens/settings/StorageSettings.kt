@@ -59,6 +59,7 @@ import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
 import com.metrolist.music.constants.DownloadExportFolderKey
+import com.metrolist.music.constants.DownloadPlaylistFoldersKey
 import com.metrolist.music.constants.EnableSongCacheKey
 import com.metrolist.music.constants.MaxImageCacheSizeKey
 import com.metrolist.music.constants.MaxSongCacheSizeKey
@@ -122,6 +123,10 @@ fun StorageSettings(
         defaultValue = ""
     )
     var savingDownloads by remember { mutableStateOf(false) }
+    val (playlistFolders, onPlaylistFoldersChange) = rememberPreference(
+        key = DownloadPlaylistFoldersKey,
+        defaultValue = true
+    )
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
@@ -394,6 +399,20 @@ fun StorageSettings(
                     },
                     onClick = { folderPicker.launch(null) },
                 ),
+                if (downloadFolder.isNotBlank()) {
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.queue_music),
+                        title = { Text(stringResource(R.string.download_folder_by_playlist)) },
+                        description = { Text(stringResource(R.string.download_folder_by_playlist_desc)) },
+                        trailingContent = {
+                            Switch(
+                                checked = playlistFolders,
+                                onCheckedChange = onPlaylistFoldersChange,
+                            )
+                        },
+                        onClick = { onPlaylistFoldersChange(!playlistFolders) },
+                    )
+                } else null,
                 if (downloadFolder.isNotBlank() && downloadUtil != null) {
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.download),

@@ -42,6 +42,10 @@ import com.metrolist.music.utils.enumPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.SupervisorJob
@@ -309,6 +313,20 @@ constructor(
             result.values
                 .filter { it.state == Download.STATE_COMPLETED }
                 .forEach { removeFromPlayerCache(it.request.id) }
+        }
+        // When downloaded songs are added to playlists, copy them into those playlists' folders
+        scope.launch {
+            @OptIn(FlowPreview::class)
+            database.playlistSongMapCount()
+                .distinctUntilChanged()
+                .drop(1)
+                .debounce(15_000)
+                .collect {
+                    if (exporter.folderUri() != null && exporter.sortsByPlaylist()) {
+                        val completed = downloads.value.filterValues { it.state == Download.STATE_COMPLETED }.keys
+                        exporter.exportAll(completed)
+                    }
+                }
         }
     }
 
