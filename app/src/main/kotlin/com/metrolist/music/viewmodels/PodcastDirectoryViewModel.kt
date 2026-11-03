@@ -27,7 +27,8 @@ sealed interface ShowPage {
     val title: String
 
     data class Loading(override val title: String) : ShowPage
-    data class Ready(val feed: PodcastFeed) : ShowPage {
+    /** [songs] are the feed's episodes saved as songs, in the same order, so they get the full song menu. */
+    data class Ready(val feed: PodcastFeed, val songs: List<Song>) : ShowPage {
         override val title get() = feed.show.title
     }
     data class Unavailable(override val title: String, val message: String) : ShowPage
@@ -113,12 +114,8 @@ constructor(
 
     /** Turns the open show's episodes into songs and hands them to [onReady] with the start index. */
     fun play(episodeIndex: Int, onReady: (List<Song>, Int) -> Unit) {
-        val feed = (_page.value as? ShowPage.Ready)?.feed ?: return
-        viewModelScope.launch {
-            runCatching { directory.prepare(feed) }
-                .onSuccess { songs -> if (songs.isNotEmpty()) onReady(songs, episodeIndex.coerceIn(0, songs.lastIndex)) }
-                .onFailure { _message.value = "Couldn't start that episode." }
-        }
+        val songs = (_page.value as? ShowPage.Ready)?.songs ?: return
+        if (songs.isNotEmpty()) onReady(songs, episodeIndex.coerceIn(0, songs.lastIndex))
     }
 
     fun dismissMessage() {
@@ -137,8 +134,11 @@ constructor(
                 )
                 return@launch
             }
-            runCatching { directory.feed(show) }
-                .onSuccess { _page.value = ShowPage.Ready(it) }
+            runCatching {
+                val feed = directory.feed(show)
+                ShowPage.Ready(feed, directory.prepare(feed))
+            }
+                .onSuccess { _page.value = it }
                 .onFailure {
                     _page.value = ShowPage.Unavailable(title, "Couldn't load this show's episodes. Try again later.")
                 }

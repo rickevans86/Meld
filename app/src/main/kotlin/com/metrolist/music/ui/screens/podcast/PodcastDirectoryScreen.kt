@@ -69,6 +69,10 @@ import com.metrolist.music.playback.queues.ListQueue
 import com.metrolist.music.podcasts.PodcastEpisode
 import com.metrolist.music.podcasts.PodcastShow
 import com.metrolist.music.ui.component.IconButton
+import com.metrolist.music.ui.component.LocalMenuState
+import com.metrolist.music.ui.component.SongListItem
+import com.metrolist.music.ui.menu.SongMenu
+import androidx.compose.material3.IconButton as PlainIconButton
 import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.viewmodels.PodcastDirectoryViewModel
 import com.metrolist.music.viewmodels.ShowPage
@@ -83,6 +87,8 @@ fun PodcastDirectoryScreen(
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState(initial = false)
+    val menuState = LocalMenuState.current
 
     val followed by viewModel.followed.collectAsState()
     val results by viewModel.results.collectAsState()
@@ -181,15 +187,37 @@ fun PodcastDirectoryScreen(
                         },
                     )
                 }
-                itemsIndexed(current.feed.episodes, key = { _, episode -> "episode:${episode.id}" }) { index, episode ->
-                    EpisodeRow(
-                        episode = episode,
-                        isCurrent = mediaMetadata?.id == PODCAST_EPISODE_ID_PREFIX + episode.id,
-                        onClick = {
-                            viewModel.play(index) { songs, start ->
-                                playerConnection.playQueue(queueOf(show.title, songs, start))
+                val episodesById = current.feed.episodes.associateBy { PODCAST_EPISODE_ID_PREFIX + it.id }
+                itemsIndexed(current.songs, key = { _, song -> "episode:${song.id}" }) { index, song ->
+                    val episode = episodesById[song.id]
+                    SongListItem(
+                        song = song,
+                        subtitleOverride = episode?.let { episodeDetails(it) },
+                        showLikedIcon = false,
+                        isActive = mediaMetadata?.id == song.id,
+                        isPlaying = isPlaying,
+                        trailingContent = {
+                            PlainIconButton(
+                                onClick = {
+                                    menuState.show {
+                                        SongMenu(originalSong = song, onDismiss = menuState::dismiss)
+                                    }
+                                },
+                            ) {
+                                Icon(painterResource(R.drawable.more_vert), contentDescription = null)
                             }
                         },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (song.id == mediaMetadata?.id) {
+                                    playerConnection.togglePlayPause()
+                                } else {
+                                    viewModel.play(index) { songs, start ->
+                                        playerConnection.playQueue(queueOf(show.title, songs, start))
+                                    }
+                                }
+                            },
                     )
                 }
             }
@@ -261,32 +289,13 @@ private fun ShowHeader(
 }
 
 @Composable
-private fun EpisodeRow(episode: PodcastEpisode, isCurrent: Boolean, onClick: () -> Unit) {
-    val details = listOfNotNull(
+private fun episodeDetails(episode: PodcastEpisode): String? =
+    listOfNotNull(
         episode.publishedAt?.let {
             DateUtils.formatDateTime(LocalContext.current, it, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH)
         },
         episode.durationSec?.takeIf { it > 0 }?.let { formatLength(it) },
-    ).joinToString(" · ")
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .then(if (isCurrent) Modifier.background(MaterialTheme.colorScheme.secondaryContainer) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Text(
-            episode.title,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (details.isNotEmpty()) {
-            Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
+    ).joinToString(" · ").ifEmpty { null }
 
 @Composable
 private fun ShowRow(title: String, author: String?, artworkUrl: String?, onClick: () -> Unit) {

@@ -28,6 +28,7 @@ import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertubex.extraction.ContentHints
 import com.metrolist.music.constants.AudioQuality
 import com.metrolist.music.constants.AudioQualityKey
+import com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.AlbumEntity
 import com.metrolist.music.db.entities.FormatEntity
@@ -112,6 +113,13 @@ constructor(
         ) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
             val length = if (dataSpec.length >= 0) dataSpec.length else 1
+
+            // Podcast-feed episodes download straight from the feed's audio URL
+            if (mediaId.startsWith(PODCAST_EPISODE_ID_PREFIX)) {
+                val audioUrl = runBlocking(Dispatchers.IO) { database.getSongById(mediaId)?.song?.localPath }
+                    ?: error("No audio URL for $mediaId")
+                return@Factory dataSpec.withUri(audioUrl.toUri())
+            }
 
             if (playerCache.isCached(mediaId, dataSpec.position, length)) {
                 return@Factory dataSpec

@@ -124,6 +124,8 @@ fun SongMenu(
     val songState = database.song(originalSong.id).collectAsStateWithLifecycle(initialValue = originalSong)
     val song = songState.value ?: originalSong
     val downloadUtil = LocalDownloadUtil.current
+    // Podcast-feed episodes, audiobooks and local files aren't YouTube songs: hide YouTube-only actions
+    val isFromYouTube = !com.metrolist.music.constants.isOnDeviceMediaId(originalSong.id)
     val download by downloadUtil
         .getDownload(originalSong.id)
         .collectAsStateWithLifecycle(initialValue = null)
@@ -494,7 +496,7 @@ fun SongMenu(
                                 ),
                             )
                         }
-                        coroutineScope.launch(Dispatchers.IO) {
+                        if (isFromYouTube) coroutineScope.launch(Dispatchers.IO) {
                             if (isCurrentlySaved) {
                                 val setVideoIdEntity = database.getSetVideoId(song.id)
                                 val setVideoId = setVideoIdEntity?.setVideoId
@@ -612,12 +614,19 @@ fun SongMenu(
                                     Intent().apply {
                                         action = Intent.ACTION_SEND
                                         type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/watch?v=${song.id}")
+                                        putExtra(
+                                            Intent.EXTRA_TEXT,
+                                            if (isFromYouTube) {
+                                                "https://music.youtube.com/watch?v=${song.id}"
+                                            } else {
+                                                song.song.localPath ?: song.song.title
+                                            },
+                                        )
                                     }
                                 context.startActivity(Intent.createChooser(intent, null))
                             },
                         ),
-                    ) + if (com.metrolist.spotify.Spotify.isAuthenticated()) {
+                    ) + if (isFromYouTube && com.metrolist.spotify.Spotify.isAuthenticated()) {
                         listOf(
                             NewAction(
                                 icon = {
@@ -670,7 +679,7 @@ fun SongMenu(
                         } else {
                             null
                         },
-                        if (!isGuest) {
+                        if (!isGuest && isFromYouTube) {
                             Material3MenuItemData(
                                 title = { Text(text = stringResource(R.string.start_radio)) },
                                 description = { Text(text = stringResource(R.string.start_radio_desc)) },
@@ -817,9 +826,11 @@ fun SongMenu(
                                                 )
                                             }
 
-                                            // Sync with YouTube (handles login check internally)
-                                            val setVideoId = if (isEpisodeSaved) database.getSetVideoId(song.id)?.setVideoId else null
-                                            syncUtils.saveEpisode(song.id, shouldBeSaved, setVideoId)
+                                            // Sync with YouTube (handles login check internally); podcast-feed episodes stay local
+                                            if (isFromYouTube) {
+                                                val setVideoId = if (isEpisodeSaved) database.getSetVideoId(song.id)?.setVideoId else null
+                                                syncUtils.saveEpisode(song.id, shouldBeSaved, setVideoId)
+                                            }
                                         }
                                         onDismiss()
                                     },
