@@ -32,6 +32,13 @@ fun LibraryScreen() {
     var libraryViewType by rememberEnumPreference(AlbumViewTypeKey, LibraryViewType.GRID)
     var playlistViewType by rememberEnumPreference(PlaylistViewTypeKey, LibraryViewType.GRID)
 
+    val localFilesHidden = com.metrolist.music.constants.WavelengthFeature.LOCAL_FILES in
+        com.metrolist.music.constants.rememberDisabledFeatures()
+    // Local files switched off in Settings → Features: go back to the main Library view
+    androidx.compose.runtime.LaunchedEffect(localFilesHidden, filterType) {
+        if (localFilesHidden && filterType == LibraryFilter.LOCAL_FILES) filterType = LibraryFilter.LIBRARY
+    }
+
     val filterContent = @Composable {
         Row {
             ChipsRow(
@@ -40,6 +47,7 @@ fun LibraryScreen() {
                     LibraryFilter.SONGS to stringResource(R.string.filter_songs),
                     LibraryFilter.ALBUMS to stringResource(R.string.filter_albums),
                     LibraryFilter.ARTISTS to stringResource(R.string.filter_artists),
+                ) + if (localFilesHidden) emptyList() else listOf(
                     LibraryFilter.LOCAL_FILES to stringResource(R.string.filter_local_files),
                 ),
                 currentValue = filterType,

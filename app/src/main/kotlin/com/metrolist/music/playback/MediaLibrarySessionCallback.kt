@@ -72,6 +72,7 @@ import kotlinx.coroutines.plus
 import javax.inject.Inject
 import com.metrolist.music.constants.AndroidAutoSearchLocalLimitKey
 import com.metrolist.music.constants.AndroidAutoSectionsOrderKey
+import com.metrolist.music.constants.hiddenAutoSections
 import com.metrolist.music.constants.AndroidAutoYouTubePlaylistsKey
 import com.metrolist.music.constants.AutoRadioQueueKey
 import com.metrolist.music.playback.queues.ListQueue
@@ -229,9 +230,11 @@ constructor(
                         // Android Auto can request ROOT children before App's async init finishes,
                         // which would otherwise hide Spotify sections until reconnect.
                         val spotifyLoggedIn = SpotifyTokenManager.ensureAuthenticated()
+                        // Features switched off in Settings → Features don't show in Android Auto
+                        val hiddenByFeatures = context.dataStore.data.first().hiddenAutoSections()
                         sections
                             .filter { (section, enabled) ->
-                                enabled && when (section) {
+                                enabled && section.id !in hiddenByFeatures && when (section) {
                                     AndroidAutoSection.SPOTIFY_LIKED,
                                     AndroidAutoSection.SPOTIFY_PLAYLISTS -> spotifyLoggedIn
                                     else -> true

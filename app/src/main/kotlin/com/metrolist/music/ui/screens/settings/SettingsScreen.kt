@@ -143,6 +143,21 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Wavelength features that can be switched off
+        Material3SettingsGroup(
+            title = stringResource(R.string.app_name),
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.tune),
+                    title = { Text(stringResource(R.string.features)) },
+                    description = { Text(stringResource(R.string.features_entry_desc)) },
+                    onClick = { navController.navigate("settings/features") }
+                )
+            )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Storage & Data Section
         Material3SettingsGroup(
             title = stringResource(R.string.settings_section_storage),

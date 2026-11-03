@@ -62,6 +62,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import com.metrolist.music.ui.component.WavelengthDrawer
+import com.metrolist.music.constants.hidesRoute
 import com.metrolist.music.ui.component.WavelengthDrawerSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -750,13 +751,15 @@ class MainActivity : FragmentActivity() {
                 val (previousTab, setPreviousTab) = rememberSaveable { mutableStateOf("home") }
 
                 val (listenTogetherInTopBar) = rememberPreference(ListenTogetherInTopBarKey, defaultValue = true)
+                // Tabs for features switched off in Settings → Features are hidden
+                val disabledFeatures = com.metrolist.music.constants.rememberDisabledFeatures()
                 val navigationItems =
-                    remember(listenTogetherInTopBar) {
+                    remember(listenTogetherInTopBar, disabledFeatures) {
                         if (listenTogetherInTopBar) {
                             Screens.MainScreens.filter { it != Screens.ListenTogether }
                         } else {
                             Screens.MainScreens
-                        }
+                        }.filterNot { disabledFeatures.hidesRoute(it.route) }
                     }
                 val routeIndexMap = remember(navigationItems) {
                     navigationItems.mapIndexed { i, s -> s.route to i }.toMap()

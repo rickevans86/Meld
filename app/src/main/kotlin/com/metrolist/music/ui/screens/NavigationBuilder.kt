@@ -444,6 +444,10 @@ fun NavGraphBuilder.navigationBuilder(
         SponsorBlockSettings(navController)
     }
 
+    composable("settings/features") {
+        com.metrolist.music.ui.screens.settings.FeaturesSettings(navController)
+    }
+
     composable("settings/storage") {
         StorageSettings(navController)
     }

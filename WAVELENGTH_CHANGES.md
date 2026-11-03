@@ -91,6 +91,18 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - Edited: `HomeViewModel.kt` (`useSpotifyHome` / `spotifyHomeOnly` / `load()` gating), `HomeScreen.kt` (sign-in
   hint), `SpotifySettings.kt`, `WavelengthDrawer.kt`, `NavigationBuilder.kt`, `MainActivity.kt` (title)
 
+### 0c. Features settings
+- Settings → Wavelength → **Features** (`settings/features`, `FeaturesSettings.kt`) turns off: the second music
+  source (whichever of YouTube/Spotify isn't the default home), News, Navidrome, Audiobooks, Podcasts, Local files
+  and Radio. Stored as `DisabledFeaturesKey` (set of ids); see `constants/Features.kt` (`WavelengthFeature`).
+- Turned-off features are hidden from the bottom bar (`navigationItems` in `MainActivity`), the side menu
+  (`WavelengthDrawerSheet`), Android Auto (`hiddenAutoSections()` filter on the root in
+  `MediaLibrarySessionCallback`), and for Local files the Library chip. Turning off Spotify as the second source
+  also hides the Spotify Android Auto sections.
+- New files: `constants/Features.kt`, `ui/screens/settings/FeaturesSettings.kt`
+- Edited: `MainActivity.kt`, `WavelengthDrawer.kt`, `MediaLibrarySessionCallback.kt`, `LibraryScreen.kt`,
+  `SettingsScreen.kt`, `NavigationBuilder.kt`
+
 ### 1. Local files: folder view and music folders
 - The Local files tab can switch between a song list and a folder view.
 - **Settings → Storage → Music folders** (`settings/local_folders`) can include or exclude MediaStore folders,
@@ -310,3 +322,4 @@ To see the exact diff at any time:
 - 2026-11-03: Navidrome: download whole albums/playlists/starred; exports into `Navidrome - ` folders.
 - 2026-11-04: Separate YouTube and Spotify homes, with a setting for which one is the Home tab.
 - 2026-11-04: Storage settings renamed Storage/Download; Wi-Fi only downloads that pause off Wi-Fi.
+- 2026-11-04: Features settings to turn off the second source, News, Navidrome, Audiobooks, Podcasts, Local files, Radio.

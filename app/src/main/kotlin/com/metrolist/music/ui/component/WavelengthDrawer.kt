@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Column
 import com.metrolist.music.R
+import com.metrolist.music.constants.hidesRoute
 
 /** One entry in the side menu. [topLevel] entries replace the current tab instead of stacking on it. */
 data class DrawerDestination(
@@ -78,6 +79,7 @@ fun WavelengthDrawerSheet(
 ) {
     val alternateIsSpotify = com.metrolist.music.constants.rememberDefaultHomeSource() !=
         com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
+    val disabled = com.metrolist.music.constants.rememberDisabledFeatures()
     ModalDrawerSheet {
         Column(
             modifier = Modifier
@@ -91,7 +93,7 @@ fun WavelengthDrawerSheet(
             )
             listOf(WavelengthDrawer.listen(alternateIsSpotify), WavelengthDrawer.browse, WavelengthDrawer.more).forEachIndexed { index, group ->
                 if (index > 0) HorizontalDivider(modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp))
-                group.forEach { destination ->
+                group.filterNot { disabled.hidesRoute(it.route) }.forEach { destination ->
                     NavigationDrawerItem(
                         label = { Text(stringResource(destination.title)) },
                         icon = { Icon(painterResource(destination.icon), contentDescription = null) },
