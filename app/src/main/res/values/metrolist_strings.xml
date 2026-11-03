@@ -1202,6 +1202,19 @@
     <string name="local_files_show_songs">Show all songs</string>
     <string name="local_files_back_to_folders">Back to folders</string>
     <string name="local_files_storage_root">Internal storage</string>
+    <string name="download_folder_section">Download folder</string>
+    <string name="download_folder">Save downloads as music files</string>
+    <string name="download_folder_off">Off. Tap to choose a folder; new downloads are also saved there as normal audio files</string>
+    <string name="download_folder_save_existing">Save existing downloads to folder</string>
+    <string name="download_folder_saving">Saving downloads…</string>
+    <string name="download_folder_stop">Stop saving to folder</string>
+    <string name="download_folder_stop_desc">Files already saved stay in the folder</string>
+    <string name="download_folder_set">Downloads will be saved to %s</string>
+    <string name="download_folder_failed">Couldn\'t use that folder. Pick a different one</string>
+    <plurals name="download_folder_saved">
+        <item quantity="one">%d song saved to the folder</item>
+        <item quantity="other">%d songs saved to the folder</item>
+    </plurals>
     <plurals name="n_local_folder">
         <item quantity="one">%d folder</item>
         <item quantity="other">%d folders</item>

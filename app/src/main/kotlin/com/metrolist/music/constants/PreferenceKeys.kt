@@ -16,6 +16,7 @@ import java.time.ZoneOffset
 val EnableHighRefreshRateKey = booleanPreferencesKey("enableHighRefreshRate")
 val EnableLandscapeScalingKey = booleanPreferencesKey("enableLandscapeScaling")
 val LocalFilesFolderViewKey = booleanPreferencesKey("localFilesFolderView")
+val DownloadExportFolderKey = stringPreferencesKey("downloadExportFolder")
 val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
 val SelectedThemeColorKey = intPreferencesKey("selectedThemeColor")
 val DarkModeKey = stringPreferencesKey("darkMode")
