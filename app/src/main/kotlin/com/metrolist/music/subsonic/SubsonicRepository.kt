@@ -92,6 +92,17 @@ constructor(
     private val database: MusicDatabase,
 ) {
     private val authStore = SubsonicAuthStore(context)
+
+    /** Song id -> "Navidrome - …" folders it's saved into (its album and playlists, as browsed). */
+    private val foldersFile = java.io.File(context.filesDir, "subsonic_folders.json")
+    private val folderSerializer = kotlinx.serialization.builtins.MapSerializer(
+        kotlinx.serialization.serializer<String>(),
+        kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.serializer<String>()),
+    )
+    private val folders: java.util.concurrent.ConcurrentHashMap<String, Set<String>> = java.util.concurrent.ConcurrentHashMap(
+        runCatching { Json.decodeFromString(folderSerializer, foldersFile.readText()).mapValues { it.value.toSet() } }
+            .getOrDefault(emptyMap()),
+    )
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -129,8 +140,12 @@ constructor(
     suspend fun artistAlbums(id: String): List<SubsonicAlbum> =
         call("getArtist", "id" to id).obj("artist").list("album").map { it.toAlbum() }
 
-    suspend fun albumSongs(id: String): List<SubsonicSong> =
-        call("getAlbum", "id" to id).obj("album").list("song").map { it.toSong() }
+    suspend fun albumSongs(id: String): List<SubsonicSong> {
+        val album = call("getAlbum", "id" to id).obj("album")
+        val songs = album.list("song").map { it.toSong() }
+        album.string("name")?.let { rememberFolder(songs, "$FOLDER_PREFIX$it") }
+        return songs
+    }
 
     suspend fun playlists(): List<SubsonicPlaylist> =
         call("getPlaylists").obj("playlists").list("playlist").map {
@@ -142,8 +157,35 @@ constructor(
             )
         }
 
-    suspend fun playlistSongs(id: String): List<SubsonicSong> =
-        call("getPlaylist", "id" to id).obj("playlist").list("entry").map { it.toSong() }
+    suspend fun playlistSongs(id: String): List<SubsonicSong> {
+        val playlist = call("getPlaylist", "id" to id).obj("playlist")
+        val songs = playlist.list("entry").map { it.toSong() }
+        playlist.string("name")?.let { rememberFolder(songs, "$FOLDER_PREFIX$it") }
+        return songs
+    }
+
+    /**
+     * Folders a downloaded server song is saved into, like "YouTube - …" and "Spotify - …":
+     * "Navidrome - <album>" and "Navidrome - <playlist>" for albums and playlists it was opened from.
+     */
+    fun exportFolders(songId: String): Set<String> = folders[songId].orEmpty()
+
+    private fun rememberFolder(songs: List<SubsonicSong>, folder: String) {
+        var changed = false
+        songs.forEach { song ->
+            val id = SUBSONIC_ID_PREFIX + song.id
+            val current = folders[id].orEmpty()
+            if (folder !in current) {
+                folders[id] = current + folder
+                changed = true
+            }
+        }
+        if (changed) {
+            runCatching {
+                foldersFile.writeText(json.encodeToString(folderSerializer, folders.mapValues { it.value.toList() }))
+            }.onFailure { Timber.tag(TAG).w(it, "Could not save Navidrome folders") }
+        }
+    }
 
     suspend fun starredSongs(): List<SubsonicSong> =
         call("getStarred2").obj("starred2").list("song").map { it.toSong() }
@@ -341,6 +383,7 @@ constructor(
         private const val TAG = "Subsonic"
         private const val API_VERSION = "1.16.1"
         private const val CLIENT_NAME = "Wavelength"
+        const val FOLDER_PREFIX = "Navidrome - "
 
         /** For places Hilt can't inject into, like the song menu. */
         fun from(context: Context): SubsonicRepository =

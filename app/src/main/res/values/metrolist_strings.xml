@@ -1373,6 +1373,9 @@
     <string name="subsonic_play_all">Play</string>
     <string name="subsonic_shuffle">Shuffle</string>
     <string name="subsonic_recent_albums">Recently added</string>
+    <string name="subsonic_download_all">Download</string>
+    <string name="subsonic_downloaded">Downloaded</string>
+    <string name="subsonic_downloading_count">Downloading %1$d songs</string>
     <string name="new_episodes_followed">From podcasts you follow</string>
     <string name="new_episodes_followed_empty">No new episodes in the last 30 days. Follow shows from podcast search to see them here.</string>
     <string name="new_episodes_youtube">From YouTube subscriptions</string>

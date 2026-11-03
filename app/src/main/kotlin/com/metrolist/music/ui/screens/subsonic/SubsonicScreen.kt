@@ -22,7 +22,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.media3.exoplayer.offline.Download
+import com.metrolist.music.LocalDownloadUtil
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -369,6 +373,7 @@ private fun Browser(viewModel: SubsonicViewModel) {
             } ?: loadingItem()
             SubsonicTab.STARRED -> starred?.let { list ->
                 if (list.isEmpty()) item(key = "no_starred") { Hint(stringResource(R.string.subsonic_empty)) }
+                playAllRow(list, "Starred", playerConnection)
                 songs(list, "Starred")
             } ?: loadingItem()
         }
@@ -388,7 +393,16 @@ private fun LazyListScope.playAllRow(
 ) {
     if (songs.isEmpty()) return
     item(key = "play_all") {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val context = LocalContext.current
+        val downloadUtil = LocalDownloadUtil.current
+        val downloads by downloadUtil.downloads.collectAsState()
+        val states = songs.map { downloads[it.id]?.state }
+        val allDownloaded = states.all { it == Download.STATE_COMPLETED }
+        val downloading = states.any { it == Download.STATE_QUEUED || it == Download.STATE_DOWNLOADING }
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(onClick = {
                 playerConnection.playQueue(ListQueue(title = title, items = songs.map { it.toMediaItem() }))
             }) {
@@ -402,6 +416,35 @@ private fun LazyListScope.playAllRow(
                 Icon(painterResource(R.drawable.shuffle), contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.subsonic_shuffle))
+            }
+            // Downloads the whole album or playlist; files go to "Navidrome - <name>" folders
+            TextButton(
+                enabled = !allDownloaded,
+                onClick = {
+                    val missing = songs.filter { downloads[it.id]?.state != Download.STATE_COMPLETED }
+                    missing.forEach { downloadUtil.download(it) }
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.subsonic_downloading_count, missing.size),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                },
+            ) {
+                when {
+                    allDownloaded -> Icon(painterResource(R.drawable.offline), contentDescription = null)
+                    downloading -> CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else -> Icon(painterResource(R.drawable.download), contentDescription = null)
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    stringResource(
+                        when {
+                            allDownloaded -> R.string.subsonic_downloaded
+                            downloading -> R.string.downloading
+                            else -> R.string.subsonic_download_all
+                        },
+                    ),
+                )
             }
         }
     }

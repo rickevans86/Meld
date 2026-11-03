@@ -77,7 +77,14 @@ class DownloadExporter(
         database.playlistFoldersForSong(song.id).forEach { playlist ->
             names += if (playlist.browseId != null) "YouTube - ${playlist.name}" else playlist.name
         }
-        if (song.song.liked) {
+        if (com.metrolist.music.constants.isSubsonicId(song.id)) {
+            // Navidrome songs: their album / playlist folders, starred songs, else the album
+            names += com.metrolist.music.subsonic.SubsonicRepository.from(context).exportFolders(song.id)
+            if (song.song.liked) names += "${com.metrolist.music.subsonic.SubsonicRepository.FOLDER_PREFIX}Starred"
+            if (names.isEmpty()) {
+                names += com.metrolist.music.subsonic.SubsonicRepository.FOLDER_PREFIX + (song.song.albumName ?: "Songs")
+            }
+        } else if (song.song.liked) {
             names += if (youTubeSignedIn()) "YouTube - Liked songs" else "Liked songs"
         }
         names += spotifyFolders[song.id].orEmpty()

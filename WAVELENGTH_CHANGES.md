@@ -189,6 +189,11 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - IDs: `subsonic:<songId>`. The stream URL is built at play time in the MusicService resolver (no stored
   credentials in the song). Cover URLs use a fixed salt so images cache.
 - Downloads use `format=raw` (the original file), so the M4A export and playlist folders apply.
+- Album, playlist and Starred pages have a **Download** button for the whole list.
+- Export folders follow the YouTube/Spotify pattern with a `Navidrome - ` prefix: `Navidrome - <album>` and
+  `Navidrome - <playlist>` (membership recorded when an album/playlist is opened, saved in
+  `filesDir/subsonic_folders.json`), `Navidrome - Starred` for starred songs, otherwise the song's album.
+  See `DownloadExporter.folderNamesFor` and `SubsonicRepository.exportFolders`.
 - "Now playing" is reported on start; a scrobble is sent after half the song or 4 minutes of listening.
 - Liking a server song stars it on the server; starred state is read back when songs are loaded.
 - New files: `subsonic/SubsonicAuthStore.kt`, `subsonic/SubsonicRepository.kt`, `viewmodels/SubsonicViewModel.kt`,
@@ -281,3 +286,4 @@ To see the exact diff at any time:
 - 2026-11-03: Side menu; News as its own tab; internet radio; Navidrome / Subsonic; combined New episodes.
 - 2026-11-03: Radio: add stations from pasted stream links; links to StreamURL.link and FMSTREAM.
 - 2026-11-03: Radio: TuneIn and region/genre search; in-app station finder for StreamURL.link and FMSTREAM.
+- 2026-11-03: Navidrome: download whole albums/playlists/starred; exports into `Navidrome - ` folders.
