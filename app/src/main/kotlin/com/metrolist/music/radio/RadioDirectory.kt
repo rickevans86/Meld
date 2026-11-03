@@ -303,6 +303,7 @@ constructor(
 
     fun setNowPlaying(songId: String, title: String?) {
         _nowPlaying.value = title?.takeIf { it.isNotBlank() }?.let { songId to it }
+        nowPlayingTitle.value = _nowPlaying.value
     }
 
     private suspend fun query(path: String, vararg params: Pair<String, String>): List<RadioStation> =
@@ -360,6 +361,9 @@ constructor(
     }.getOrDefault(emptyList())
 
     companion object {
+        /** The same "now playing" as [nowPlaying], for screens that can't inject this class. */
+        val nowPlayingTitle = MutableStateFlow<Pair<String, String>?>(null)
+
         private const val TAG = "RadioDirectory"
         const val ALBUM_NAME = "Internet radio"
         private const val USER_AGENT = "Wavelength/1.0"

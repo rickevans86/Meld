@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -434,6 +435,24 @@ constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Downloads without starting the download service (which Android blocks from the background),
+     * for scheduled auto-downloads. The download runs while the app's process is alive.
+     */
+    suspend fun downloadInBackground(song: Song) {
+        val metadata = song.toMediaMetadata()
+        val request = DownloadRequest
+            .Builder(metadata.id, metadata.id.toUri())
+            .setCustomCacheKey(metadata.id)
+            .setData(metadata.title.toByteArray())
+            .build()
+        withContext(Dispatchers.Main) { downloadManager.addDownload(request) }
+    }
+
+    suspend fun removeInBackground(songId: String) {
+        withContext(Dispatchers.Main) { downloadManager.removeDownload(songId) }
     }
 
     fun download(songId: String) {

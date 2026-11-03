@@ -25,6 +25,7 @@ import com.metrolist.music.db.entities.Song
 import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.localfiles.LocalMusicFolders
 import com.metrolist.music.models.toMediaMetadata
+import com.metrolist.music.utils.dataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -57,6 +58,7 @@ constructor(
             (mediaId.startsWith("$LIB_ALBUM/") && mediaId.count { it == '/' } == 1) ||
             (mediaId.startsWith("$LIB_ARTIST/") && mediaId.count { it == '/' } == 1) ||
             mediaId == NEW_EPISODES ||
+            mediaId == CONTINUE ||
             mediaId == NEWS ||
             mediaId == RADIO ||
             mediaId == SUBSONIC ||
@@ -75,6 +77,7 @@ constructor(
         LOCAL_FILES -> folder(LOCAL_FILES, context.getString(R.string.local_files), null, icon(R.drawable.folder), MediaMetadata.MEDIA_TYPE_PLAYLIST)
         NEWS -> folder(NEWS, context.getString(R.string.news_briefing), null, icon(R.drawable.newspaper), MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
         RADIO -> folder(RADIO, context.getString(R.string.radio_tab), null, icon(R.drawable.radio), MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS)
+        CONTINUE -> folder(CONTINUE, context.getString(R.string.auto_continue_listening), null, icon(R.drawable.history), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         SUBSONIC -> folder(SUBSONIC, context.getString(R.string.subsonic_tab), null, icon(R.drawable.dns), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         AUDIOBOOKS -> folder(AUDIOBOOKS, context.getString(R.string.filter_audiobooks), null, icon(R.drawable.audiobook), MediaMetadata.MEDIA_TYPE_FOLDER_AUDIO_BOOKS)
         else -> folder(PODCASTS, context.getString(R.string.filter_podcasts), null, icon(R.drawable.mic), MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
@@ -115,6 +118,9 @@ constructor(
         parentId.startsWith("$LIB_ARTIST/") -> {
             val songs = poolArtistSongs(parentId.substringAfter('/'))
             if (songs.isEmpty()) emptyList() else listOf(shuffleItem(parentId)) + songs.map { it.toAutoItem(parentId) }
+        }
+        parentId == CONTINUE -> continueListening().mapIndexed { index, entry ->
+            playable("$CONTINUE/$index", entry.title, entry.subtitle, entry.artwork)
         }
         parentId == NEW_EPISODES -> newEpisodes(refresh = true).mapIndexed { index, item ->
             playable(
@@ -165,6 +171,10 @@ constructor(
             }
         }
         NEWS -> playNews(path)
+        CONTINUE -> {
+            val entries = continueCache.ifEmpty { continueListening() }
+            path.getOrNull(1)?.toIntOrNull()?.let(entries::getOrNull)?.play?.invoke()
+        }
         LIB_ALBUM -> playList(poolAlbumSongs(path.getOrNull(1).orEmpty()), path.getOrNull(2))
         LIB_ARTIST -> playList(poolArtistSongs(path.getOrNull(1).orEmpty()), path.getOrNull(2))
         RADIO -> {
@@ -291,10 +301,136 @@ constructor(
                 withTimeoutOrNull(NETWORK_TIMEOUT_MS * 2) { runCatching { podcastFeeds.recentFromFollowed() }.getOrNull() }.orEmpty()
             }
             val yt = async { withTimeoutOrNull(NETWORK_TIMEOUT_MS) { YouTube.newEpisodes().getOrNull() }.orEmpty() }
-            rss.await().map { it.first.toMediaItem() } + yt.await().map { it.toMediaItem() }
+            com.metrolist.music.podcasts.PlayedEpisodes.init(context)
+            val hidePlayed = context.dataStore.data.first()[com.metrolist.music.podcasts.HidePlayedEpisodesKey] ?: false
+            fun keep(id: String) = !hidePlayed || !com.metrolist.music.podcasts.PlayedEpisodes.isPlayed(id)
+            rss.await().filter { keep(it.first.id) }.map { it.first.toMediaItem() } +
+                yt.await().filter { keep(it.id) }.map { it.toMediaItem() }
         }
         newEpisodesCache = System.currentTimeMillis() to items
         return items
+    }
+
+    /** One thing to resume: a half-played podcast episode or an unfinished audiobook. */
+    private class ContinueEntry(
+        val title: String,
+        val subtitle: String?,
+        val artwork: Uri?,
+        val at: Long,
+        val play: suspend () -> MediaItemsWithStartPosition?,
+    )
+
+    @Volatile
+    private var continueCache: List<ContinueEntry> = emptyList()
+
+    /** Half-finished podcast episodes and audiobooks, most recent first. */
+    private suspend fun continueListening(): List<ContinueEntry> {
+        com.metrolist.music.podcasts.PlayedEpisodes.init(context)
+        val entries = mutableListOf<ContinueEntry>()
+        database.inProgressEpisodes().filterNot { com.metrolist.music.podcasts.PlayedEpisodes.isPlayed(it.id) }
+            .forEachIndexed { index, song ->
+                entries += ContinueEntry(
+                    title = song.song.title,
+                    subtitle = song.song.albumName ?: song.artists.firstOrNull()?.name,
+                    artwork = song.song.thumbnailUrl?.toUri(),
+                    // Already newest first; keep that order among episodes
+                    at = Long.MAX_VALUE / 2 - index,
+                    play = { MediaItemsWithStartPosition(listOf(song.toMediaItem()), 0, C.TIME_UNSET) },
+                )
+            }
+        audiobooks.books.value.forEach { book ->
+            val progress = audiobooks.progress.value[book.id] ?: return@forEach
+            if (progress.finished) return@forEach
+            entries += ContinueEntry(
+                title = book.title,
+                subtitle = book.author,
+                artwork = book.coverUri?.toUri(),
+                at = progress.updatedAt,
+                play = { playAudiobook(listOf(AUDIOBOOKS, "device", book.id)) },
+            )
+        }
+        withTimeoutOrNull(NETWORK_TIMEOUT_MS) { runCatching { audiobookshelf.inProgress() }.getOrNull() }.orEmpty()
+            .forEach { book ->
+                entries += ContinueEntry(
+                    title = book.title,
+                    subtitle = book.author,
+                    artwork = audiobookshelf.coverUrl(book.id)?.toUri(),
+                    at = 0,
+                    play = { playAudiobook(listOf(AUDIOBOOKS, "abs", book.id)) },
+                )
+            }
+        // Episodes are ordered by when they were last played; books by their own progress time
+        return entries.sortedByDescending { it.at }.also { continueCache = it }
+    }
+
+    /**
+     * "Hey Google, play … on Wavelength": the news, a favourite or searched radio station, the newest
+     * episode of a followed podcast, an audiobook, or Navidrome music. Null lets YouTube search handle it.
+     */
+    suspend fun voicePlay(query: String): MediaItemsWithStartPosition? = runCatching {
+        val words = query.lowercase().replace(Regex("[^a-z0-9 ]"), " ").split(' ').filter { it.isNotBlank() }
+        val filler = setOf("play", "the", "latest", "newest", "new", "episode", "of", "on", "wavelength", "please", "some")
+        val core = words.filterNot { it in filler }.joinToString("")
+        val wantsRadio = words.any { it in setOf("radio", "station", "fm", "am") }
+        val wantsServer = words.any { it in setOf("navidrome", "server") }
+        val core2 = words.filterNot { it in filler || it in setOf("radio", "station", "podcast", "navidrome", "server", "my", "from") }
+            .joinToString("")
+        if (core.isEmpty()) return@runCatching null
+
+        // The news
+        if (core in setOf("news", "newsbriefing", "mynews", "briefing", "headlines")) {
+            return@runCatching playNews(listOf(NEWS, NEWS_ALL))
+        }
+        // Favourite radio station, or a search when they said "radio" / "FM"
+        val favourites = radio.favourites.value
+        favourites.indexOfFirst { matches(it.name, core2) || matches(it.name, core) }.takeIf { it >= 0 }?.let { index ->
+            radio.resolveForPlay(favourites[index])
+            val songs = radio.prepare(favourites)
+            return@runCatching MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, index, C.TIME_UNSET)
+        }
+        if (wantsRadio && core2.isNotEmpty()) {
+            withTimeoutOrNull(NETWORK_TIMEOUT_MS) { radio.search(query.replace(Regex("(?i)\\b(play|radio|station|on wavelength)\\b"), "").trim()) }
+                ?.firstOrNull()?.let { station ->
+                    radio.resolveForPlay(station)
+                    return@runCatching MediaItemsWithStartPosition(radio.prepare(listOf(station)).map { it.toMediaItem() }, 0, C.TIME_UNSET)
+                }
+        }
+        // Followed podcast: newest episode first, older ones after
+        podcastFeeds.followed.value.firstOrNull { matches(it.title, core2) || matches(it.title, core) }?.let { show ->
+            val feed = withTimeoutOrNull(NETWORK_TIMEOUT_MS * 2) { podcastFeeds.feed(show) } ?: return@let
+            val songs = podcastFeeds.prepare(feed.copy(episodes = feed.episodes.take(10)))
+            if (songs.isNotEmpty()) return@runCatching MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, 0, C.TIME_UNSET)
+        }
+        // Audiobook on the phone
+        audiobooks.books.value.firstOrNull { matches(it.title, core2) || matches(it.title, core) }?.let { book ->
+            playAudiobook(listOf(AUDIOBOOKS, "device", book.id))?.let { return@runCatching it }
+        }
+        // Navidrome: an exact album or song name, or anything when they asked for the server
+        if (subsonic.session.value != null) {
+            val text = query.replace(Regex("(?i)\\b(play|on wavelength|from navidrome|on navidrome|navidrome|from my server|my server)\\b"), "").trim()
+            val result = withTimeoutOrNull(NETWORK_TIMEOUT_MS) { subsonic.search(text) }
+            if (result != null) {
+                result.albums.firstOrNull { matches(it.name, core2) && normalize(it.name) == core2 }?.let { album ->
+                    val songs = subsonic.prepare(subsonic.albumSongs(album.id))
+                    if (songs.isNotEmpty()) return@runCatching MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, 0, C.TIME_UNSET)
+                }
+                val exactSong = result.songs.indexOfFirst { normalize(it.title) == core2 }
+                if ((exactSong >= 0 || wantsServer) && result.songs.isNotEmpty()) {
+                    val songs = subsonic.prepare(result.songs)
+                    return@runCatching MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, exactSong.coerceAtLeast(0), C.TIME_UNSET)
+                }
+            }
+        }
+        null
+    }.onFailure { Timber.tag(TAG).w(it, "Voice request failed") }.getOrNull()
+
+    private fun normalize(text: String) = text.lowercase().filter { it.isLetterOrDigit() }
+
+    /** A spoken name matches a title when one contains the other (ignoring spaces and punctuation). */
+    private fun matches(title: String, spoken: String): Boolean {
+        if (spoken.length < 3) return false
+        val name = normalize(title)
+        return name == spoken || (spoken.length >= 4 && name.contains(spoken)) || (name.length >= 4 && spoken.contains(name))
     }
 
     private suspend fun allowedLocalSongs(): List<Song> {
@@ -612,6 +748,7 @@ constructor(
         const val LIB_ALBUM = "lib_album"
         const val LIB_ARTIST = "lib_artist"
         private const val NEW_EPISODES = "$PODCASTS/new"
+        const val CONTINUE = "continue"
         private const val NEW_EPISODES_TTL_MS = 5 * 60 * 1000L
     }
 }

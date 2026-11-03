@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -178,6 +179,7 @@ private fun DeviceAudiobooks(
                     isCurrentBookPlaying = isPlaying && book.chapters.any { it.id == mediaMetadata?.id },
                     onBack = { viewModel.openBookId.value = null },
                     onContinue = { play(book, book.summary.resumeIndex) },
+                    onToggleFinished = { viewModel.setFinished(book.summary.book, !book.summary.finished) },
                 )
             }
             itemsIndexed(book.chapters, key = { _, chapter -> chapter.id }) { index, chapter ->
@@ -374,6 +376,7 @@ private fun BookHeader(
     isCurrentBookPlaying: Boolean,
     onBack: () -> Unit,
     onContinue: () -> Unit,
+    onToggleFinished: () -> Unit,
 ) {
     val summary = detail.summary
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -440,6 +443,19 @@ private fun BookHeader(
                     else -> stringResource(R.string.audiobook_start)
                 }
             )
+        }
+        OutlinedButton(
+            onClick = onToggleFinished,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+        ) {
+            Icon(
+                painter = painterResource(if (summary.finished) R.drawable.radio_button_unchecked else R.drawable.check_circle),
+                contentDescription = null,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(if (summary.finished) R.string.mark_unfinished else R.string.mark_finished))
         }
         Text(
             text = stringResource(R.string.audiobook_chapters),

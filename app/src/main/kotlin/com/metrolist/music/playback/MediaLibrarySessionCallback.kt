@@ -325,6 +325,7 @@ constructor(
                                     AndroidAutoSection.PODCASTS -> autoExtras.rootItem(AutoLibraryExtras.PODCASTS)
                                     AndroidAutoSection.NEWS -> autoExtras.rootItem(AutoLibraryExtras.NEWS)
                                     AndroidAutoSection.RADIO -> autoExtras.rootItem(AutoLibraryExtras.RADIO)
+                                    AndroidAutoSection.CONTINUE -> autoExtras.rootItem(AutoLibraryExtras.CONTINUE)
                                     AndroidAutoSection.SUBSONIC -> autoExtras.rootItem(AutoLibraryExtras.SUBSONIC)
                                 }
                             }
@@ -772,6 +773,8 @@ constructor(
                 mediaItems.firstOrNull()?.mediaId?.split("/")
             } ?: return@future defaultResult
 
+            // Voice: radio stations, podcasts, the news, audiobooks and Navidrome before YouTube
+            if (!voiceQuery.isNullOrBlank()) autoExtras.voicePlay(voiceQuery)?.let { return@future it }
             autoExtras.playback(path)?.let { return@future it }
 
             when (path.firstOrNull()) {

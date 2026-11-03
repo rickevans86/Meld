@@ -53,6 +53,12 @@ data class PodcastShow(
     val followedAt: Long? = null,
     /** Newest episode's date, remembered each time the feed loads (for "Latest episode" sorting). */
     val latestEpisodeAt: Long? = null,
+    /** Download new episodes automatically on Wi-Fi. */
+    val autoDownload: Boolean = false,
+    /** How many of the newest episodes auto-download keeps. */
+    val autoDownloadKeep: Int = 3,
+    /** Episodes auto-download fetched, so it only ever removes its own. */
+    val autoDownloadedIds: List<String> = emptyList(),
 )
 
 data class PodcastEpisode(
@@ -225,6 +231,47 @@ constructor(
         }.also { rememberLatest(it) }
     }
 
+    /** Episode song id -> the feed it came from, so per-show settings (speed) can find the show. */
+    private val episodeFeeds = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** Playback speed per show (by feed URL), remembered whether or not the show is followed. */
+    private val speedsFile = File(context.filesDir, "podcast_speeds.json")
+    private val speedSerializer = kotlinx.serialization.builtins.MapSerializer(
+        kotlinx.serialization.serializer<String>(),
+        kotlinx.serialization.serializer<Float>(),
+    )
+    private val _speeds = MutableStateFlow<Map<String, Float>>(
+        runCatching { json.decodeFromString(speedSerializer, speedsFile.readText()) }.getOrDefault(emptyMap()),
+    )
+    val speeds = _speeds.asStateFlow()
+
+    fun setSpeed(feedUrl: String, speed: Float?) {
+        _speeds.value = if (speed == null || speed == 1f) _speeds.value - feedUrl else _speeds.value + (feedUrl to speed)
+        runCatching { speedsFile.writeText(json.encodeToString(speedSerializer, _speeds.value)) }
+    }
+
+    /** The speed set for the show an episode belongs to, or null for "normal". */
+    fun speedForEpisode(songId: String, showTitle: String? = null): Float? {
+        val feedUrl = episodeFeeds[songId]
+            ?: showTitle?.let { title -> _followed.value.firstOrNull { it.title == title }?.feedUrl }
+            ?: return null
+        return _speeds.value[feedUrl]
+    }
+
+    fun setAutoDownload(show: PodcastShow, enabled: Boolean, keep: Int) {
+        if (!isFollowed(show.feedUrl)) setFollowed(show, true)
+        _followed.value = _followed.value.map {
+            if (it.feedUrl == show.feedUrl) it.copy(autoDownload = enabled, autoDownloadKeep = keep.coerceIn(1, 20)) else it
+        }
+        saveFollowed()
+        PodcastAutoDownload.schedule(context, runNow = enabled)
+    }
+
+    internal fun setAutoDownloaded(feedUrl: String, ids: List<String>) {
+        _followed.value = _followed.value.map { if (it.feedUrl == feedUrl) it.copy(autoDownloadedIds = ids) else it }
+        saveFollowed()
+    }
+
     /** Updates a followed show's newest-episode date so sorting by latest episode stays right. */
     private fun rememberLatest(feed: PodcastFeed) {
         val latest = feed.episodes.mapNotNull { it.publishedAt }.maxOrNull() ?: return
@@ -278,6 +325,7 @@ constructor(
         val author = feed.show.author?.takeIf { it.isNotBlank() }
         val ids = feed.episodes.map { episode ->
             val songId = PODCAST_EPISODE_ID_PREFIX + episode.id
+            episodeFeeds[songId] = feed.show.feedUrl
             val existing = database.getSongById(songId)?.song
             with(database) {
                 if (existing == null) {

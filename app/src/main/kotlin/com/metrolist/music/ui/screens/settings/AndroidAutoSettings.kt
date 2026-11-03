@@ -62,6 +62,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlin.math.roundToInt
 
 enum class AndroidAutoSection(val id: String) {
+    CONTINUE("continue"),
     SPOTIFY_LIKED("spotify_liked"),
     SPOTIFY_PLAYLISTS("spotify_playlists"),
     LIKED("liked"),
@@ -91,6 +92,7 @@ fun AndroidAutoSection.label(): String = when (this) {
     AndroidAutoSection.PODCASTS -> stringResource(R.string.filter_podcasts)
     AndroidAutoSection.NEWS -> stringResource(R.string.news_briefing)
     AndroidAutoSection.RADIO -> stringResource(R.string.radio_tab)
+    AndroidAutoSection.CONTINUE -> stringResource(R.string.auto_continue_listening)
     AndroidAutoSection.SUBSONIC -> stringResource(R.string.subsonic_tab)
 }
 
@@ -111,7 +113,9 @@ fun deserializeSections(raw: String): List<Pair<AndroidAutoSection, Boolean>> {
     val newSections = AndroidAutoSection.values()
         .filter { it !in known }
         .map { it to true }
-    return parsed + newSections
+    // Continue listening goes first when it's new to someone's list; other new sections go last
+    return newSections.filter { it.first == AndroidAutoSection.CONTINUE } + parsed +
+        newSections.filter { it.first != AndroidAutoSection.CONTINUE }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -235,6 +239,7 @@ fun AndroidAutoSettings(
                                         AndroidAutoSection.PODCASTS -> R.drawable.mic
                                         AndroidAutoSection.NEWS -> R.drawable.newspaper
                                         AndroidAutoSection.RADIO -> R.drawable.radio
+                                        AndroidAutoSection.CONTINUE -> R.drawable.history
                                         AndroidAutoSection.SUBSONIC -> R.drawable.dns
                                     }
                                 ),

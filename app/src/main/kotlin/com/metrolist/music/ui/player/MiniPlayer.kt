@@ -54,6 +54,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.metrolist.music.radio.withRadioNowPlaying
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -200,7 +201,10 @@ private fun NewMiniPlayer(
 
     // Player states - only collect what's needed at this level
     val playbackState by playerConnection.playbackState.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    // Radio stations show the song they're playing (Wavelength)
+    val mediaMetadata by remember(playerConnection) {
+        playerConnection.mediaMetadata.withRadioNowPlaying()
+    }.collectAsState(initial = playerConnection.mediaMetadata.value)
     val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
 
@@ -698,7 +702,10 @@ private fun LegacyMiniPlayer(
     val pureBlack by rememberPreference(PureBlackMiniPlayerKey, defaultValue = false)
 
     val playbackState by playerConnection.playbackState.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    // Radio stations show the song they're playing (Wavelength)
+    val mediaMetadata by remember(playerConnection) {
+        playerConnection.mediaMetadata.withRadioNowPlaying()
+    }.collectAsState(initial = playerConnection.mediaMetadata.value)
     val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
 

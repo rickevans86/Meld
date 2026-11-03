@@ -203,6 +203,25 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   `NewsSortKey`, `NewsSortReversedKey` in `NewsBriefing.kt`). Applies to the News tab, Android Auto and Play the news.
   Last publish times are remembered in `filesDir/news_latest.json`.
 
+### 5e. Played state, per-show options and auto-download
+- **Played / unplayed**: `podcasts/PlayedEpisodes.kt` keeps played episode ids in `filesDir/played_episodes.json`
+  (no database change). Episodes are marked played when they finish (`MusicService` transition and STATE_ENDED).
+  Buttons: a circle/tick on each show-page and New episodes row, and "Mark as played" in `SongMenu` for episodes.
+  **Hide played** (`HidePlayedEpisodesKey`) applies to show pages, New episodes and Android Auto's New episodes.
+- **Audiobooks**: "Mark as finished / not finished" on the book page. Phone books: `AudiobookRepository.setFinished`;
+  Audiobookshelf: `AbsRepository.setFinished` updates the server progress.
+- **Per-show speed**: chip on the show page; stored per feed URL in `filesDir/podcast_speeds.json`. `MusicService`
+  applies it when an episode of that show starts and puts the earlier speed back afterwards.
+- **Auto-download**: chip on the show page with "Keep N" (1–10). `PodcastAutoDownload` (WorkManager, new
+  `work-runtime-ktx` dependency) runs every 6 hours on unmetered Wi-Fi: downloads the newest N unplayed episodes of
+  each such show and removes only auto-downloaded ones that dropped out. Downloads go straight to the download
+  manager (`DownloadUtil.downloadInBackground`) because Android blocks starting the download service from the
+  background; the worker waits up to ~9 minutes for them. Turning it on also follows the show.
+- New files: `podcasts/PlayedEpisodes.kt`, `podcasts/PodcastAutoDownload.kt`, `res/drawable/check_circle.xml`
+- Edited: `PodcastDirectory.kt` (`PodcastShow.autoDownload`, `autoDownloadKeep`, `autoDownloadedIds`, speeds,
+  episode→feed map), `PodcastDirectoryScreen.kt`, `NewEpisodesScreen.kt`, `SongMenu.kt`, `AudiobooksScreen.kt`,
+  `AudiobookshelfContent.kt`, their view models, `DownloadUtil.kt`, `MusicService.kt`
+
 ### 5b. New episodes (combined)
 - The "New episodes" card (Podcasts tab and Account screen) opens `new_episodes` instead of YouTube's RDPN list:
   recent episodes from followed feeds (last 30 days, up to 5 per show, newest first) followed by YouTube's
@@ -266,6 +285,15 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   length). The app's Local files all-songs list uses the same rule (`LocalFilesViewModel.uniqueSongs`).
 - Albums and Artists list saved ones first, then ones built from downloaded and local songs
   (`poolAlbums` / `poolArtists`, ids `lib_album/<key>`, `lib_artist/<key>`).
+- **Continue listening** section (`continue`, `AndroidAutoSection.CONTINUE`, placed first): half-played podcast
+  episodes (`DatabaseDao.inProgressEpisodes`) and unfinished phone and Audiobookshelf books, most recent first.
+- **Voice** ("Hey Google, play … on Wavelength", `AutoLibraryExtras.voicePlay`, hooked in before YouTube search in
+  `MediaLibrarySessionCallback.onSetMediaItems`): "the news"; a favourite station by name, or a radio search when
+  the request says radio / station / FM; the newest episode of a followed podcast; a phone audiobook; Navidrome
+  (exact album or song name, or anything when "Navidrome" / "my server" is said). Otherwise YouTube as before.
+- Radio "now playing": the media session gets `RadioMetadataPlayer` (a `ForwardingPlayer`), which shows the
+  station's song as the title and the station as artist for the notification, lock screen and Android Auto. The app's
+  player and mini player use `withRadioNowPlaying()` (`radio/RadioNowPlaying.kt`).
 - Podcasts page: New episodes on top (`podcasts/new`, the combined list, cached 5 minutes), then Saved episodes,
   then channels and followed feeds in the chosen podcast sort.
 - New file: `playback/AutoLibraryExtras.kt`
@@ -302,7 +330,9 @@ These are the files that can conflict during a merge, and what to re-apply in ea
 | `ui/screens/Screens.kt` | Podcasts, News and Audiobooks screens; bottom tab list |
 | `ui/screens/AccountScreen.kt` | New episodes card opens `new_episodes` |
 | `playback/AutoLibraryExtras.kt` (Wavelength file) | Radio and Navidrome sections |
-| `gradle/libs.versions.toml` | `media3-hls` |
+| `gradle/libs.versions.toml` | `media3-hls`, `work-runtime` |
+| `db/DatabaseDao.kt` | `inProgressEpisodes` (also `playlistFoldersForSong`, `playlistSongMapCount`) |
+| `ui/player/Player.kt`, `ui/player/MiniPlayer.kt` | Radio now-playing via `withRadioNowPlaying()` |
 | `ui/screens/NavigationBuilder.kt` | Routes `settings/local_folders`, `news_sources`, `podcast_directory?feed={feed}`, audiobook routes |
 | `ui/screens/library/LibraryPodcastsScreen.kt` | Search icon, news card, followed feeds |
 | `ui/screens/library/LibraryScreen.kt` | Audiobooks filter, which opens `AudiobooksScreen` |
@@ -354,3 +384,4 @@ To see the exact diff at any time:
 - 2026-11-04: Storage settings renamed Storage/Download; Wi-Fi only downloads that pause off Wi-Fi.
 - 2026-11-04: Features settings to turn off the second source, News, Navidrome, Audiobooks, Podcasts, Local files, Radio.
 - 2026-11-04: Android Auto: Local files folders, Songs follows Music folders, Albums/Artists from downloads and local songs, New episodes; podcast and news sorting; Default home on Features page; Discord, Last.fm and Listen Together switched off and hidden; duplicate copies collapsed in song lists.
+- 2026-11-04: Voice commands, Continue listening, podcast auto-download on Wi-Fi, played/unplayed for podcasts and audiobooks, hide played, per-show speed, radio now-playing on the player and Android Auto.

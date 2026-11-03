@@ -72,6 +72,8 @@ constructor(
         refreshTick.value++
     }
 
+    fun setFinished(book: Audiobook, finished: Boolean) = repository.setFinished(book, finished)
+
     fun rescan() {
         viewModelScope.launch { repository.scan() }
     }

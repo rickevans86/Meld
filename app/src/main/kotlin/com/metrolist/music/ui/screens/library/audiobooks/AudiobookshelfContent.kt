@@ -190,6 +190,7 @@ fun AudiobookshelfContent(
                     onPlay = { startAt -> play(book.id, startAt) },
                     onDownload = { viewModel.download(book.id) },
                     onRemoveDownload = { viewModel.removeDownload(book.id) },
+                    onToggleFinished = { viewModel.setFinished(book, progress[book.id]?.isFinished != true) },
                 )
             }
             return@LazyColumn
@@ -435,6 +436,7 @@ private fun LazyListScope.bookDetail(
     onPlay: (Double?) -> Unit,
     onDownload: () -> Unit,
     onRemoveDownload: () -> Unit,
+    onToggleFinished: () -> Unit,
 ) {
     val started = progress != null && progress.currentTimeSec > 0 && !progress.isFinished
     item(key = "abs_book_header") {
@@ -500,6 +502,20 @@ private fun LazyListScope.bookDetail(
                         }
                     )
                 }
+            }
+            val finished = progress?.isFinished == true
+            OutlinedButton(
+                onClick = onToggleFinished,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+            ) {
+                Icon(
+                    painterResource(if (finished) R.drawable.radio_button_unchecked else R.drawable.check_circle),
+                    contentDescription = null,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(if (finished) R.string.mark_unfinished else R.string.mark_finished))
             }
             DownloadControls(download, onDownload, onRemoveDownload)
             if (book.chapters.isNotEmpty() || book.tracks.size > 1) {

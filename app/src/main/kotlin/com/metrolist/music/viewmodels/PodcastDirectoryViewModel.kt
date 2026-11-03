@@ -121,6 +121,13 @@ constructor(
 
     fun isFollowed(show: PodcastShow) = directory.isFollowed(show.feedUrl)
 
+    val speeds = directory.speeds
+
+    /** Turning auto-download on also follows the show. */
+    fun setAutoDownload(show: PodcastShow, enabled: Boolean, keep: Int) = directory.setAutoDownload(show, enabled, keep)
+
+    fun setSpeed(show: PodcastShow, speed: Float?) = directory.setSpeed(show.feedUrl, speed)
+
     fun toggleFollow(show: PodcastShow) = directory.setFollowed(show, !directory.isFollowed(show.feedUrl))
 
     /** Turns the open show's episodes into songs and hands them to [onReady] with the start index. */

@@ -143,6 +143,20 @@ constructor(
         }
     }
 
+    /** Marks a whole book finished, or not started (unfinished books start again from the beginning). */
+    fun setFinished(book: Audiobook, finished: Boolean) {
+        scope.launch {
+            if (finished) {
+                val last = book.chapterIds.lastOrNull() ?: return@launch
+                _progress.update { it + (book.id to AudiobookProgress(last, System.currentTimeMillis(), finished = true)) }
+            } else {
+                _progress.update { it - book.id }
+            }
+            withContext(Dispatchers.IO) { book.chapterIds.forEach { database.updatePlaybackPosition(it, null) } }
+            save()
+        }
+    }
+
     suspend fun scan(): Int = withContext(Dispatchers.IO) {
         val treeUri = folderUri() ?: return@withContext 0
         scanLock.withLock {

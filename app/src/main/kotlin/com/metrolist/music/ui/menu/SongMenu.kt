@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -982,6 +983,34 @@ fun SongMenu(
                         }
                     },
             )
+        }
+
+        // Podcast episodes: mark played / unplayed (Wavelength)
+        if (song.song.isEpisode || song.id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX)) {
+            item { Spacer(modifier = Modifier.height(12.dp)) }
+            item {
+                com.metrolist.music.podcasts.PlayedEpisodes.init(context)
+                val playedSet by com.metrolist.music.podcasts.PlayedEpisodes.played.collectAsState()
+                val isPlayed = song.id in playedSet
+                Material3MenuGroup(
+                    items = listOf(
+                        Material3MenuItemData(
+                            title = { Text(stringResource(if (isPlayed) R.string.mark_unplayed else R.string.mark_played)) },
+                            icon = {
+                                Icon(
+                                    painter = painterResource(if (isPlayed) R.drawable.radio_button_unchecked else R.drawable.check_circle),
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                com.metrolist.music.podcasts.PlayedEpisodes.set(context, song.id, !isPlayed)
+                                coroutineScope.launch(Dispatchers.IO) { database.updatePlaybackPosition(song.id, null) }
+                                onDismiss()
+                            },
+                        ),
+                    ),
+                )
+            }
         }
 
         item { Spacer(modifier = Modifier.height(12.dp)) }

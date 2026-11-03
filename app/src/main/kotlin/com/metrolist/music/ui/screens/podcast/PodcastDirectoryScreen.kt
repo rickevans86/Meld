@@ -9,6 +9,13 @@ import android.text.format.DateUtils
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import com.metrolist.music.utils.rememberPreference
+import com.metrolist.music.podcasts.PlayedEpisodes
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,6 +52,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -91,6 +99,9 @@ fun PodcastDirectoryScreen(
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState(initial = false)
     val menuState = LocalMenuState.current
+    val played = com.metrolist.music.podcasts.rememberPlayedEpisodes()
+    val speeds by viewModel.speeds.collectAsState()
+    val (hidePlayed, onHidePlayedChange) = rememberPreference(com.metrolist.music.podcasts.HidePlayedEpisodesKey, false)
 
     val followed by viewModel.followed.collectAsState()
     val results by viewModel.results.collectAsState()
@@ -196,6 +207,7 @@ fun PodcastDirectoryScreen(
             is ShowPage.Ready -> {
                 val show = current.feed.show
                 val isFollowing = followed.any { it.feedUrl == show.feedUrl }
+                val followedShow = followed.firstOrNull { it.feedUrl == show.feedUrl }
                 item(key = "show_header") {
                     ShowHeader(
                         show = show,
@@ -207,9 +219,25 @@ fun PodcastDirectoryScreen(
                         },
                     )
                 }
+                item(key = "show_options") {
+                    ShowOptions(
+                        autoDownload = followedShow?.autoDownload == true,
+                        keep = followedShow?.autoDownloadKeep ?: 3,
+                        speed = speeds[show.feedUrl] ?: 1f,
+                        hidePlayed = hidePlayed,
+                        onAutoDownload = { enabled, keep -> viewModel.setAutoDownload(show, enabled, keep) },
+                        onSpeed = { viewModel.setSpeed(show, it) },
+                        onHidePlayed = onHidePlayedChange,
+                    )
+                }
                 val episodesById = current.feed.episodes.associateBy { PODCAST_EPISODE_ID_PREFIX + it.id }
-                itemsIndexed(current.songs, key = { _, song -> "episode:${song.id}" }) { index, song ->
+                // Played episodes can be hidden; indexes stay those of the full list for playing
+                val visible = current.songs.withIndex().filter { (_, song) ->
+                    !hidePlayed || song.id !in played || song.id == mediaMetadata?.id
+                }
+                items(visible, key = { "episode:${it.value.id}" }) { (index, song) ->
                     val episode = episodesById[song.id]
+                    val isPlayed = song.id in played
                     SongListItem(
                         song = song,
                         subtitleOverride = episode?.let { episodeDetails(it) },
@@ -217,6 +245,13 @@ fun PodcastDirectoryScreen(
                         isActive = mediaMetadata?.id == song.id,
                         isPlaying = isPlaying,
                         trailingContent = {
+                            PlainIconButton(onClick = { PlayedEpisodes.set(context, song.id, !isPlayed) }) {
+                                Icon(
+                                    painterResource(if (isPlayed) R.drawable.check_circle else R.drawable.radio_button_unchecked),
+                                    contentDescription = stringResource(if (isPlayed) R.string.mark_unplayed else R.string.mark_played),
+                                    tint = if (isPlayed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             PlainIconButton(
                                 onClick = {
                                     menuState.show {
@@ -307,6 +342,81 @@ private fun ShowHeader(
         }
     }
 }
+
+/** Per-show options: auto-download on Wi-Fi (and how many to keep), playback speed, hide played. */
+@Composable
+private fun ShowOptions(
+    autoDownload: Boolean,
+    keep: Int,
+    speed: Float,
+    hidePlayed: Boolean,
+    onAutoDownload: (Boolean, Int) -> Unit,
+    onSpeed: (Float?) -> Unit,
+    onHidePlayed: (Boolean) -> Unit,
+) {
+    var keepMenu by remember { mutableStateOf(false) }
+    var speedMenu by remember { mutableStateOf(false) }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+    ) {
+        FilterChip(
+            selected = autoDownload,
+            onClick = { onAutoDownload(!autoDownload, keep) },
+            label = { Text(stringResource(R.string.podcast_auto_download)) },
+            leadingIcon = { Icon(painterResource(R.drawable.download), contentDescription = null, modifier = Modifier.size(18.dp)) },
+        )
+        if (autoDownload) {
+            Box {
+                FilterChip(
+                    selected = false,
+                    onClick = { keepMenu = true },
+                    label = { Text(stringResource(R.string.podcast_keep_count, keep)) },
+                )
+                DropdownMenu(expanded = keepMenu, onDismissRequest = { keepMenu = false }) {
+                    listOf(1, 2, 3, 5, 10).forEach { count ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.podcast_keep_count, count)) },
+                            onClick = {
+                                onAutoDownload(true, count)
+                                keepMenu = false
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        Box {
+            FilterChip(
+                selected = speed != 1f,
+                onClick = { speedMenu = true },
+                label = { Text(stringResource(R.string.podcast_speed, formatSpeed(speed))) },
+            )
+            DropdownMenu(expanded = speedMenu, onDismissRequest = { speedMenu = false }) {
+                listOf(0.8f, 1f, 1.2f, 1.5f, 1.75f, 2f).forEach { value ->
+                    DropdownMenuItem(
+                        text = { Text(formatSpeed(value)) },
+                        onClick = {
+                            onSpeed(value.takeIf { it != 1f })
+                            speedMenu = false
+                        },
+                    )
+                }
+            }
+        }
+        FilterChip(
+            selected = hidePlayed,
+            onClick = { onHidePlayed(!hidePlayed) },
+            label = { Text(stringResource(R.string.podcast_hide_played)) },
+        )
+    }
+}
+
+private fun formatSpeed(speed: Float): String =
+    (if (speed % 1f == 0f) speed.toInt().toString() else speed.toString().trimEnd('0')) + "×"
 
 @Composable
 private fun episodeDetails(episode: PodcastEpisode): String? =

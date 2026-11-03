@@ -187,6 +187,25 @@ constructor(
         }
     }
 
+    fun setFinished(book: AbsBook, finished: Boolean) {
+        viewModelScope.launch {
+            runCatching { repository.setFinished(book, finished) }
+                .onSuccess {
+                    _progress.value = _progress.value + (
+                        book.id to AbsProgress(
+                            libraryItemId = book.id,
+                            currentTimeSec = if (finished) book.durationSec else 0.0,
+                            durationSec = book.durationSec,
+                            progress = if (finished) 1.0 else 0.0,
+                            isFinished = finished,
+                            lastUpdate = System.currentTimeMillis(),
+                        )
+                        )
+                }
+                .onFailure { _error.value = it.message ?: "Couldn't update the book on the server." }
+        }
+    }
+
     fun close() {
         openBookId.value = null
         _openBook.value = null

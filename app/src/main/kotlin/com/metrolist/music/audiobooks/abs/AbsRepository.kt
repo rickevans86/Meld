@@ -254,6 +254,22 @@ constructor(
         }
     }
 
+    /** Marks a book finished on the server, or back to not started (it then plays from the beginning). */
+    suspend fun setFinished(book: AbsBook, finished: Boolean) = withContext(Dispatchers.IO) {
+        pendingReport.remove(book.id)
+        val position = if (finished) book.durationSec else 0.0
+        localPositions[book.id] = AbsLocalPosition(position, System.currentTimeMillis(), finished = finished)
+        savePositions()
+        authed { s ->
+            client.updateProgress(
+                s.serverUrl, s.accessToken, book.id,
+                currentTimeSec = position,
+                durationSec = book.durationSec,
+                isFinished = finished,
+            )
+        }
+    }
+
     fun onTrackFinished(trackId: String) {
         val info = tracks[trackId] ?: return
         if (!info.isLast) return

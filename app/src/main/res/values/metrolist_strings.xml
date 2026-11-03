@@ -1332,6 +1332,15 @@
     <!-- Wavelength: side menu, News tab, internet radio, Navidrome / Subsonic -->
     <string name="open_menu">Open menu</string>
     <string name="features">Features</string>
+    <string name="mark_played">Mark as played</string>
+    <string name="mark_unplayed">Mark as unplayed</string>
+    <string name="mark_finished">Mark as finished</string>
+    <string name="mark_unfinished">Mark as not finished</string>
+    <string name="podcast_hide_played">Hide played</string>
+    <string name="podcast_auto_download">Auto-download</string>
+    <string name="podcast_keep_count">Keep %1$d</string>
+    <string name="podcast_speed">Speed %1$s</string>
+    <string name="auto_continue_listening">Continue listening</string>
     <string name="sort_by">Sort</string>
     <string name="sort_reverse">Reverse order</string>
     <string name="sort_name">Name (A–Z)</string>

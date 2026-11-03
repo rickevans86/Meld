@@ -340,6 +340,15 @@ class MusicService :
     @Inject
     lateinit var subsonicRepository: com.metrolist.music.subsonic.SubsonicRepository
 
+    @Inject
+    lateinit var podcastDirectory: com.metrolist.music.podcasts.PodcastDirectory
+
+    /** What the media session sees: the player plus radio "now playing" titles. */
+    private var sessionPlayer: RadioMetadataPlayer? = null
+
+    /** The speed before a show's own speed was applied, to put back afterwards. */
+    private var speedBeforeShow: Float? = null
+
     private var subsonicScrobbleJob: Job? = null
 
     @Inject
@@ -775,9 +784,11 @@ class MusicService :
             toggleLibrary = ::toggleLibrary
             addToTargetPlaylist = ::addToTargetPlaylist
         }
+        val radioAwarePlayer = RadioMetadataPlayer(player) { radioDirectory.nowPlaying.value }
+        sessionPlayer = radioAwarePlayer
         mediaSession =
             MediaLibrarySession
-                .Builder(this, player, mediaLibrarySessionCallback)
+                .Builder(this, radioAwarePlayer, mediaLibrarySessionCallback)
                 .setSessionActivity(
                     PendingIntent.getActivity(
                         this,
@@ -1143,7 +1154,9 @@ class MusicService :
                 sleepTimer?.player = newPlayer
 
                 try {
-                    mediaSession?.let { (it as MediaSession).player = newPlayer }
+                    val radioAwarePlayer = RadioMetadataPlayer(newPlayer) { radioDirectory.nowPlaying.value }
+                    sessionPlayer = radioAwarePlayer
+                    mediaSession?.let { (it as MediaSession).player = radioAwarePlayer }
                 } catch (e: Exception) {
                     Timber.tag(TAG).e(e, "Failed to swap player in MediaSession")
                 }
@@ -1161,6 +1174,15 @@ class MusicService :
 
                 Timber.tag("MusicService").i("Player recreated with AudioTrackPlaybackParams: $useAudioTrackParams")
             }
+
+        // Radio "now playing" titles: refresh the notification and Android Auto when they change
+        scope.launch {
+            radioDirectory.nowPlaying.collect { sessionPlayer?.notifyMetadataChanged() }
+        }
+        com.metrolist.music.podcasts.PlayedEpisodes.init(this@MusicService)
+        if (podcastDirectory.followed.value.any { it.autoDownload }) {
+            com.metrolist.music.podcasts.PodcastAutoDownload.schedule(this@MusicService)
+        }
 
         // Wavelength: Discord, Last.fm and Listen Together are switched off; clear any saved sign-ins
         scope.launch(Dispatchers.IO) {
@@ -2796,6 +2818,16 @@ class MusicService :
     /** Radio play counts and Subsonic "now playing" / scrobbles when the track changes. */
     private fun onWavelengthTransition(mediaItem: MediaItem?) {
         val id = mediaItem?.mediaId
+        // A podcast's own playback speed, put back to the earlier speed for anything else
+        val showSpeed = id?.takeIf { it.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) }
+            ?.let { podcastDirectory.speedForEpisode(it, mediaItem.mediaMetadata.albumTitle?.toString()) }
+        if (showSpeed != null) {
+            if (speedBeforeShow == null) speedBeforeShow = player.playbackParameters.speed
+            player.setPlaybackSpeed(showSpeed)
+        } else {
+            speedBeforeShow?.let { player.setPlaybackSpeed(it) }
+            speedBeforeShow = null
+        }
         radioDirectory.setNowPlaying(id.orEmpty(), null)
         if (com.metrolist.music.constants.isRadioId(id)) radioDirectory.reportPlay(id!!)
         subsonicScrobbleJob?.cancel()
@@ -2844,6 +2876,10 @@ class MusicService :
             if (isAudiobookId(episodeId) && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
                 audiobookRepository.onChapterFinished(episodeId)
                 if (isAbsTrackId(episodeId)) absRepository.onTrackFinished(episodeId)
+            } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                // A podcast episode played to the end: mark it played and start it fresh next time
+                com.metrolist.music.podcasts.PlayedEpisodes.set(this, episodeId, true)
+                scope.launch(Dispatchers.IO) { database.updatePlaybackPosition(episodeId, null) }
             } else if (previousEpisodePosition > 0) {
                 saveEpisodePosition(episodeId, previousEpisodePosition)
             }
@@ -2940,6 +2976,10 @@ class MusicService :
         updateInitialBufferRecovery(playbackState)
 
         if (playbackState == Player.STATE_ENDED) {
+            // The last episode in the queue finished: mark it played too
+            player.currentMediaItem?.mediaId
+                ?.takeIf { it.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) || player.currentMetadata?.isEpisode == true }
+                ?.let { com.metrolist.music.podcasts.PlayedEpisodes.set(this, it, true) }
             player.currentMediaItem?.mediaId?.let { mediaId ->
                 scope.launch(Dispatchers.IO) { markCachedIfFullyDownloaded(mediaId) }
             }

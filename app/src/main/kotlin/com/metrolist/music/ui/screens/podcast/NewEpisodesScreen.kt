@@ -61,8 +61,16 @@ fun NewEpisodesScreen(
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val menuState = LocalMenuState.current
-    val followed by viewModel.followed.collectAsState()
-    val youtube by viewModel.youtube.collectAsState()
+    val followedAll by viewModel.followed.collectAsState()
+    val youtubeAll by viewModel.youtube.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val played = com.metrolist.music.podcasts.rememberPlayedEpisodes()
+    val (hidePlayed, onHidePlayedChange) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.podcasts.HidePlayedEpisodesKey,
+        false,
+    )
+    val followed = followedAll?.filter { !hidePlayed || it.first.id !in played }
+    val youtube = youtubeAll?.filter { !hidePlayed || it.id !in played }
     val refreshing by viewModel.refreshing.collectAsState()
     val current by playerConnection.mediaMetadata.collectAsState()
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState(initial = false)
@@ -91,6 +99,11 @@ fun NewEpisodesScreen(
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.subsonic_play_all))
                 }
+                androidx.compose.material3.FilterChip(
+                    selected = hidePlayed,
+                    onClick = { onHidePlayedChange(!hidePlayed) },
+                    label = { Text(stringResource(R.string.podcast_hide_played)) },
+                )
                 Spacer(Modifier.weight(1f))
                 if (refreshing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 IconButton(onClick = viewModel::refresh, enabled = !refreshing) {
@@ -115,6 +128,14 @@ fun NewEpisodesScreen(
                     isActive = current?.id == song.id,
                     isPlaying = isPlaying,
                     trailingContent = {
+                        val isPlayed = song.id in played
+                        IconButton(onClick = { com.metrolist.music.podcasts.PlayedEpisodes.set(context, song.id, !isPlayed) }) {
+                            Icon(
+                                painterResource(if (isPlayed) R.drawable.check_circle else R.drawable.radio_button_unchecked),
+                                contentDescription = stringResource(if (isPlayed) R.string.mark_unplayed else R.string.mark_played),
+                                tint = if (isPlayed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         IconButton(onClick = { menuState.show { SongMenu(originalSong = song, onDismiss = menuState::dismiss) } }) {
                             Icon(painterResource(R.drawable.more_vert), contentDescription = null)
                         }

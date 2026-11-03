@@ -1454,6 +1454,14 @@ interface DatabaseDao {
     @Query("SELECT * FROM song WHERE isEpisode = 1 AND isDownloaded = 1 ORDER BY totalPlayTime")
     fun downloadedPodcastEpisodesByPlayTimeAsc(): Flow<List<Song>>
 
+    // Wavelength: half-finished podcast episodes, most recently played first (Android Auto Continue listening)
+    @Transaction
+    @Query(
+        "SELECT * FROM song WHERE isEpisode = 1 AND playbackPosition > 0 " +
+            "ORDER BY (SELECT MAX(timestamp) FROM event WHERE event.songId = song.id) DESC LIMIT :limit",
+    )
+    suspend fun inProgressEpisodes(limit: Int = 20): List<Song>
+
     // Saved episodes (in library but not necessarily downloaded)
     @Transaction
     @Query("SELECT * FROM song WHERE isEpisode = 1 AND inLibrary IS NOT NULL ORDER BY inLibrary DESC")
