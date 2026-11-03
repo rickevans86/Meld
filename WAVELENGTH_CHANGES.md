@@ -60,7 +60,7 @@ The build task is `:app:assembleFossDebug` with `PULL_REQUEST=false`, and it ret
 
 ## App icon
 
-The red music-note icon is in `res/mipmap-*/ic_launcher*.png`: the background, foreground, monochrome and
+The purple-to-orange headphones icon (an original design) is in `res/mipmap-*/ic_launcher*.png`: the background, foreground, monochrome and
 legacy versions at every density. Upstream icon changes will conflict here; keep the Wavelength versions.
 
 ## Features
@@ -209,3 +209,4 @@ To see the exact diff at any time:
 - 2026-11-03: Added this changes file.
 - 2026-11-03: Fixed a crash when podcast search returns the same show twice (results, episodes, Spotify shows and news sources are de-duplicated).
 - 2026-11-03: Paste button and pasted-link support in podcast search (Pocket Casts, Apple, Spotify, RSS).
+- 2026-11-03: Replaced the app icon with an original headphones and sound-bars design.
