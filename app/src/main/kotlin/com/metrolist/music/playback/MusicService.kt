@@ -103,7 +103,9 @@ import com.metrolist.lastfm.LastFM
 import com.metrolist.music.MainActivity
 import com.metrolist.music.R
 import com.metrolist.music.audiobooks.AudiobookRepository
+import com.metrolist.music.audiobooks.abs.AbsRepository
 import com.metrolist.music.constants.AddToPlaylistPosition
+import com.metrolist.music.constants.isAbsTrackId
 import com.metrolist.music.constants.isAudiobookId
 import com.metrolist.music.constants.isOnDeviceMediaId
 import com.metrolist.music.constants.AddToPlaylistPositionKey
@@ -322,6 +324,9 @@ class MusicService :
 
     @Inject
     lateinit var audiobookRepository: AudiobookRepository
+
+    @Inject
+    lateinit var absRepository: AbsRepository
 
     @Inject
     lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
@@ -2732,6 +2737,7 @@ class MusicService :
         positionMs: Long,
     ) {
         if (positionMs < 3000) return // Don't save if less than 3 seconds played
+        if (isAbsTrackId(episodeId)) absRepository.reportPosition(episodeId, positionMs)
         scope.launch(Dispatchers.IO + SilentHandler) {
             database.updatePlaybackPosition(episodeId, positionMs)
             Timber.tag(TAG).d("Saved episode position: $episodeId at ${positionMs}ms")
@@ -2780,6 +2786,7 @@ class MusicService :
         previousEpisodeId?.let { episodeId ->
             if (isAudiobookId(episodeId) && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
                 audiobookRepository.onChapterFinished(episodeId)
+                if (isAbsTrackId(episodeId)) absRepository.onTrackFinished(episodeId)
             } else if (previousEpisodePosition > 0) {
                 saveEpisodePosition(episodeId, previousEpisodePosition)
             }
@@ -4501,6 +4508,10 @@ class MusicService :
                     database.getSongById(mediaId)?.song?.localPath
                 }
                 if (localPath != null) {
+                    if (isAbsTrackId(mediaId)) {
+                        return@Factory dataSpec.withUri(localPath.toUri())
+                            .withAdditionalHeaders(absRepository.streamHeaders())
+                    }
                     return@Factory dataSpec.withUri(localPath.toUri())
                 }
                 // fallback: URI already set to localPath in MediaItem

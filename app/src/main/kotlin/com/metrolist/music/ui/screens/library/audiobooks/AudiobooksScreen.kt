@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -39,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,10 +60,12 @@ import coil3.compose.AsyncImage
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
+import com.metrolist.music.constants.AudiobooksSourceKey
 import com.metrolist.music.constants.CONTENT_TYPE_HEADER
 import com.metrolist.music.db.entities.Song
 import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.playback.queues.ListQueue
+import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.viewmodels.AudiobookDetail
 import com.metrolist.music.viewmodels.AudiobookSummary
 import com.metrolist.music.viewmodels.AudiobooksViewModel
@@ -71,6 +75,41 @@ import kotlin.math.roundToInt
 fun AudiobooksScreen(
     @Suppress("UNUSED_PARAMETER") navController: NavController,
     filterContent: @Composable () -> Unit,
+) {
+    var source by rememberPreference(AudiobooksSourceKey, SOURCE_DEVICE)
+    val header: @Composable () -> Unit = {
+        Column {
+            filterContent()
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            ) {
+                FilterChip(
+                    selected = source != SOURCE_ABS,
+                    onClick = { source = SOURCE_DEVICE },
+                    label = { Text(stringResource(R.string.audiobooks_source_device)) },
+                )
+                FilterChip(
+                    selected = source == SOURCE_ABS,
+                    onClick = { source = SOURCE_ABS },
+                    label = { Text(stringResource(R.string.audiobooks_source_abs)) },
+                )
+            }
+        }
+    }
+    if (source == SOURCE_ABS) {
+        AudiobookshelfContent(header = header)
+    } else {
+        DeviceAudiobooks(header = header)
+    }
+}
+
+private const val SOURCE_DEVICE = "device"
+private const val SOURCE_ABS = "audiobookshelf"
+
+@Composable
+private fun DeviceAudiobooks(
+    header: @Composable () -> Unit,
     viewModel: AudiobooksViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -122,7 +161,7 @@ fun AudiobooksScreen(
         contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         modifier = Modifier.fillMaxSize(),
     ) {
-        item(key = "filter", contentType = CONTENT_TYPE_HEADER) { filterContent() }
+        item(key = "filter", contentType = CONTENT_TYPE_HEADER) { header() }
 
         if (!hasFolder) {
             item(key = "setup") {
