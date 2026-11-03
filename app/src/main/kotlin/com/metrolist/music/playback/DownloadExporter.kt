@@ -15,7 +15,11 @@ import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
 import com.metrolist.music.constants.DownloadExportFolderKey
 import com.metrolist.music.constants.DownloadPlaylistFoldersKey
+import com.metrolist.music.constants.InnerTubeCookieKey
 import com.metrolist.music.db.MusicDatabase
+import com.metrolist.music.db.entities.Song
+import com.metrolist.music.utils.SpotifyTokenManager
+import com.metrolist.spotify.Spotify
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.get
 import kotlinx.coroutines.Dispatchers
@@ -46,16 +50,91 @@ class DownloadExporter(
 
     suspend fun export(songId: String): Boolean = withContext(Dispatchers.IO) {
         val treeUri = folderUri() ?: return@withContext false
-        lock.withLock { exportTo(songId, FolderCache(treeUri)) }
+        lock.withLock {
+            if (sortsByPlaylist()) refreshSpotifyFolders(force = false)
+            exportTo(songId, FolderCache(treeUri))
+        }
     }
 
     /** Returns how many songs are now present in the folder. */
     suspend fun exportAll(songIds: Collection<String>): Int = withContext(Dispatchers.IO) {
         val treeUri = folderUri() ?: return@withContext 0
         lock.withLock {
+            if (sortsByPlaylist()) refreshSpotifyFolders(force = true)
             val cache = FolderCache(treeUri)
             songIds.count { exportTo(it, cache) }
         }
+    }
+
+    /**
+     * Folder names for a song: its playlists ("YouTube - " for ones synced from YouTube Music,
+     * plain for ones made in Meld, "Spotify - " for Spotify's), plus a liked-songs folder.
+     * An empty list entry means the main folder.
+     */
+    private fun folderNamesFor(song: Song): List<String> {
+        if (!sortsByPlaylist()) return listOf("")
+        val names = LinkedHashSet<String>()
+        database.playlistFoldersForSong(song.id).forEach { playlist ->
+            names += if (playlist.browseId != null) "YouTube - ${playlist.name}" else playlist.name
+        }
+        if (song.song.liked) {
+            names += if (youTubeSignedIn()) "YouTube - Liked songs" else "Liked songs"
+        }
+        names += spotifyFolders[song.id].orEmpty()
+        return names.map { sanitizeFileName(it, "Playlist") }.distinct().ifEmpty { listOf("") }
+    }
+
+    private fun youTubeSignedIn(): Boolean =
+        context.dataStore[InnerTubeCookieKey]?.contains("SAPISID") == true
+
+    /** YouTube song id -> "Spotify - …" folders, from the user's Spotify playlists and liked songs. */
+    @Volatile
+    private var spotifyFolders: Map<String, Set<String>> = emptyMap()
+    private var spotifyFoldersAt = 0L
+
+    private suspend fun refreshSpotifyFolders(force: Boolean) {
+        if (!force && System.currentTimeMillis() - spotifyFoldersAt < SPOTIFY_REFRESH_MS) return
+        runCatching { buildSpotifyFolders() }
+            .onSuccess {
+                spotifyFolders = it
+                spotifyFoldersAt = System.currentTimeMillis()
+            }
+            .onFailure { Timber.tag(TAG).w(it, "Could not read Spotify playlists") }
+    }
+
+    private suspend fun buildSpotifyFolders(): Map<String, Set<String>> {
+        if (!SpotifyTokenManager.ensureAuthenticated()) return emptyMap()
+        val folders = HashMap<String, MutableSet<String>>()
+        fun add(spotifyTrackId: String?, folder: String) {
+            val youtubeId = spotifyTrackId?.takeIf { it.isNotBlank() }
+                ?.let { database.getSpotifyMatch(it)?.youtubeId } ?: return
+            folders.getOrPut(youtubeId) { HashSet() }.add(folder)
+        }
+
+        var playlistOffset = 0
+        while (playlistOffset < MAX_SPOTIFY_PLAYLISTS) {
+            val page = Spotify.myPlaylists(limit = 50, offset = playlistOffset).getOrNull() ?: break
+            for (playlist in page.items) {
+                var trackOffset = 0
+                while (trackOffset < MAX_SPOTIFY_TRACKS) {
+                    val tracks = Spotify.playlistTracks(playlist.id, limit = 100, offset = trackOffset).getOrNull() ?: break
+                    tracks.items.filterNot { it.isLocal }.forEach { add(it.track?.id, "Spotify - ${playlist.name}") }
+                    trackOffset += 100
+                    if (tracks.items.size < 100) break
+                }
+            }
+            playlistOffset += 50
+            if (page.items.size < 50) break
+        }
+
+        var likedOffset = 0
+        while (likedOffset < MAX_SPOTIFY_TRACKS) {
+            val page = Spotify.likedSongs(limit = 50, offset = likedOffset).getOrNull() ?: break
+            page.items.forEach { add(it.track.id, "Spotify - Liked songs") }
+            likedOffset += 50
+            if (page.items.size < 50) break
+        }
+        return folders
     }
 
     private suspend fun exportTo(songId: String, folders: FolderCache): Boolean {
@@ -69,15 +148,7 @@ class DownloadExporter(
             val baseName = sanitizeFileName(title, songId)
             val m4aName = "$baseName.m4a"
 
-            val folderNames = if (sortsByPlaylist()) {
-                database.playlistNamesForSong(songId)
-                    .map { sanitizeFileName(it, "Playlist") }
-                    .distinct()
-                    .ifEmpty { listOf("") }
-            } else {
-                listOf("")
-            }
-            val targets = folderNames
+            val targets = folderNamesFor(song)
                 .mapNotNull(folders::directoryId)
                 .filter { dirId ->
                     val names = folders.names(dirId)
@@ -195,6 +266,9 @@ class DownloadExporter(
 
     private companion object {
         const val TAG = "DownloadExporter"
+        const val SPOTIFY_REFRESH_MS = 30 * 60 * 1000L
+        const val MAX_SPOTIFY_PLAYLISTS = 500
+        const val MAX_SPOTIFY_TRACKS = 5000
     }
 }
 

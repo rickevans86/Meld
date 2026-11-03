@@ -1280,7 +1280,7 @@
     <string name="download_folder_off">Off. Tap to choose a folder; new downloads are also saved there as .m4a audio files</string>
     <string name="download_folder_save_existing">Save existing downloads to folder</string>
     <string name="download_folder_by_playlist">Sort into playlist folders</string>
-    <string name="download_folder_by_playlist_desc">Each playlist gets its own folder, with a copy of every downloaded song in it. Songs in no playlist go in the main folder.</string>
+    <string name="download_folder_by_playlist_desc">Each playlist gets its own folder (named \"YouTube - …\" or \"Spotify - …\" for synced ones), plus folders for liked songs. A song is copied into every folder it belongs to; songs in none go in the main folder.</string>
     <string name="download_folder_saving">Saving downloads…</string>
     <string name="download_folder_stop">Stop saving to folder</string>
     <string name="download_folder_stop_desc">Files already saved stay in the folder</string>

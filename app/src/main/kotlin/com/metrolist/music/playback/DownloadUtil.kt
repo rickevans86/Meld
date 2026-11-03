@@ -43,6 +43,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -314,10 +315,10 @@ constructor(
                 .filter { it.state == Download.STATE_COMPLETED }
                 .forEach { removeFromPlayerCache(it.request.id) }
         }
-        // When downloaded songs are added to playlists, copy them into those playlists' folders
+        // When downloaded songs are added to playlists or liked, copy them into the matching folders
         scope.launch {
             @OptIn(FlowPreview::class)
-            database.playlistSongMapCount()
+            combine(database.playlistSongMapCount(), database.likedSongsCount()) { playlists, liked -> playlists to liked }
                 .distinctUntilChanged()
                 .drop(1)
                 .debounce(15_000)
