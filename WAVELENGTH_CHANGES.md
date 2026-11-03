@@ -167,6 +167,9 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   Everything else uses the normal cached factory. ICY "now playing" titles come in through `onMetadata` and show
   on the Radio screen (the player notification shows them automatically).
 - Radio can't be downloaded (SongMenu hides it; DownloadUtil refuses it). Plays are reported to Radio Browser.
+- Add station: paste a stream link (`RadioDirectory.addCustom`, id `radio:custom-<hash>`); .pls/.m3u playlist links
+  are opened to find the stream. The screen links out to StreamURL.link and FMSTREAM for finding links (neither
+  has a public API, and FMSTREAM blocks automated access, so they aren't searched in-app).
 - New files: `radio/RadioDirectory.kt`, `viewmodels/RadioViewModel.kt`, `ui/screens/radio/RadioScreen.kt`
 - Edited: `MusicService.kt`, `DownloadUtil.kt`, `SongMenu.kt`, `constants/Audiobooks.kt` (`RADIO_ID_PREFIX`),
   `gradle/libs.versions.toml` + `app/build.gradle.kts` (`media3-hls`)
@@ -268,3 +271,4 @@ To see the exact diff at any time:
 - 2026-11-03: Replaced the app icon with an original headphones and sound-bars design.
 - 2026-11-03: Podcasts and Audiobooks moved from Library chips to their own bottom tabs.
 - 2026-11-03: Side menu; News as its own tab; internet radio; Navidrome / Subsonic; combined New episodes.
+- 2026-11-03: Radio: add stations from pasted stream links; links to StreamURL.link and FMSTREAM.

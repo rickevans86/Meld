@@ -1344,6 +1344,13 @@
     <string name="radio_no_favourites">No favourite stations yet. Tap the heart next to a station to keep it here.</string>
     <string name="radio_no_results">No stations found.</string>
     <string name="radio_favourite">Favourite</string>
+    <string name="radio_add_station">Add station</string>
+    <string name="radio_add_station_intro">Paste a stream link, for example one copied from StreamURL.link or FMSTREAM. Playlist links (.pls, .m3u) work too. It\'s saved to your favourites.</string>
+    <string name="radio_stream_link">Stream link</string>
+    <string name="radio_station_name">Station name (optional)</string>
+    <string name="radio_add">Add</string>
+    <string name="radio_add_this_link">Add this link as a radio station</string>
+    <string name="radio_find_online">Can\'t find a station? Look it up on these sites, copy its stream link and add it here.</string>
     <string name="subsonic_tab">Navidrome</string>
     <string name="subsonic_sign_in_title">Connect your music server</string>
     <string name="subsonic_sign_in_intro">Works with Navidrome and other Subsonic-compatible servers such as Airsonic and Gonic. Your password is stored encrypted on this phone.</string>

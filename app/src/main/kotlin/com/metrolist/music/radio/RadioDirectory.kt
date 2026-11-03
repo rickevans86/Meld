@@ -29,6 +29,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import timber.log.Timber
@@ -171,6 +172,40 @@ constructor(
                     .execute().close()
             }
         }
+    }
+
+    /**
+     * Adds a station from a pasted stream link (e.g. found on StreamURL.link or FMSTREAM) and saves it
+     * to favourites. Playlist links (.pls / .m3u) are opened to find the actual stream.
+     */
+    suspend fun addCustom(name: String, link: String): RadioStation = withContext(Dispatchers.IO) {
+        val url = streamFromPlaylist(link.trim()) ?: link.trim()
+        if (url.toHttpUrlOrNull() == null) throw IOException("That doesn't look like a stream link.")
+        val station = RadioStation(
+            id = "custom-" + java.security.MessageDigest.getInstance("SHA-1").digest(url.toByteArray())
+                .joinToString("") { "%02x".format(it) }.take(16),
+            name = name.trim().ifEmpty { url.toHttpUrlOrNull()?.host ?: "Radio stream" },
+            streamUrl = url,
+            hls = url.contains(".m3u8", ignoreCase = true),
+        )
+        known[station.songId] = station
+        setFavourite(station, true)
+        station
+    }
+
+    /** For .pls and .m3u playlist links, the first stream inside; null for anything else. */
+    private fun streamFromPlaylist(link: String): String? {
+        val path = link.substringBefore('?').lowercase()
+        if (!path.endsWith(".pls") && !(path.endsWith(".m3u") && !path.endsWith(".m3u8"))) return null
+        return runCatching {
+            val body = http.newCall(Request.Builder().url(link).header("User-Agent", USER_AGENT).build()).execute().use {
+                if (!it.isSuccessful) return null
+                it.body?.string().orEmpty()
+            }
+            body.lineSequence()
+                .map { it.trim().substringAfter('=', it.trim()).trim() }
+                .firstOrNull { it.startsWith("http://") || it.startsWith("https://") }
+        }.getOrNull()
     }
 
     fun setNowPlaying(songId: String, title: String?) {

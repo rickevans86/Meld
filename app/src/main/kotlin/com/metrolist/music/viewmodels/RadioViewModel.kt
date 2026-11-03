@@ -84,6 +84,18 @@ constructor(
 
     fun search(query: String) = show(if (query.isBlank()) RadioList.Popular else RadioList.Search(query.trim()))
 
+    /** Adds a pasted stream link as a favourite station; calls [onDone] with an error message or null. */
+    fun addCustom(name: String, link: String, onDone: (String?) -> Unit) {
+        viewModelScope.launch {
+            runCatching { directory.addCustom(name, link) }
+                .onSuccess {
+                    show(RadioList.Favourites)
+                    onDone(null)
+                }
+                .onFailure { onDone(it.message ?: "Couldn't add that station.") }
+        }
+    }
+
     fun isFavourite(station: RadioStation) = favourites.value.any { it.id == station.id }
 
     fun toggleFavourite(station: RadioStation) = directory.setFavourite(station, !isFavourite(station))

@@ -25,7 +25,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,7 +80,27 @@ fun RadioScreen(
     val nowPlaying by viewModel.nowPlaying.collectAsState()
     val current by playerConnection.mediaMetadata.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
+    var addDialogLink by rememberSaveable { mutableStateOf<String?>(null) }
+    val uriHandler = LocalUriHandler.current
     val shown = if (list is RadioList.Favourites) favourites else stations
+    val pastedLink = com.metrolist.music.podcasts.PodcastDirectory.linkIn(query)
+
+    addDialogLink?.let { initial ->
+        AddStationDialog(
+            initialLink = initial,
+            onDismiss = { addDialogLink = null },
+            onAdd = { name, link, onError ->
+                viewModel.addCustom(name, link) { error ->
+                    if (error == null) {
+                        addDialogLink = null
+                        query = ""
+                    } else {
+                        onError(error)
+                    }
+                }
+            },
+        )
+    }
     val queueTitle = stringResource(R.string.radio_tab)
 
     LazyColumn(
@@ -92,6 +117,11 @@ fun RadioScreen(
                 singleLine = true,
                 placeholder = { Text(stringResource(R.string.radio_search_hint)) },
                 leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = { addDialogLink = "" }) {
+                        Icon(painterResource(R.drawable.add), contentDescription = stringResource(R.string.radio_add_station))
+                    }
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             )
@@ -121,6 +151,37 @@ fun RadioScreen(
                         onClick = { query = ""; viewModel.show(RadioList.Genre(tag, label)) },
                         label = { Text(label) },
                     )
+                }
+            }
+        }
+        if (pastedLink != null) {
+            item(key = "pasted_link") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { addDialogLink = pastedLink }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    Icon(painterResource(R.drawable.add), contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(R.string.radio_add_this_link), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+        if (list is RadioList.Favourites || list is RadioList.Search) {
+            item(key = "find_online") {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text(
+                        stringResource(R.string.radio_find_online),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { uriHandler.openUri("https://streamurl.link/") }) { Text("StreamURL.link") }
+                        TextButton(onClick = { uriHandler.openUri("https://fmstream.org/") }) { Text("FMSTREAM") }
+                        TextButton(onClick = { addDialogLink = "" }) { Text(stringResource(R.string.radio_add_station)) }
+                    }
                 }
             }
         }
@@ -187,6 +248,71 @@ fun RadioScreen(
             }
         }
     }
+}
+
+@Composable
+private fun AddStationDialog(
+    initialLink: String,
+    onDismiss: () -> Unit,
+    onAdd: (name: String, link: String, onError: (String) -> Unit) -> Unit,
+) {
+    val context = LocalContext.current
+    var name by rememberSaveable { mutableStateOf("") }
+    var link by rememberSaveable { mutableStateOf(initialLink) }
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.radio_add_station)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(R.string.radio_add_station_intro),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = link,
+                    onValueChange = { link = it; error = null },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.radio_stream_link)) },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()?.trim()
+                                ?.let { pasted -> link = com.metrolist.music.podcasts.PodcastDirectory.linkIn(pasted) ?: pasted }
+                        }) {
+                            Icon(painterResource(R.drawable.content_paste), contentDescription = stringResource(R.string.podcast_paste))
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.radio_station_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !adding && link.isNotBlank(),
+                onClick = {
+                    adding = true
+                    onAdd(name, link) { message ->
+                        adding = false
+                        error = message
+                    }
+                },
+            ) { Text(stringResource(R.string.radio_add)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
+    )
 }
 
 @Composable
