@@ -14,6 +14,7 @@ import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.metrolist.music.constants.SongSortDescendingKey
+import com.metrolist.music.constants.isAudiobookId
 import com.metrolist.music.constants.SongSortType
 import com.metrolist.music.constants.SongSortTypeKey
 import com.metrolist.music.db.MusicDatabase
@@ -68,6 +69,7 @@ constructor(
             .flatMapLatest { (sortType, descending) ->
                 database.localSongs(sortType, descending)
             }
+            .map { songs -> songs.filterNot { isAudiobookId(it.id) } }
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     // Song id -> folder path relative to storage root, read from MediaStore so the DB schema stays unchanged

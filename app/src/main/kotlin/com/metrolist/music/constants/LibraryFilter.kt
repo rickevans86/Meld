@@ -12,5 +12,6 @@ enum class LibraryFilter {
     PLAYLISTS,
     PODCASTS,
     LOCAL_FILES,
+    AUDIOBOOKS,
     LIBRARY,
 }

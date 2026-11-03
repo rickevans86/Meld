@@ -625,6 +625,7 @@ fun AppearanceSettings(
                     LibraryFilter.PLAYLISTS -> stringResource(R.string.playlists)
                     LibraryFilter.PODCASTS -> stringResource(R.string.filter_podcasts)
                     LibraryFilter.LOCAL_FILES -> stringResource(R.string.filter_local_files)
+                    LibraryFilter.AUDIOBOOKS -> stringResource(R.string.filter_audiobooks)
                     LibraryFilter.LIBRARY -> stringResource(R.string.filter_library)
                 }
             },
@@ -1586,6 +1587,7 @@ fun AppearanceSettings(
                                     LibraryFilter.PODCASTS -> stringResource(R.string.filter_podcasts)
                                     LibraryFilter.LIBRARY -> stringResource(R.string.filter_library)
                                     LibraryFilter.LOCAL_FILES -> stringResource(R.string.local_files)
+                                    LibraryFilter.AUDIOBOOKS -> stringResource(R.string.filter_audiobooks)
                                 },
                             )
                         },

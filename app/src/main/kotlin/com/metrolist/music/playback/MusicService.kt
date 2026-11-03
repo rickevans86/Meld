@@ -102,7 +102,10 @@ import com.metrolist.innertubex.extraction.ContentHints
 import com.metrolist.lastfm.LastFM
 import com.metrolist.music.MainActivity
 import com.metrolist.music.R
+import com.metrolist.music.audiobooks.AudiobookRepository
 import com.metrolist.music.constants.AddToPlaylistPosition
+import com.metrolist.music.constants.isAudiobookId
+import com.metrolist.music.constants.isOnDeviceMediaId
 import com.metrolist.music.constants.AddToPlaylistPositionKey
 import com.metrolist.music.constants.AndroidAutoTargetPlaylistKey
 import com.metrolist.music.constants.AudioFocusEnabledKey
@@ -316,6 +319,9 @@ class MusicService :
 
     @Inject
     lateinit var downloadUtil: DownloadUtil
+
+    @Inject
+    lateinit var audiobookRepository: AudiobookRepository
 
     @Inject
     lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
@@ -1406,7 +1412,7 @@ class MusicService :
                     saveQueueToDisk()
                 }
                 val currentMetadata = player.currentMediaItem?.metadata
-                if (currentMetadata?.isEpisode == true && player.isPlaying && player.currentPosition > 0) {
+                if (currentMetadata != null && currentMetadata.remembersPosition() && player.isPlaying && player.currentPosition > 0) {
                     previousEpisodePosition = player.currentPosition
                     saveEpisodePosition(currentMetadata.id, player.currentPosition)
                 }
@@ -2713,6 +2719,10 @@ class MusicService :
     private var lastTransitionedMediaId: String? = null
     private var previousEpisodePosition: Long = 0L
 
+    /** Podcast episodes and audiobook chapters resume where the listener stopped. */
+    private fun com.metrolist.music.models.MediaMetadata?.remembersPosition(): Boolean =
+        this != null && (isEpisode || isAudiobookId(id))
+
     /**
      * Save podcast episode playback position to database.
      * Only saves if the item is an episode and position is meaningful (> 3 seconds).
@@ -2768,7 +2778,9 @@ class MusicService :
         updateInitialBufferRecovery(player.playbackState)
 
         previousEpisodeId?.let { episodeId ->
-            if (previousEpisodePosition > 0) {
+            if (isAudiobookId(episodeId) && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                audiobookRepository.onChapterFinished(episodeId)
+            } else if (previousEpisodePosition > 0) {
                 saveEpisodePosition(episodeId, previousEpisodePosition)
             }
         }
@@ -2776,8 +2788,11 @@ class MusicService :
         previousEpisodePosition = 0L
 
         val newMetadata = mediaItem?.metadata
-        if (newMetadata?.isEpisode == true) {
+        if (newMetadata != null && newMetadata.remembersPosition()) {
             previousEpisodeId = newMetadata.id
+            if (isAudiobookId(newMetadata.id)) {
+                audiobookRepository.onChapterStarted(newMetadata.id)
+            }
             scope.launch {
                 delay(100)
                 restoreEpisodePosition(newMetadata.id)
@@ -2943,7 +2958,7 @@ class MusicService :
 
         if (!playWhenReady) {
             val currentMetadata = player.currentMediaItem?.metadata
-            if (currentMetadata?.isEpisode == true && player.currentPosition > 0) {
+            if (currentMetadata != null && currentMetadata.remembersPosition() && player.currentPosition > 0) {
                 saveEpisodePosition(currentMetadata.id, player.currentPosition)
                 previousEpisodePosition = player.currentPosition
             }
@@ -3967,7 +3982,7 @@ class MusicService :
             val mediaId = mediaItem.mediaMetadata.extras?.getString("mediaId")
                 ?: mediaItem.mediaId
             val title = mediaItem.mediaMetadata.title?.toString() ?: "unknown"
-            if (mediaId.startsWith("local:")) {
+            if (isOnDeviceMediaId(mediaId)) {
                 Timber.tag(PRECACHE_TAG).d("[PRECACHE] Skip local track [$i]: $title ($mediaId)")
                 continue
             }
@@ -4481,7 +4496,7 @@ class MusicService :
             val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
 
             // Handle local audio files — resolve to content URI and bypass YouTube fetch
-            if (mediaId.startsWith("local:")) {
+            if (isOnDeviceMediaId(mediaId)) {
                 val localPath = runBlocking(Dispatchers.IO) {
                     database.getSongById(mediaId)?.song?.localPath
                 }
@@ -5166,7 +5181,7 @@ class MusicService :
         }
 
         val currentMetadata = player.currentMediaItem?.metadata
-        if (currentMetadata?.isEpisode == true && player.currentPosition > 0) {
+        if (currentMetadata != null && currentMetadata.remembersPosition() && player.currentPosition > 0) {
             runBlocking(Dispatchers.IO) {
                 database.updatePlaybackPosition(currentMetadata.id, player.currentPosition)
             }
@@ -5828,7 +5843,7 @@ class MusicService :
 
         val mediaId = player.currentMediaItem?.mediaId ?: return
         // Episodes (podcasts) are not on YouTube proper and aren't on SponsorBlock.
-        if (player.currentMediaItem?.metadata?.isEpisode == true) return
+        if (player.currentMediaItem?.metadata?.let { it.isEpisode || isAudiobookId(it.id) } == true) return
 
         val showToast = dataStore.get(SponsorBlockShowToastKey, false)
 

@@ -21,6 +21,7 @@ import com.metrolist.music.constants.LibraryFilter
 import com.metrolist.music.constants.LibraryViewType
 import com.metrolist.music.constants.PlaylistViewTypeKey
 import com.metrolist.music.ui.component.ChipsRow
+import com.metrolist.music.ui.screens.library.audiobooks.AudiobooksScreen
 import com.metrolist.music.ui.screens.library.local.LocalFilesScreen
 import com.metrolist.music.utils.rememberEnumPreference
 import androidx.navigation.NavController
@@ -42,6 +43,7 @@ fun LibraryScreen() {
                     LibraryFilter.ARTISTS to stringResource(R.string.filter_artists),
                     LibraryFilter.PODCASTS to stringResource(R.string.filter_podcasts),
                     LibraryFilter.LOCAL_FILES to stringResource(R.string.filter_local_files),
+                    LibraryFilter.AUDIOBOOKS to stringResource(R.string.filter_audiobooks),
                 ),
                 currentValue = filterType,
                 onValueUpdate = {
@@ -84,6 +86,11 @@ fun LibraryScreen() {
             )
 
             LibraryFilter.LOCAL_FILES -> LocalFilesScreen(
+                navController,
+                filterContent,
+            )
+
+            LibraryFilter.AUDIOBOOKS -> AudiobooksScreen(
                 navController,
                 filterContent,
             )

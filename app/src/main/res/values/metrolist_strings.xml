@@ -1203,6 +1203,30 @@
     <string name="local_files_back_to_folders">Back to folders</string>
     <string name="local_files_storage_root">Internal storage</string>
     <string name="download_folder_section">Download folder</string>
+    <string name="filter_audiobooks">Audiobooks</string>
+    <string name="audiobooks_setup_title">Listen to audiobooks on your phone</string>
+    <string name="audiobooks_setup_body">Choose the folder where your audiobooks are saved. Each folder of audio files becomes one book, with every file as a chapter. Single .m4b or .mp3 books work too.</string>
+    <string name="audiobooks_choose_folder">Choose audiobooks folder</string>
+    <string name="audiobooks_change_folder">Change audiobooks folder</string>
+    <string name="audiobooks_rescan">Scan for new audiobooks</string>
+    <string name="audiobooks_none_found">No audiobooks found in this folder. Put each book in its own folder, then tap the scan button.</string>
+    <string name="audiobooks_back">Back to audiobooks</string>
+    <string name="audiobook_finished">Finished</string>
+    <string name="audiobook_progress">Chapter %1$d of %2$d · %3$d%%</string>
+    <string name="audiobook_start">Start listening</string>
+    <string name="audiobook_continue">Continue chapter %d</string>
+    <string name="audiobook_listen_again">Listen again</string>
+    <string name="audiobook_pause">Pause</string>
+    <string name="audiobook_chapters">Chapters</string>
+    <string name="audiobook_time_left">%s left</string>
+    <plurals name="n_audiobook">
+        <item quantity="one">%d audiobook</item>
+        <item quantity="other">%d audiobooks</item>
+    </plurals>
+    <plurals name="n_audiobook_chapter">
+        <item quantity="one">%d chapter</item>
+        <item quantity="other">%d chapters</item>
+    </plurals>
     <string name="download_folder">Save downloads as music files</string>
     <string name="download_folder_off">Off. Tap to choose a folder; new downloads are also saved there as normal audio files</string>
     <string name="download_folder_save_existing">Save existing downloads to folder</string>
