@@ -65,6 +65,15 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 
 ## Features
 
+### 0. Bottom tabs
+- Podcasts and Audiobooks are their own bottom tabs (`Screens.Podcasts` route `podcasts`, `Screens.Audiobooks`
+  route `audiobooks`) and are no longer Library chips. The Library falls back to its main view if an old saved
+  chip points at them.
+- New file: `res/drawable/podcasts.xml`
+- Edited: `ui/screens/Screens.kt` (new screens and `MainScreens` order), `NavigationBuilder.kt`, `MainActivity.kt`
+  (`topLevelScreens`, titles), `LibraryScreen.kt` (chips removed), `LibraryPodcastsScreen.kt` (`onDeselect`
+  nullable), `AppearanceSettings.kt` (default-chip list excludes them)
+
 ### 1. Local files: folder view and music folders
 - The Local files tab can switch between a song list and a folder view.
 - **Settings → Storage → Music folders** (`settings/local_folders`) can include or exclude MediaStore folders,
@@ -168,6 +177,7 @@ These are the files that can conflict during a merge, and what to re-apply in ea
 | `playback/MediaLibrarySessionCallback.kt` | `autoExtras` injection, search-supported extra, new section routing |
 | `playback/MusicService.kt` | Audiobook and ABS repos, `remembersPosition()`, ABS headers, `isOnDeviceMediaId` in resolver and precache, extra extractors |
 | `ui/menu/SongMenu.kt` | `isFromYouTube` guards |
+| `ui/screens/Screens.kt` | Podcasts and Audiobooks bottom tabs |
 | `ui/screens/NavigationBuilder.kt` | Routes `settings/local_folders`, `news_sources`, `podcast_directory?feed={feed}`, audiobook routes |
 | `ui/screens/library/LibraryPodcastsScreen.kt` | Search icon, news card, followed feeds |
 | `ui/screens/library/LibraryScreen.kt` | Audiobooks filter, which opens `AudiobooksScreen` |
@@ -210,3 +220,4 @@ To see the exact diff at any time:
 - 2026-11-03: Fixed a crash when podcast search returns the same show twice (results, episodes, Spotify shows and news sources are de-duplicated).
 - 2026-11-03: Paste button and pasted-link support in podcast search (Pocket Casts, Apple, Spotify, RSS).
 - 2026-11-03: Replaced the app icon with an original headphones and sound-bars design.
+- 2026-11-03: Podcasts and Audiobooks moved from Library chips to their own bottom tabs.

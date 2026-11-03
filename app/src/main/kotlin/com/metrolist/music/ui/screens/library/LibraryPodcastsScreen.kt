@@ -99,7 +99,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun LibraryPodcastsScreen(
     navController: NavController,
-    onDeselect: () -> Unit,
+    /** Null when shown as its own tab rather than as a Library chip, which hides the close chip. */
+    onDeselect: (() -> Unit)?,
     viewModel: LibraryPodcastsViewModel = hiltViewModel(),
 ) {
     val downloadedEpisodesStr = stringResource(R.string.downloaded_episodes)
@@ -180,7 +181,7 @@ fun LibraryPodcastsScreen(
         val chipsHeader = @Composable {
             Row {
                 Spacer(Modifier.width(12.dp))
-                FilterChip(
+                if (onDeselect != null) FilterChip(
                     label = { Text(stringResource(R.string.filter_podcasts)) },
                     selected = true,
                     colors =

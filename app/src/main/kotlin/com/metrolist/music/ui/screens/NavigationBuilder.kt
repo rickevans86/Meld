@@ -106,6 +106,14 @@ fun NavGraphBuilder.navigationBuilder(
         LibraryScreen()
     }
 
+    composable(Screens.Podcasts.route) {
+        com.metrolist.music.ui.screens.library.LibraryPodcastsScreen(navController, onDeselect = null)
+    }
+
+    composable(Screens.Audiobooks.route) {
+        com.metrolist.music.ui.screens.library.audiobooks.AudiobooksScreen(navController, filterContent = {})
+    }
+
     composable(Screens.ListenTogether.route) {
         ListenTogetherScreen(navController, showTopBar = false)
     }

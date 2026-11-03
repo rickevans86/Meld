@@ -616,7 +616,8 @@ fun AppearanceSettings(
             },
             title = stringResource(R.string.default_lib_chips),
             current = defaultChip,
-            values = LibraryFilter.values().toList(),
+            // Podcasts and audiobooks are bottom tabs, not Library chips
+            values = LibraryFilter.values().filter { it != LibraryFilter.PODCASTS && it != LibraryFilter.AUDIOBOOKS },
             valueText = {
                 when (it) {
                     LibraryFilter.SONGS -> stringResource(R.string.songs)
