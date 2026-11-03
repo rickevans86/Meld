@@ -401,6 +401,10 @@ fun NavGraphBuilder.navigationBuilder(
         LocalMusicFoldersSettings(navController)
     }
 
+    composable("news_sources") {
+        com.metrolist.music.ui.screens.podcast.NewsSourcesScreen(navController)
+    }
+
     composable(
         route = "podcast_directory?feed={feed}",
         arguments = listOf(

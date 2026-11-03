@@ -228,6 +228,10 @@ fun LibraryPodcastsScreen(
                         chipsHeader()
                     }
 
+                    item(key = "news_briefing", contentType = CONTENT_TYPE_HEADER) {
+                        com.metrolist.music.ui.screens.podcast.NewsBriefingCard(navController)
+                    }
+
                     // RDPN "New Episodes" auto-playlist card
                     item(key = "rdpn_playlist", contentType = CONTENT_TYPE_HEADER) {
                         AutoPlaylistCard(

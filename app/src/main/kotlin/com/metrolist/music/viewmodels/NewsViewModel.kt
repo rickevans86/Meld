@@ -1,0 +1,64 @@
+/**
+ * Metrolist Project (C) 2026
+ * Licensed under GPL-3.0 | See git history for contributors
+ */
+
+package com.metrolist.music.viewmodels
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.metrolist.music.db.entities.Song
+import com.metrolist.music.podcasts.NewsBriefing
+import com.metrolist.music.podcasts.NewsSourceChoice
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class NewsViewModel
+@Inject
+constructor(
+    private val briefing: NewsBriefing,
+) : ViewModel() {
+    val choices = briefing.choices.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val _loading = MutableStateFlow(false)
+    val loading = _loading.asStateFlow()
+
+    /** Fetches the latest bulletins and calls [onReady] with them, or with an empty list if none came back. */
+    fun play(onReady: (List<Song>) -> Unit) {
+        if (_loading.value) return
+        viewModelScope.launch {
+            _loading.value = true
+            val sources = choices.value.filter { it.enabled }.map { it.source }
+            val songs = runCatching { briefing.latestBulletins(sources) }.getOrDefault(emptyList())
+            _loading.value = false
+            onReady(songs)
+        }
+    }
+
+    fun toggle(choice: NewsSourceChoice) = save(
+        enabledKeys().let { keys ->
+            if (choice.enabled) keys - choice.source.key else keys + choice.source.key
+        },
+    )
+
+    fun move(choice: NewsSourceChoice, offset: Int) {
+        val keys = enabledKeys().toMutableList()
+        val from = keys.indexOf(choice.source.key)
+        val to = from + offset
+        if (from < 0 || to !in keys.indices) return
+        keys.add(to, keys.removeAt(from))
+        save(keys)
+    }
+
+    private fun enabledKeys() = choices.value.filter { it.enabled }.map { it.source.key }
+
+    private fun save(keys: List<String>) {
+        viewModelScope.launch { briefing.setEnabled(keys) }
+    }
+}

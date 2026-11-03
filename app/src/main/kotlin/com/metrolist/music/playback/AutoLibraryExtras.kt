@@ -44,9 +44,11 @@ constructor(
     private val audiobookshelf: AbsRepository,
     private val localMusicFolders: LocalMusicFolders,
     private val podcastFeeds: com.metrolist.music.podcasts.PodcastDirectory,
+    private val news: com.metrolist.music.podcasts.NewsBriefing,
 ) {
     fun isBrowsable(mediaId: String): Boolean =
         mediaId == LOCAL_FILES ||
+            mediaId == NEWS ||
             mediaId == AUDIOBOOKS ||
             mediaId == ABS_ALL ||
             mediaId == PODCASTS ||
@@ -56,6 +58,7 @@ constructor(
 
     fun rootItem(section: String): MediaItem = when (section) {
         LOCAL_FILES -> folder(LOCAL_FILES, context.getString(R.string.local_files), null, icon(R.drawable.folder), MediaMetadata.MEDIA_TYPE_PLAYLIST)
+        NEWS -> folder(NEWS, context.getString(R.string.news_briefing), null, icon(R.drawable.newspaper), MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
         AUDIOBOOKS -> folder(AUDIOBOOKS, context.getString(R.string.filter_audiobooks), null, icon(R.drawable.audiobook), MediaMetadata.MEDIA_TYPE_FOLDER_AUDIO_BOOKS)
         else -> folder(PODCASTS, context.getString(R.string.filter_podcasts), null, icon(R.drawable.mic), MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
     }
@@ -66,6 +69,7 @@ constructor(
             val songs = localSongs()
             if (songs.isEmpty()) emptyList() else listOf(shuffleItem(LOCAL_FILES)) + songs.map { it.toAutoItem(LOCAL_FILES) }
         }
+        parentId == NEWS -> newsItems()
         parentId == AUDIOBOOKS -> audiobookItems()
         parentId == ABS_ALL -> absAllBooks()
         parentId == PODCASTS -> podcastFolders()
@@ -90,6 +94,7 @@ constructor(
                 )
             }
         }
+        NEWS -> playNews(path)
         AUDIOBOOKS -> playAudiobook(path)
         PODCASTS -> playPodcast(path)
         else -> null
@@ -109,6 +114,30 @@ constructor(
                 else -> song.id.removePrefix("local:").toLongOrNull()?.let { it in included } ?: true
             }
         }
+    }
+
+    private suspend fun enabledNewsSources() =
+        news.choices.first().filter { it.enabled }.map { it.source }
+
+    private suspend fun newsItems(): List<MediaItem> {
+        val sources = enabledNewsSources()
+        if (sources.isEmpty()) return emptyList()
+        return listOf(
+            playable("$NEWS/$NEWS_ALL", context.getString(R.string.news_play_all), sources.joinToString(" · ") { it.name }, icon(R.drawable.newspaper)),
+        ) + sources.mapIndexed { index, source ->
+            playable("$NEWS/$index", source.name, source.region, source.artworkUrl?.toUri() ?: icon(R.drawable.newspaper))
+        }
+    }
+
+    private suspend fun playNews(path: List<String>): MediaItemsWithStartPosition? {
+        val sources = enabledNewsSources()
+        val chosen = when (val which = path.getOrNull(1)) {
+            NEWS_ALL -> sources
+            else -> listOfNotNull(which?.toIntOrNull()?.let(sources::getOrNull))
+        }
+        val bulletins = news.latestBulletins(chosen)
+        if (bulletins.isEmpty()) return null
+        return MediaItemsWithStartPosition(bulletins.map { it.toMediaItem() }, 0, C.TIME_UNSET)
     }
 
     private suspend fun audiobookItems(): List<MediaItem> {
@@ -313,6 +342,8 @@ constructor(
         private const val TAG = "AutoLibraryExtras"
         private const val NETWORK_TIMEOUT_MS = 8_000L
         const val LOCAL_FILES = "local_files"
+        const val NEWS = "news"
+        private const val NEWS_ALL = "__all__"
         const val AUDIOBOOKS = "audiobooks"
         const val PODCASTS = "podcasts"
         private const val ABS_ALL = "$AUDIOBOOKS/abs_all"

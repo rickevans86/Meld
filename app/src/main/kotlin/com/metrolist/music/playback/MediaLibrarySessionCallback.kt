@@ -292,6 +292,7 @@ constructor(
                                     AndroidAutoSection.LOCAL_FILES -> autoExtras.rootItem(AutoLibraryExtras.LOCAL_FILES)
                                     AndroidAutoSection.AUDIOBOOKS -> autoExtras.rootItem(AutoLibraryExtras.AUDIOBOOKS)
                                     AndroidAutoSection.PODCASTS -> autoExtras.rootItem(AutoLibraryExtras.PODCASTS)
+                                    AndroidAutoSection.NEWS -> autoExtras.rootItem(AutoLibraryExtras.NEWS)
                                 }
                             }
                     }

@@ -22,6 +22,7 @@ val DownloadPlaylistFoldersKey = booleanPreferencesKey("downloadPlaylistFolders"
 val AudiobooksFolderKey = stringPreferencesKey("audiobooksFolder")
 val AudiobooksSourceKey = stringPreferencesKey("audiobooksSource")
 val AbsLibraryKey = stringPreferencesKey("audiobookshelfLibrary")
+val NewsSourcesKey = stringPreferencesKey("newsSources")
 val LocalMusicIncludedFoldersKey = stringSetPreferencesKey("localMusicIncludedFolders")
 val LocalMusicExcludedFoldersKey = stringSetPreferencesKey("localMusicExcludedFolders")
 val LocalMusicAddedFoldersKey = stringSetPreferencesKey("localMusicAddedFolders")

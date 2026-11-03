@@ -1250,6 +1250,15 @@
     <string name="update_downloading_toast">Downloading the update…</string>
     <string name="update_download_failed">The update didn\'t download. Check your connection and try again.</string>
     <string name="update_allow_installs">Allow installing apps from Wavelength, then tap update again.</string>
+    <string name="news_briefing">News briefing</string>
+    <string name="news_play_all">Play the news</string>
+    <string name="news_loading">Getting the latest bulletins…</string>
+    <string name="news_choose_sources">Choose news sources</string>
+    <string name="news_sources">News sources</string>
+    <string name="news_sources_intro">Ticked sources play in this order, newest bulletin from each. Podcasts you follow can be added too.</string>
+    <string name="news_none_available">No recent bulletins could be loaded. Check your connection or news sources.</string>
+    <string name="news_move_up">Move up</string>
+    <string name="news_move_down">Move down</string>
     <string name="podcast_directory">Find podcasts</string>
     <string name="podcast_search_hint">Search all podcasts</string>
     <string name="podcast_no_results">No podcasts match that search.</string>
