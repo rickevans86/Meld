@@ -37,7 +37,10 @@ import javax.inject.Singleton
 
 /** A news outlet whose short audio bulletins are published as a podcast feed. */
 data class NewsSource(
-    /** Stable key saved in settings: "apple:<id>" for built-in outlets, "feed:<url>" for followed podcasts. */
+    /**
+     * Stable key saved in settings: "apple:<id>" for outlets with a known Apple Podcasts id,
+     * "search:<name>::<publisher>" for ones looked up by name, "feed:<url>" for followed podcasts.
+     */
     val key: String,
     val name: String,
     val region: String,
@@ -109,8 +112,13 @@ constructor(
         bulletins
     }
 
-    private fun feedUrlFor(source: NewsSource): String? {
+    private suspend fun feedUrlFor(source: NewsSource): String? {
         if (source.key.startsWith("feed:")) return source.key.removePrefix("feed:")
+        if (source.key.startsWith("search:")) {
+            feedUrls[source.key]?.let { return it }
+            val (name, publisher) = source.key.removePrefix("search:").split("::").let { it[0] to it.getOrNull(1) }
+            return directory.findFeed(name, publisher)?.feedUrl?.also { feedUrls[source.key] = it }
+        }
         val appleId = source.key.removePrefix("apple:")
         feedUrls[appleId]?.let { return it }
         val looked = runCatching {
@@ -132,13 +140,29 @@ constructor(
         private const val SOURCE_TIMEOUT_MS = 20_000L
 
         val BUILT_IN = listOf(
+            NewsSource("apple:1303342739", "7NEWS", "Australia"),
+            NewsSource("search:From the Newsroom::news.com.au", "news.com.au From the Newsroom", "Australia"),
+            NewsSource("search:Global's Newsroom::Global", "Global's Newsroom", "International"),
+            NewsSource("apple:1461999702", "7am", "Australia"),
             NewsSource("apple:1668721389", "ABC News Top Stories", "Australia"),
             NewsSource("apple:1527948302", "SBS News Updates", "Australia"),
+            NewsSource("apple:73329715", "SBS News In Depth", "Australia"),
+            NewsSource("apple:1128428812", "Daily Tech Headlines", "Technology"),
+            NewsSource("search:Engadget::Engadget", "Engadget", "Technology"),
             NewsSource("apple:135067274", "BBC Global News", "International"),
             NewsSource("apple:121493675", "NPR News Now", "International"),
         )
 
-        private val DEFAULT_SOURCES = listOf("apple:1668721389", "apple:1527948302", "apple:135067274")
+        /** Mirrors a typical Android Auto news line-up: local first, then world and tech. */
+        private val DEFAULT_SOURCES = listOf(
+            "apple:1303342739",
+            "search:Global's Newsroom::Global",
+            "apple:1461999702",
+            "apple:1668721389",
+            "apple:1527948302",
+            "apple:73329715",
+            "apple:1128428812",
+        )
 
         /** Used only if Apple's directory can't be reached. */
         private val FALLBACK_FEEDS = mapOf(
