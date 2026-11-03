@@ -18,8 +18,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      HAS_KEYSTORE_SECRET: ${{ secrets.DEBUG_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -33,25 +31,42 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
 
       # Updates only install over the app when every build is signed with the same key.
-      # The key comes from the DEBUG_KEYSTORE_BASE64 secret; without it, one generated on the
-      # first run is kept in the Actions cache (which GitHub clears after 7 unused days).
+      # The key comes from the DEBUG_KEYSTORE_BASE64 secret; if that is missing or unreadable,
+      # a key generated on the first run is kept in the Actions cache instead
+      # (GitHub clears the cache after 7 days without a build).
+      - name: Read signing key from secret
+        id: secret-key
+        env:
+          KEYSTORE_SECRET: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p ~/meld-signing
+          if [ -z "$KEYSTORE_SECRET" ]; then
+            echo "usable=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_SECRET" | tr -cd 'A-Za-z0-9+/=' > ~/meld-signing/secret.b64
+          echo "Secret has $(wc -c < ~/meld-signing/secret.b64) base64 characters (expected 3536)."
+          if base64 -d ~/meld-signing/secret.b64 > ~/meld-signing/secret.keystore 2>/dev/null &&
+             keytool -list -keystore ~/meld-signing/secret.keystore -storepass android -alias androiddebugkey > /dev/null 2>&1; then
+            echo "Key from secret OK: $(sha256sum ~/meld-signing/secret.keystore | cut -c1-12)"
+            cp ~/meld-signing/secret.keystore ~/meld-signing/fork.keystore
+            echo "usable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::The DEBUG_KEYSTORE_BASE64 secret isn't a readable key (it may have been cut short when pasted). Using the cached key for now; paste the secret again."
+            echo "usable=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Restore cached signing key
-        id: key-cache
-        if: env.HAS_KEYSTORE_SECRET != 'true'
+        if: steps.secret-key.outputs.usable != 'true'
         uses: actions/cache@v4
         with:
           path: ~/meld-signing/fork.keystore
           key: meld-fork-signing-key-v1
 
       - name: Prepare signing key
-        env:
-          KEYSTORE_SECRET: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
         run: |
-          mkdir -p ~/meld-signing
-          if [ -n "$KEYSTORE_SECRET" ]; then
-            echo "$KEYSTORE_SECRET" | base64 -d > ~/meld-signing/fork.keystore
-          elif [ ! -f ~/meld-signing/fork.keystore ]; then
-            echo "::warning::No DEBUG_KEYSTORE_BASE64 secret; generating a signing key and caching it."
+          if [ ! -f ~/meld-signing/fork.keystore ]; then
+            echo "Generating a signing key and caching it."
             keytool -genkeypair -keystore ~/meld-signing/fork.keystore \
               -storepass android -keypass android -alias androiddebugkey \
               -keyalg RSA -keysize 2048 -validity 10000 \
