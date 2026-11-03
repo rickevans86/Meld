@@ -37,7 +37,11 @@ data class IndexedAudio(
     val mediaStoreId: Long,
     val folder: String,
     val isMusic: Boolean,
-)
+    val fileName: String = "",
+) {
+    /** "Music/Meld/song.m4a", the same form [LocalMusicFolders.documentPath] gives for picked folders. */
+    val path: String get() = if (folder.isEmpty()) fileName else "$folder/$fileName"
+}
 
 data class AudioFolder(
     /** Path relative to the storage root, e.g. "Music/Meld"; empty for the root itself. */
@@ -127,7 +131,12 @@ constructor(
         try {
             context.contentResolver.query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                arrayOf(MediaStore.Audio.Media._ID, pathColumn, MediaStore.Audio.Media.IS_MUSIC),
+                arrayOf(
+                    MediaStore.Audio.Media._ID,
+                    pathColumn,
+                    MediaStore.Audio.Media.IS_MUSIC,
+                    MediaStore.Audio.Media.DISPLAY_NAME,
+                ),
                 null,
                 null,
                 null,
@@ -135,6 +144,7 @@ constructor(
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                 val pathCol = cursor.getColumnIndexOrThrow(pathColumn)
                 val musicCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.IS_MUSIC)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
                 while (cursor.moveToNext()) {
                     val raw = cursor.getString(pathCol) ?: continue
                     val folder = if (useRelativePath) {
@@ -142,14 +152,19 @@ constructor(
                     } else {
                         File(raw).parent?.removePrefix(storageRoot)?.trim('/') ?: continue
                     }
-                    entries += IndexedAudio(cursor.getLong(idCol), folder, cursor.getInt(musicCol) != 0)
+                    val name = cursor.getString(nameCol) ?: if (useRelativePath) "" else File(raw).name
+                    entries += IndexedAudio(cursor.getLong(idCol), folder, cursor.getInt(musicCol) != 0, name)
                 }
             }
         } catch (e: SecurityException) {
             Timber.tag(TAG).w(e, "No permission to read audio files")
         }
-        _index.value = entries
-        entries
+        // A file rewritten in place can be listed twice; keep only its newest entry
+        val unique = entries
+            .groupBy { if (it.fileName.isEmpty()) "id:${it.mediaStoreId}" else it.path }
+            .map { (_, copies) -> copies.maxBy { it.mediaStoreId } }
+        _index.value = unique
+        unique
     }
 
     private fun Preferences.toChoices() = FolderChoices(
@@ -166,6 +181,11 @@ constructor(
             DocumentsContract.getDocumentId(documentUri.toUri())
                 .substringAfter(':', "")
                 .substringBeforeLast('/', "")
+        }.getOrNull()
+
+        /** Path of a file inside a picked folder tree, as "Music/Meld/song.m4a". */
+        fun documentPath(documentUri: String): String? = runCatching {
+            DocumentsContract.getDocumentId(documentUri.toUri()).substringAfter(':', "")
         }.getOrNull()
 
         fun treeLabel(treeUri: String): String = runCatching {

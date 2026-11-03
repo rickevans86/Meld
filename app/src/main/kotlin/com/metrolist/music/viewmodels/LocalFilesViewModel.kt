@@ -85,13 +85,16 @@ constructor(
         }
 
     val songs =
-        combine(allLocalSongs, folderPaths, musicFolders.choices) { songs, paths, choices ->
+        combine(allLocalSongs, folderPaths, musicFolders.choices, musicFolders.index) { songs, paths, choices, index ->
+            // A file in a hand-added folder that the phone also indexes would otherwise show twice
+            val indexedPaths = index.orEmpty().mapTo(HashSet()) { it.path }
             songs.filter { song ->
                 val id = song.id
                 when {
                     isAudiobookId(id) -> false
                     id.startsWith(PICKED_PREFIX) ->
-                        choices.added.any { tree -> song.song.localPath?.startsWith(tree) == true }
+                        choices.added.any { tree -> song.song.localPath?.startsWith(tree) == true } &&
+                            song.song.localPath?.let(LocalMusicFolders::documentPath) !in indexedPaths
                     // Until the media index is read, keep showing what was there before
                     paths == null -> true
                     else -> id in paths
@@ -229,12 +232,14 @@ constructor(
     private suspend fun scanPickedFolders() {
         val artworkDir = File(context.cacheDir, "artwork").also { it.mkdirs() }
         val trees = context.contentResolver.persistedUriPermissions.map { it.uri.toString() }.toSet()
+        val indexedPaths = musicFolders.index.value.orEmpty().mapTo(HashSet()) { it.path }
         val added = musicFolders.currentChoices().added
         for (tree in added) {
             if (tree !in trees) continue
             val treeUri = tree.toUri()
             runCatching {
                 walkTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri), 0) { documentId ->
+                    if (documentId.substringAfter(':', "") in indexedPaths) return@walkTree
                     val fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId).toString()
                     saveSong(
                         songId = PICKED_PREFIX + hash(documentId),

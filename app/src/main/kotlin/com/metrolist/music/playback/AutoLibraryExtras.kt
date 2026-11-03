@@ -96,10 +96,12 @@ constructor(
         val all = database.localSongs(SongSortType.NAME, false).first().filterNot { isAudiobookId(it.id) }
         val choices = localMusicFolders.currentChoices()
         val included = runCatching { localMusicFolders.includedFolderById() }.getOrNull()
+        val indexedPaths = localMusicFolders.index.value.orEmpty().mapTo(HashSet()) { it.path }
         return all.filter { song ->
             when {
                 song.id.startsWith("local:doc:") ->
-                    choices.added.any { tree -> song.song.localPath?.startsWith(tree) == true }
+                    choices.added.any { tree -> song.song.localPath?.startsWith(tree) == true } &&
+                        song.song.localPath?.let(LocalMusicFolders::documentPath) !in indexedPaths
                 included == null -> true
                 else -> song.id.removePrefix("local:").toLongOrNull()?.let { it in included } ?: true
             }
