@@ -149,7 +149,7 @@ fun SettingsScreen(
             items = listOf(
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.storage),
-                    title = { Text(stringResource(R.string.storage)) },
+                    title = { Text(stringResource(R.string.storage_and_downloads)) },
                     onClick = { navController.navigate("settings/storage") }
                 ),
                 Material3SettingsItem(

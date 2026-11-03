@@ -169,6 +169,9 @@ val EnableSongCacheKey = booleanPreferencesKey("enableSongCache")
 val PreCacheTracksKey = intPreferencesKey("preCacheTracks")
 val PreCacheOnlyWifiKey = booleanPreferencesKey("preCacheOnlyWifi")
 
+/** Wavelength: only download over Wi-Fi; downloads pause off Wi-Fi and resume when it's back. */
+val DownloadWifiOnlyKey = booleanPreferencesKey("downloadWifiOnly")
+
 val PauseListenHistoryKey = booleanPreferencesKey("pauseListenHistory")
 val PauseSearchHistoryKey = booleanPreferencesKey("pauseSearchHistory")
 val DisableScreenshotKey = booleanPreferencesKey("disableScreenshot")

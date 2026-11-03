@@ -116,6 +116,13 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   (`playlistFoldersForSong`, `playlistSongMapCount`), `StorageSettings.kt`, `PreferenceKeys.kt`
   (`DownloadExportFolderKey`, `DownloadPlaylistFoldersKey`)
 
+### 2b. Storage/Download settings and Wi-Fi only downloads
+- The Storage settings page and its entry are titled "Storage/Download" (`storage_and_downloads`).
+- **Download on Wi-Fi only** (`DownloadWifiOnlyKey`): `DownloadUtil` sets `downloadManager.requirements` to
+  `NETWORK_UNMETERED` (else `NETWORK`), so downloads pause off Wi-Fi and resume automatically on Wi-Fi; the
+  download notification shows that it's waiting. Metered Wi-Fi (e.g. a phone hotspot) counts as not Wi-Fi.
+- Edited: `PreferenceKeys.kt`, `DownloadUtil.kt`, `StorageSettings.kt`, `SettingsScreen.kt`
+
 ### 3. Audiobooks (phone folder and Audiobookshelf)
 - New **Audiobooks** library filter.
 - **Phone folder:** each sub-folder is a book. IDs are `audiobook:<...>`.
@@ -302,3 +309,4 @@ To see the exact diff at any time:
 - 2026-11-03: Radio: TuneIn and region/genre search; in-app station finder for StreamURL.link and FMSTREAM.
 - 2026-11-03: Navidrome: download whole albums/playlists/starred; exports into `Navidrome - ` folders.
 - 2026-11-04: Separate YouTube and Spotify homes, with a setting for which one is the Home tab.
+- 2026-11-04: Storage settings renamed Storage/Download; Wi-Fi only downloads that pause off Wi-Fi.

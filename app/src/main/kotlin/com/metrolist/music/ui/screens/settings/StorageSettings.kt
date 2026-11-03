@@ -127,6 +127,10 @@ fun StorageSettings(
         key = DownloadPlaylistFoldersKey,
         defaultValue = true
     )
+    val (downloadWifiOnly, onDownloadWifiOnlyChange) = rememberPreference(
+        key = com.metrolist.music.constants.DownloadWifiOnlyKey,
+        defaultValue = false
+    )
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
@@ -350,9 +354,30 @@ fun StorageSettings(
             ),
         )
         Material3SettingsGroup(
-            title = stringResource(R.string.storage),
+            title = stringResource(R.string.storage_and_downloads),
             items =
                 listOf(
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.wifi_proxy),
+                        title = { Text(stringResource(R.string.download_wifi_only)) },
+                        description = { Text(stringResource(R.string.download_wifi_only_desc)) },
+                        trailingContent = {
+                            Switch(
+                                checked = downloadWifiOnly,
+                                onCheckedChange = onDownloadWifiOnlyChange,
+                                thumbContent = {
+                                    Icon(
+                                        painter = painterResource(
+                                            id = if (downloadWifiOnly) R.drawable.check else R.drawable.close
+                                        ),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        },
+                        onClick = { onDownloadWifiOnlyChange(!downloadWifiOnly) }
+                    ),
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.storage),
                         title = { Text(stringResource(R.string.downloaded_songs)) },
@@ -679,7 +704,7 @@ fun StorageSettings(
     }
 
     TopAppBar(
-        title = { Text(stringResource(R.string.storage)) },
+        title = { Text(stringResource(R.string.storage_and_downloads)) },
         navigationIcon = {
             IconButton(
                 onClick = navController::navigateUp,

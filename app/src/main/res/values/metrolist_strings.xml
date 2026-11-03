@@ -1331,6 +1331,9 @@
     <string name="discord_information_warning">Meld uses Discord\'s public OAuth2 and Gateway APIs to share what you\'re listening to. Authorization happens through a local browser session that closes itself after capturing the code — nothing is sent to third-party servers. Your token is stored on this device in encrypted preferences and is never shared. Meld connects directly to wss://gateway.discord.gg to publish your activity, and only requests the minimum scope required (sdk.social_layer_presence).</string>
     <!-- Wavelength: side menu, News tab, internet radio, Navidrome / Subsonic -->
     <string name="open_menu">Open menu</string>
+    <string name="storage_and_downloads">Storage/Download</string>
+    <string name="download_wifi_only">Download on Wi-Fi only</string>
+    <string name="download_wifi_only_desc">Downloads pause when you leave Wi-Fi and carry on automatically when you\'re back on Wi-Fi</string>
     <string name="home_spotify">Spotify</string>
     <string name="home_youtube">YouTube</string>
     <string name="home_spotify_sign_in">Sign in to Spotify to see your Spotify home. Tap here to open Spotify settings.</string>

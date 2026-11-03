@@ -39,6 +39,7 @@ import com.metrolist.music.di.PlayerCache
 import com.metrolist.music.models.MediaMetadata
 import com.metrolist.music.models.toMediaMetadata
 import com.metrolist.music.utils.InnerTubeXPlayer
+import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.enumPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -319,6 +320,22 @@ constructor(
         }
 
     init {
+        // Wi-Fi only: the download manager pauses downloads off unmetered networks and resumes them on Wi-Fi
+        CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+            context.dataStore.data
+                .map { it[com.metrolist.music.constants.DownloadWifiOnlyKey] ?: false }
+                .distinctUntilChanged()
+                .collect { wifiOnly ->
+                    downloadManager.requirements = androidx.media3.exoplayer.scheduler.Requirements(
+                        if (wifiOnly) {
+                            androidx.media3.exoplayer.scheduler.Requirements.NETWORK_UNMETERED
+                        } else {
+                            androidx.media3.exoplayer.scheduler.Requirements.NETWORK
+                        },
+                    )
+                }
+        }
+
         val result = mutableMapOf<String, Download>()
         downloadManager.downloadIndex.getDownloads().use { cursor ->
             while (cursor.moveToNext()) {
