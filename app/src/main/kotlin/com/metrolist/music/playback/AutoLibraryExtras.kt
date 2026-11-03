@@ -45,10 +45,18 @@ constructor(
     private val localMusicFolders: LocalMusicFolders,
     private val podcastFeeds: com.metrolist.music.podcasts.PodcastDirectory,
     private val news: com.metrolist.music.podcasts.NewsBriefing,
+    private val radio: com.metrolist.music.radio.RadioDirectory,
+    private val subsonic: com.metrolist.music.subsonic.SubsonicRepository,
 ) {
     fun isBrowsable(mediaId: String): Boolean =
         mediaId == LOCAL_FILES ||
             mediaId == NEWS ||
+            mediaId == RADIO ||
+            mediaId == SUBSONIC ||
+            mediaId == SUB_STARRED ||
+            mediaId == SUB_PLAYLISTS ||
+            mediaId == SUB_ALBUMS ||
+            ((mediaId.startsWith("$SUB_ALBUM/") || mediaId.startsWith("$SUB_PLAYLIST/")) && mediaId.count { it == '/' } == 2) ||
             mediaId == AUDIOBOOKS ||
             mediaId == ABS_ALL ||
             mediaId == PODCASTS ||
@@ -59,6 +67,8 @@ constructor(
     fun rootItem(section: String): MediaItem = when (section) {
         LOCAL_FILES -> folder(LOCAL_FILES, context.getString(R.string.local_files), null, icon(R.drawable.folder), MediaMetadata.MEDIA_TYPE_PLAYLIST)
         NEWS -> folder(NEWS, context.getString(R.string.news_briefing), null, icon(R.drawable.newspaper), MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
+        RADIO -> folder(RADIO, context.getString(R.string.radio_tab), null, icon(R.drawable.radio), MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS)
+        SUBSONIC -> folder(SUBSONIC, context.getString(R.string.subsonic_tab), null, icon(R.drawable.dns), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         AUDIOBOOKS -> folder(AUDIOBOOKS, context.getString(R.string.filter_audiobooks), null, icon(R.drawable.audiobook), MediaMetadata.MEDIA_TYPE_FOLDER_AUDIO_BOOKS)
         else -> folder(PODCASTS, context.getString(R.string.filter_podcasts), null, icon(R.drawable.mic), MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
     }
@@ -70,6 +80,19 @@ constructor(
             if (songs.isEmpty()) emptyList() else listOf(shuffleItem(LOCAL_FILES)) + songs.map { it.toAutoItem(LOCAL_FILES) }
         }
         parentId == NEWS -> newsItems()
+        parentId == RADIO -> radioStations().map { station ->
+            playable("$RADIO/${station.id}", station.name, station.details.ifBlank { null }, station.favicon?.toUri() ?: icon(R.drawable.radio))
+        }
+        parentId == SUBSONIC -> subsonicRoot()
+        parentId == SUB_STARRED -> serverSongsWithShuffle(SUB_STARRED) { subsonic.starredSongs() }
+        parentId == SUB_PLAYLISTS -> serverCall { subsonic.playlists() }.orEmpty().map {
+            folder("$SUB_PLAYLIST/${it.id}", it.name, null, subsonic.coverUrl(it.coverArt)?.toUri(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
+        }
+        parentId == SUB_ALBUMS -> serverCall { subsonic.albums("newest") }.orEmpty().map {
+            folder("$SUB_ALBUM/${it.id}", it.name, it.artist, subsonic.coverUrl(it.coverArt)?.toUri(), MediaMetadata.MEDIA_TYPE_ALBUM)
+        }
+        parentId.startsWith("$SUB_ALBUM/") -> serverSongsWithShuffle(parentId) { subsonic.albumSongs(parentId.substringAfterLast('/')) }
+        parentId.startsWith("$SUB_PLAYLIST/") -> serverSongsWithShuffle(parentId) { subsonic.playlistSongs(parentId.substringAfterLast('/')) }
         parentId == AUDIOBOOKS -> audiobookItems()
         parentId == ABS_ALL -> absAllBooks()
         parentId == PODCASTS -> podcastFolders()
@@ -95,6 +118,13 @@ constructor(
             }
         }
         NEWS -> playNews(path)
+        RADIO -> {
+            val stations = radioStations()
+            val songs = radio.prepare(stations)
+            val start = songs.indexOfFirst { it.id == com.metrolist.music.constants.RADIO_ID_PREFIX + path.getOrNull(1) }
+            if (songs.isEmpty()) null else MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, start.coerceAtLeast(0), C.TIME_UNSET)
+        }
+        SUBSONIC -> playSubsonic(path)
         AUDIOBOOKS -> playAudiobook(path)
         PODCASTS -> playPodcast(path)
         else -> null
@@ -114,6 +144,52 @@ constructor(
                 else -> song.id.removePrefix("local:").toLongOrNull()?.let { it in included } ?: true
             }
         }
+    }
+
+    /** Favourite stations, or popular ones near you when there are none yet. */
+    private suspend fun radioStations(): List<com.metrolist.music.radio.RadioStation> =
+        radio.favourites.value.ifEmpty {
+            withTimeoutOrNull(NETWORK_TIMEOUT_MS) { runCatching { radio.popular().take(40) }.getOrNull() }.orEmpty()
+        }
+
+    private fun subsonicRoot(): List<MediaItem> {
+        if (subsonic.session.value == null) return emptyList()
+        return listOf(
+            folder(SUB_STARRED, context.getString(R.string.subsonic_starred), null, icon(R.drawable.favorite), MediaMetadata.MEDIA_TYPE_PLAYLIST),
+            folder(SUB_PLAYLISTS, context.getString(R.string.playlists), null, icon(R.drawable.queue_music), MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS),
+            folder(SUB_ALBUMS, context.getString(R.string.subsonic_recent_albums), null, icon(R.drawable.album), MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS),
+        )
+    }
+
+    private suspend fun <T> serverCall(block: suspend () -> T): T? =
+        withTimeoutOrNull(NETWORK_TIMEOUT_MS) {
+            runCatching { block() }.onFailure { Timber.tag(TAG).w(it, "Server request failed") }.getOrNull()
+        }
+
+    private suspend fun serverSongs(
+        load: suspend () -> List<com.metrolist.music.subsonic.SubsonicSong>,
+    ): List<Song> = serverCall { subsonic.prepare(load()) }.orEmpty()
+
+    private suspend fun serverSongsWithShuffle(
+        parent: String,
+        load: suspend () -> List<com.metrolist.music.subsonic.SubsonicSong>,
+    ): List<MediaItem> {
+        val songs = serverSongs(load)
+        return if (songs.isEmpty()) emptyList() else listOf(shuffleItem(parent)) + songs.map { it.toAutoItem(parent) }
+    }
+
+    /** Paths: subsonic/starred/<song>, subsonic/album/<album>/<song>, subsonic/playlist/<playlist>/<song>. */
+    private suspend fun playSubsonic(path: List<String>): MediaItemsWithStartPosition? {
+        val (songs, chosen) = when (path.getOrNull(1)) {
+            "starred" -> serverSongs { subsonic.starredSongs() } to path.getOrNull(2)
+            "album" -> serverSongs { subsonic.albumSongs(path.getOrNull(2).orEmpty()) } to path.getOrNull(3)
+            "playlist" -> serverSongs { subsonic.playlistSongs(path.getOrNull(2).orEmpty()) } to path.getOrNull(3)
+            else -> return null
+        }
+        if (songs.isEmpty()) return null
+        if (chosen == SHUFFLE) return MediaItemsWithStartPosition(songs.shuffled().map { it.toMediaItem() }, 0, C.TIME_UNSET)
+        val start = songs.indexOfFirst { it.id == chosen }.coerceAtLeast(0)
+        return MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, start, C.TIME_UNSET)
     }
 
     private suspend fun enabledNewsSources() =
@@ -346,6 +422,13 @@ constructor(
         private const val NEWS_ALL = "__all__"
         const val AUDIOBOOKS = "audiobooks"
         const val PODCASTS = "podcasts"
+        const val RADIO = "radio"
+        const val SUBSONIC = "subsonic"
+        private const val SUB_STARRED = "$SUBSONIC/starred"
+        private const val SUB_PLAYLISTS = "$SUBSONIC/playlists"
+        private const val SUB_ALBUMS = "$SUBSONIC/albums"
+        private const val SUB_ALBUM = "$SUBSONIC/album"
+        private const val SUB_PLAYLIST = "$SUBSONIC/playlist"
         private const val ABS_ALL = "$AUDIOBOOKS/abs_all"
         private const val SAVED_EPISODES = "$PODCASTS/saved"
         private const val PODCAST_CHANNEL = "$PODCASTS/channel"

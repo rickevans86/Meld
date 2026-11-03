@@ -49,6 +49,9 @@ data class NewsSource(
 
 data class NewsSourceChoice(val source: NewsSource, val enabled: Boolean)
 
+/** A source's newest bulletin, ready to play. */
+data class Bulletin(val song: Song, val publishedAt: Long?, val artworkUrl: String?)
+
 /**
  * Plays the latest bulletin from each chosen outlet back to back, like a car's news briefing.
  * Built-in outlets are looked up by Apple Podcasts id so a moved feed keeps working.
@@ -90,31 +93,35 @@ constructor(
      * Bulletins older than two days are skipped so a quiet feed doesn't play stale news.
      */
     suspend fun latestBulletins(sources: List<NewsSource>): List<Song> = withContext(Dispatchers.IO) {
-        val cutoff = System.currentTimeMillis() - MAX_AGE_MS
         val bulletins = coroutineScope {
-            sources.map { source ->
-                async {
-                    withTimeoutOrNull(SOURCE_TIMEOUT_MS) {
-                        runCatching {
-                            val feedUrl = feedUrlFor(source) ?: return@runCatching null
-                            val feed = directory.feed(PodcastShow(feedUrl, source.name))
-                            val newest = feed.episodes.firstOrNull()
-                                ?.takeIf { (it.publishedAt ?: System.currentTimeMillis()) >= cutoff }
-                                ?: return@runCatching null
-                            directory.prepare(feed.copy(episodes = listOf(newest))).firstOrNull()
-                        }.onFailure { Timber.tag(TAG).w(it, "No bulletin from ${source.name}") }.getOrNull()
-                    }
-                }
-            }.awaitAll()
+            sources.map { source -> async { latestBulletin(source)?.song } }.awaitAll()
         }.filterNotNull()
         // Each briefing should start every bulletin from the beginning
         bulletins.forEach { database.updatePlaybackPosition(it.id, null) }
         bulletins
     }
 
+    /** The newest bulletin from one source with when it was published, or null if there's no recent one. */
+    suspend fun latestBulletin(source: NewsSource): Bulletin? = withContext(Dispatchers.IO) {
+        val cutoff = System.currentTimeMillis() - MAX_AGE_MS
+        withTimeoutOrNull(SOURCE_TIMEOUT_MS) {
+            runCatching {
+                val feedUrl = feedUrlFor(source) ?: return@runCatching null
+                val feed = directory.feed(PodcastShow(feedUrl, source.name))
+                val newest = feed.episodes.firstOrNull()
+                    ?.takeIf { (it.publishedAt ?: System.currentTimeMillis()) >= cutoff }
+                    ?: return@runCatching null
+                directory.prepare(feed.copy(episodes = listOf(newest))).firstOrNull()
+                    ?.let { Bulletin(it, newest.publishedAt, feed.show.artworkUrl) }
+            }.onFailure { Timber.tag(TAG).w(it, "No bulletin from ${source.name}") }.getOrNull()
+        }
+    }
+
     /** True if the source publishes a public feed this app can play. */
     suspend fun isAvailable(source: NewsSource): Boolean =
         withContext(Dispatchers.IO) { runCatching { feedUrlFor(source) != null }.getOrDefault(false) }
+
+    suspend fun restart(songId: String) = withContext(Dispatchers.IO) { database.updatePlaybackPosition(songId, null) }
 
     private suspend fun feedUrlFor(source: NewsSource): String? {
         if (source.key.startsWith("feed:")) return source.key.removePrefix("feed:")

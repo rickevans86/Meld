@@ -110,6 +110,26 @@ fun NavGraphBuilder.navigationBuilder(
         com.metrolist.music.ui.screens.library.LibraryPodcastsScreen(navController, onDeselect = null)
     }
 
+    composable(Screens.News.route) {
+        com.metrolist.music.ui.screens.podcast.NewsScreen(navController)
+    }
+
+    composable("new_episodes") {
+        com.metrolist.music.ui.screens.podcast.NewEpisodesScreen(navController)
+    }
+
+    composable("local_files") {
+        com.metrolist.music.ui.screens.library.local.LocalFilesScreen(navController, filterContent = {})
+    }
+
+    composable("radio") {
+        com.metrolist.music.ui.screens.radio.RadioScreen(navController)
+    }
+
+    composable("subsonic") {
+        com.metrolist.music.ui.screens.subsonic.SubsonicScreen(navController)
+    }
+
     composable(Screens.Audiobooks.route) {
         com.metrolist.music.ui.screens.library.audiobooks.AudiobooksScreen(navController, filterContent = {})
     }

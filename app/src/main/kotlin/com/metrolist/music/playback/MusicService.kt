@@ -80,6 +80,7 @@ import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.mkv.MatroskaExtractor
@@ -332,6 +333,14 @@ class MusicService :
 
     @Inject
     lateinit var absRepository: AbsRepository
+
+    @Inject
+    lateinit var radioDirectory: com.metrolist.music.radio.RadioDirectory
+
+    @Inject
+    lateinit var subsonicRepository: com.metrolist.music.subsonic.SubsonicRepository
+
+    private var subsonicScrobbleJob: Job? = null
 
     @Inject
     lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
@@ -2767,10 +2776,48 @@ class MusicService :
         }
     }
 
+    /** Radio stations announce the song they're playing (ICY metadata); show it in the radio screen. */
+    override fun onMetadata(metadata: androidx.media3.common.Metadata) {
+        val id = player.currentMediaItem?.mediaId ?: return
+        if (!com.metrolist.music.constants.isRadioId(id)) return
+        for (i in 0 until metadata.length()) {
+            val entry = metadata.get(i)
+            if (entry is androidx.media3.extractor.metadata.icy.IcyInfo) {
+                radioDirectory.setNowPlaying(id, entry.title)
+            }
+        }
+    }
+
+    /** Radio play counts and Subsonic "now playing" / scrobbles when the track changes. */
+    private fun onWavelengthTransition(mediaItem: MediaItem?) {
+        val id = mediaItem?.mediaId
+        radioDirectory.setNowPlaying(id.orEmpty(), null)
+        if (com.metrolist.music.constants.isRadioId(id)) radioDirectory.reportPlay(id!!)
+        subsonicScrobbleJob?.cancel()
+        if (id != null && com.metrolist.music.constants.isSubsonicId(id)) {
+            subsonicRepository.scrobble(id, submission = false)
+            // Counts as played after half the song or four minutes of actual listening
+            subsonicScrobbleJob = scope.launch {
+                var listenedMs = 0L
+                while (true) {
+                    delay(5_000)
+                    if (player.currentMediaItem?.mediaId != id) break
+                    if (player.isPlaying) listenedMs += 5_000
+                    val duration = player.duration.takeIf { it > 0 } ?: 480_000L
+                    if (listenedMs >= minOf(duration / 2, 240_000L)) {
+                        subsonicRepository.scrobble(id, submission = true)
+                        break
+                    }
+                }
+            }
+        }
+    }
+
     override fun onMediaItemTransition(
         mediaItem: MediaItem?,
         reason: Int,
     ) {
+        onWavelengthTransition(mediaItem)
         // Only natural completion transitions mark the previous track as fully cached,
         // never a manual skip or seek. Read lastTransitionedMediaId before replacing it.
         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
@@ -4507,6 +4554,12 @@ class MusicService :
             val mediaId = stripQobuzCacheKeyPrefix(dataSpec.key ?: error("No media id"))
             val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
 
+            // Navidrome / Subsonic: stream from the server with fresh credentials
+            if (com.metrolist.music.constants.isSubsonicId(mediaId)) {
+                val uri = subsonicRepository.streamUri(mediaId) ?: error("Not signed in to the music server")
+                return@Factory dataSpec.withUri(uri)
+            }
+
             // Handle local audio files — resolve to content URI and bypass YouTube fetch
             if (isOnDeviceMediaId(mediaId)) {
                 val localPath = runBlocking(Dispatchers.IO) {
@@ -4890,6 +4943,57 @@ class MusicService :
     }
 
     private fun createMediaSourceFactory(
+        normalizationProcessor: VolumeNormalizationAudioProcessor,
+        playerProvider: () -> ExoPlayer?,
+    ): MediaSource.Factory = RadioAwareMediaSourceFactory(
+        main = createMainMediaSourceFactory(normalizationProcessor, playerProvider),
+        // Live radio skips the caches entirely: a never-ending stream would fill them, and a
+        // cached copy would replay old audio. Default extractors cover ICY, AAC, MP3, Ogg and HLS.
+        live = DefaultMediaSourceFactory(
+            DefaultDataSource.Factory(
+                this,
+                OkHttpDataSource.Factory(OkHttpClient.Builder().build()).setUserAgent("Wavelength"),
+            ),
+        ),
+        streamFor = { id -> radioDirectory.stream(id) },
+    )
+
+    /** Sends radio stations to [live] with their real stream address, and everything else to [main]. */
+    private class RadioAwareMediaSourceFactory(
+        private val main: MediaSource.Factory,
+        private val live: MediaSource.Factory,
+        private val streamFor: (String) -> Pair<String, Boolean>?,
+    ) : MediaSource.Factory {
+        override fun setDrmSessionManagerProvider(provider: androidx.media3.exoplayer.drm.DrmSessionManagerProvider): MediaSource.Factory {
+            main.setDrmSessionManagerProvider(provider)
+            live.setDrmSessionManagerProvider(provider)
+            return this
+        }
+
+        override fun setLoadErrorHandlingPolicy(policy: androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy): MediaSource.Factory {
+            main.setLoadErrorHandlingPolicy(policy)
+            live.setLoadErrorHandlingPolicy(policy)
+            return this
+        }
+
+        override fun getSupportedTypes(): IntArray = (main.supportedTypes + live.supportedTypes).distinct().toIntArray()
+
+        override fun createMediaSource(mediaItem: MediaItem): MediaSource {
+            if (com.metrolist.music.constants.isRadioId(mediaItem.mediaId)) {
+                streamFor(mediaItem.mediaId)?.let { (url, hls) ->
+                    val streamItem = mediaItem.buildUpon()
+                        .setUri(url)
+                        .setCustomCacheKey(null)
+                        .setMimeType(if (hls && !url.contains(".m3u8", ignoreCase = true)) androidx.media3.common.MimeTypes.APPLICATION_M3U8 else null)
+                        .build()
+                    return live.createMediaSource(streamItem)
+                }
+            }
+            return main.createMediaSource(mediaItem)
+        }
+    }
+
+    private fun createMainMediaSourceFactory(
         normalizationProcessor: VolumeNormalizationAudioProcessor,
         playerProvider: () -> ExoPlayer?,
     ) =

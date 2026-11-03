@@ -121,6 +121,14 @@ constructor(
                 return@Factory dataSpec.withUri(audioUrl.toUri())
             }
 
+            // Navidrome / Subsonic songs download the original file from the server
+            if (com.metrolist.music.constants.isSubsonicId(mediaId)) {
+                val uri = com.metrolist.music.subsonic.SubsonicRepository.from(context).streamUri(mediaId, original = true)
+                    ?: error("Not signed in to the music server")
+                return@Factory dataSpec.withUri(uri)
+            }
+            if (com.metrolist.music.constants.isRadioId(mediaId)) error("Live radio can't be downloaded")
+
             if (playerCache.isCached(mediaId, dataSpec.position, length)) {
                 return@Factory dataSpec
             }

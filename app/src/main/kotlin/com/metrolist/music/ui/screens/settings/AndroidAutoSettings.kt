@@ -73,6 +73,8 @@ enum class AndroidAutoSection(val id: String) {
     AUDIOBOOKS("audiobooks"),
     PODCASTS("podcasts"),
     NEWS("news"),
+    RADIO("radio"),
+    SUBSONIC("subsonic"),
 }
 
 @Composable
@@ -88,6 +90,8 @@ fun AndroidAutoSection.label(): String = when (this) {
     AndroidAutoSection.AUDIOBOOKS -> stringResource(R.string.filter_audiobooks)
     AndroidAutoSection.PODCASTS -> stringResource(R.string.filter_podcasts)
     AndroidAutoSection.NEWS -> stringResource(R.string.news_briefing)
+    AndroidAutoSection.RADIO -> stringResource(R.string.radio_tab)
+    AndroidAutoSection.SUBSONIC -> stringResource(R.string.subsonic_tab)
 }
 
 fun serializeSections(sections: List<Pair<AndroidAutoSection, Boolean>>): String =
@@ -230,6 +234,8 @@ fun AndroidAutoSettings(
                                         AndroidAutoSection.AUDIOBOOKS -> R.drawable.audiobook
                                         AndroidAutoSection.PODCASTS -> R.drawable.mic
                                         AndroidAutoSection.NEWS -> R.drawable.newspaper
+                                        AndroidAutoSection.RADIO -> R.drawable.radio
+                                        AndroidAutoSection.SUBSONIC -> R.drawable.dns
                                     }
                                 ),
                                 title = { Text(section.label()) },

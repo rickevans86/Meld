@@ -228,7 +228,7 @@ fun AccountScreen(
                             thumbnailUrl = rdpn.thumbnail,
                             title = stringResource(R.string.new_episodes),
                             subtitle = stringResource(R.string.auto_playlist),
-                            onClick = { navController.navigate("online_playlist/RDPN") },
+                            onClick = { navController.navigate("new_episodes") },
                         )
                     }
                 }

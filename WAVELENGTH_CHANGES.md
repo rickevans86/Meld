@@ -65,14 +65,19 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 
 ## Features
 
-### 0. Bottom tabs
-- Podcasts and Audiobooks are their own bottom tabs (`Screens.Podcasts` route `podcasts`, `Screens.Audiobooks`
-  route `audiobooks`) and are no longer Library chips. The Library falls back to its main view if an old saved
-  chip points at them.
-- New file: `res/drawable/podcasts.xml`
-- Edited: `ui/screens/Screens.kt` (new screens and `MainScreens` order), `NavigationBuilder.kt`, `MainActivity.kt`
-  (`topLevelScreens`, titles), `LibraryScreen.kt` (chips removed), `LibraryPodcastsScreen.kt` (`onDeselect`
-  nullable), `AppearanceSettings.kt` (default-chip list excludes them)
+### 0. Navigation: bottom tabs and side menu
+- Bottom tabs: Home, Search, Podcasts, News, Library (`Screens.MainScreens`). Together is no longer a bottom tab.
+- Side menu (☰ in the top bar): every section (Home, Search, Library, Podcasts, News, Audiobooks, Radio,
+  Navidrome, Local files, Together, History, Stats, Settings). The menu only opens from the button, and swiping
+  only closes it, so it doesn't fight Android's back gesture. Drawer-only screens (`WavelengthDrawer.drawerOnlyRoutes`)
+  still show the top and bottom bars.
+- Podcasts and Audiobooks aren't Library chips any more; an old saved chip falls back to the main Library view.
+- New files: `ui/component/WavelengthDrawer.kt`, `res/drawable/podcasts.xml`, `menu.xml`, `dns.xml`
+- Edited: `ui/screens/Screens.kt` (Podcasts, News, Audiobooks screens; `MainScreens`), `NavigationBuilder.kt`
+  (routes `podcasts`, `news`, `audiobooks`, `local_files`, `radio`, `subsonic`, `new_episodes`),
+  `MainActivity.kt` (Scaffold wrapped in `ModalNavigationDrawer`, ☰ `navigationIcon`, `topLevelScreens`, titles,
+  bottom bar on drawer-only routes), `LibraryScreen.kt`, `LibraryPodcastsScreen.kt` (`onDeselect` nullable),
+  `AppearanceSettings.kt`
 
 ### 1. Local files: folder view and music folders
 - The Local files tab can switch between a song list and a folder view.
@@ -142,11 +147,49 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - **News sources** screen (`news_sources`) has search, category chips and reordering.
 - New files: `podcasts/NewsBriefing.kt`, `viewmodels/NewsViewModel.kt`,
   `ui/screens/podcast/NewsBriefingCard.kt`, `NewsSourcesScreen.kt`
-- Edited: `PreferenceKeys.kt` (`NewsSourcesKey`), `LibraryPodcastsScreen.kt` (card at the top of Episodes)
+- **News tab** (`news`, `NewsScreen.kt`): play-all card, then each source's newest bulletin (loaded in parallel,
+  tap to play one). The card was removed from the Podcasts tab.
+- Edited: `PreferenceKeys.kt` (`NewsSourcesKey`), `NewsViewModel.kt` (`refresh`, `bulletins`, `playOne`)
+
+### 5b. New episodes (combined)
+- The "New episodes" card (Podcasts tab and Account screen) opens `new_episodes` instead of YouTube's RDPN list:
+  recent episodes from followed feeds (last 30 days, up to 5 per show, newest first) followed by YouTube's
+  new episodes from subscriptions. Play all queues both.
+- New files: `viewmodels/NewEpisodesViewModel.kt`, `ui/screens/podcast/NewEpisodesScreen.kt`
+- Edited: `PodcastDirectory.recentFromFollowed`, `LibraryPodcastsScreen.kt`, `AccountScreen.kt`
+
+### 5c. Internet radio
+- Stations from the free Radio Browser directory (radio-browser.info, several mirrors tried in turn):
+  favourites (`filesDir/radio_favourites.json`), popular in the phone's country (default AU), genres, search.
+- IDs: `radio:<stationuuid>`; songs saved with `localPath` = stream URL, album "Internet radio", artist = country.
+- Playback: `MusicService.RadioAwareMediaSourceFactory` sends radio items to a separate, **uncached**
+  `DefaultMediaSourceFactory` with the real stream URL (HLS via the new `media3-exoplayer-hls` dependency).
+  Everything else uses the normal cached factory. ICY "now playing" titles come in through `onMetadata` and show
+  on the Radio screen (the player notification shows them automatically).
+- Radio can't be downloaded (SongMenu hides it; DownloadUtil refuses it). Plays are reported to Radio Browser.
+- New files: `radio/RadioDirectory.kt`, `viewmodels/RadioViewModel.kt`, `ui/screens/radio/RadioScreen.kt`
+- Edited: `MusicService.kt`, `DownloadUtil.kt`, `SongMenu.kt`, `constants/Audiobooks.kt` (`RADIO_ID_PREFIX`),
+  `gradle/libs.versions.toml` + `app/build.gradle.kts` (`media3-hls`)
+
+### 5d. Navidrome / Subsonic
+- Sign in with server address, username and password (password encrypted with an Android Keystore key,
+  `SubsonicAuthStore`). Token auth (`t = md5(password + salt)`), API 1.16.1, client "Wavelength".
+- Browse albums (recently added / played / most played / A–Z / random), artists, playlists, starred; search.
+- IDs: `subsonic:<songId>`. The stream URL is built at play time in the MusicService resolver (no stored
+  credentials in the song). Cover URLs use a fixed salt so images cache.
+- Downloads use `format=raw` (the original file), so the M4A export and playlist folders apply.
+- "Now playing" is reported on start; a scrobble is sent after half the song or 4 minutes of listening.
+- Liking a server song stars it on the server; starred state is read back when songs are loaded.
+- New files: `subsonic/SubsonicAuthStore.kt`, `subsonic/SubsonicRepository.kt`, `viewmodels/SubsonicViewModel.kt`,
+  `ui/screens/subsonic/SubsonicScreen.kt`
+- Edited: `MusicService.kt`, `DownloadUtil.kt`, `SongMenu.kt` (like → star), `constants/Audiobooks.kt`
+  (`SUBSONIC_ID_PREFIX`, both new prefixes in `isOnDeviceMediaId`)
 
 ### 6. Android Auto
 - New browse sections: Local files, Audiobooks (device and Audiobookshelf), Podcasts (saved, channels,
-  followed feeds `podcasts/feed/<key>`) and News (`news/__all__`, `news/<index>`).
+  followed feeds `podcasts/feed/<key>`), News (`news/__all__`, `news/<index>`), Radio (`radio/<station>`:
+  favourites, or popular stations when there are none) and Navidrome (`subsonic/starred`, `subsonic/playlists`,
+  `subsonic/albums`, `subsonic/album/<id>/<song>`, `subsonic/playlist/<id>/<song>`).
 - Voice and text search of YouTube songs (the `android.media.browse.SEARCH_SUPPORTED` root extra).
 - New file: `playback/AutoLibraryExtras.kt`
 - Edited: `MediaLibrarySessionCallback.kt`, `AndroidAutoSettings.kt` (enum entries LOCAL_FILES, AUDIOBOOKS,
@@ -177,7 +220,10 @@ These are the files that can conflict during a merge, and what to re-apply in ea
 | `playback/MediaLibrarySessionCallback.kt` | `autoExtras` injection, search-supported extra, new section routing |
 | `playback/MusicService.kt` | Audiobook and ABS repos, `remembersPosition()`, ABS headers, `isOnDeviceMediaId` in resolver and precache, extra extractors |
 | `ui/menu/SongMenu.kt` | `isFromYouTube` guards |
-| `ui/screens/Screens.kt` | Podcasts and Audiobooks bottom tabs |
+| `ui/screens/Screens.kt` | Podcasts, News and Audiobooks screens; bottom tab list |
+| `ui/screens/AccountScreen.kt` | New episodes card opens `new_episodes` |
+| `playback/AutoLibraryExtras.kt` (Wavelength file) | Radio and Navidrome sections |
+| `gradle/libs.versions.toml` | `media3-hls` |
 | `ui/screens/NavigationBuilder.kt` | Routes `settings/local_folders`, `news_sources`, `podcast_directory?feed={feed}`, audiobook routes |
 | `ui/screens/library/LibraryPodcastsScreen.kt` | Search icon, news card, followed feeds |
 | `ui/screens/library/LibraryScreen.kt` | Audiobooks filter, which opens `AudiobooksScreen` |
@@ -221,3 +267,4 @@ To see the exact diff at any time:
 - 2026-11-03: Paste button and pasted-link support in podcast search (Pocket Casts, Apple, Spotify, RSS).
 - 2026-11-03: Replaced the app icon with an original headphones and sound-bars design.
 - 2026-11-03: Podcasts and Audiobooks moved from Library chips to their own bottom tabs.
+- 2026-11-03: Side menu; News as its own tab; internet radio; Navidrome / Subsonic; combined New episodes.

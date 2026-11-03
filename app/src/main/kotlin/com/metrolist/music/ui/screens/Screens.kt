@@ -45,6 +45,13 @@ sealed class Screens(
         route = "podcasts"
     )
 
+    object News : Screens(
+        titleId = R.string.news_tab,
+        iconIdInactive = R.drawable.newspaper,
+        iconIdActive = R.drawable.newspaper,
+        route = "news"
+    )
+
     object Audiobooks : Screens(
         titleId = R.string.filter_audiobooks,
         iconIdInactive = R.drawable.audiobook,
@@ -60,6 +67,7 @@ sealed class Screens(
     )
 
     companion object {
-        val MainScreens = listOf(Home, Search, Podcasts, Audiobooks, ListenTogether, Library)
+        // Audiobooks, Together and the rest live in the side menu (WavelengthDrawer)
+        val MainScreens = listOf(Home, Search, Podcasts, News, Library)
     }
 }

@@ -1329,4 +1329,41 @@
         <item quantity="other">%d files</item>
     </plurals>
     <string name="discord_information_warning">Meld uses Discord\'s public OAuth2 and Gateway APIs to share what you\'re listening to. Authorization happens through a local browser session that closes itself after capturing the code — nothing is sent to third-party servers. Your token is stored on this device in encrypted preferences and is never shared. Meld connects directly to wss://gateway.discord.gg to publish your activity, and only requests the minimum scope required (sdk.social_layer_presence).</string>
+    <!-- Wavelength: side menu, News tab, internet radio, Navidrome / Subsonic -->
+    <string name="open_menu">Open menu</string>
+    <string name="news_tab">News</string>
+    <string name="news_latest_bulletins">Latest bulletins</string>
+    <string name="news_refresh">Refresh</string>
+    <string name="news_loading_one">Loading…</string>
+    <string name="news_no_recent">No bulletin in the last two days</string>
+    <string name="radio_tab">Radio</string>
+    <string name="radio_search_hint">Search radio stations</string>
+    <string name="radio_favourites">Favourites</string>
+    <string name="radio_popular">Popular near you</string>
+    <string name="radio_now_playing">Now playing on %1$s</string>
+    <string name="radio_no_favourites">No favourite stations yet. Tap the heart next to a station to keep it here.</string>
+    <string name="radio_no_results">No stations found.</string>
+    <string name="radio_favourite">Favourite</string>
+    <string name="subsonic_tab">Navidrome</string>
+    <string name="subsonic_sign_in_title">Connect your music server</string>
+    <string name="subsonic_sign_in_intro">Works with Navidrome and other Subsonic-compatible servers such as Airsonic and Gonic. Your password is stored encrypted on this phone.</string>
+    <string name="subsonic_server">Server address</string>
+    <string name="subsonic_username">Username</string>
+    <string name="subsonic_password">Password</string>
+    <string name="subsonic_connect">Connect</string>
+    <string name="subsonic_signed_in_as">%1$s on %2$s</string>
+    <string name="subsonic_sign_out">Sign out</string>
+    <string name="subsonic_search_hint">Search your server</string>
+    <string name="subsonic_no_results">Nothing found on your server.</string>
+    <string name="subsonic_artist_albums">%1$d albums</string>
+    <string name="subsonic_starred">Starred</string>
+    <string name="subsonic_empty">Nothing here yet.</string>
+    <string name="subsonic_song_count">%1$d songs</string>
+    <string name="subsonic_play_all">Play</string>
+    <string name="subsonic_shuffle">Shuffle</string>
+    <string name="subsonic_recent_albums">Recently added</string>
+    <string name="new_episodes_followed">From podcasts you follow</string>
+    <string name="new_episodes_followed_empty">No new episodes in the last 30 days. Follow shows from podcast search to see them here.</string>
+    <string name="new_episodes_youtube">From YouTube subscriptions</string>
+    <string name="new_episodes_youtube_empty">No new YouTube episodes.</string>
 </resources>

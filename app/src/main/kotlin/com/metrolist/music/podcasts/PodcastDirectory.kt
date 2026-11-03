@@ -15,6 +15,8 @@ import com.metrolist.music.db.entities.SongArtistMap
 import com.metrolist.music.db.entities.SongEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
@@ -227,6 +229,31 @@ constructor(
         runCatching {
             followsFile.writeText(json.encodeToString(ListSerializer(PodcastShow.serializer()), _followed.value))
         }.onFailure { Timber.tag(TAG).w(it, "Could not save followed podcasts") }
+    }
+
+    /**
+     * Recent episodes from every followed show, newest first: up to [perShow] per show from the
+     * last [days] days. Shows that fail to load are skipped.
+     */
+    suspend fun recentFromFollowed(days: Int = 30, perShow: Int = 5): List<Pair<Song, Long?>> = withContext(Dispatchers.IO) {
+        val cutoff = System.currentTimeMillis() - days * 24L * 60 * 60 * 1000
+        val perFeed = kotlinx.coroutines.coroutineScope {
+            _followed.value.map { show ->
+                async {
+                    kotlinx.coroutines.withTimeoutOrNull(20_000) {
+                        runCatching<List<Pair<Song, Long?>>> {
+                            val feed = feed(show)
+                            val recent = feed.episodes.filter { (it.publishedAt ?: 0L) >= cutoff }.take(perShow)
+                            if (recent.isEmpty()) return@runCatching emptyList()
+                            val songs = prepare(feed.copy(episodes = recent))
+                            val dates = recent.associate { PODCAST_EPISODE_ID_PREFIX + it.id to it.publishedAt }
+                            songs.map { it to dates[it.id] }
+                        }.onFailure { Timber.tag(TAG).w(it, "Couldn't refresh ${show.title}") }.getOrNull()
+                    }.orEmpty()
+                }
+            }.awaitAll()
+        }
+        perFeed.flatten().sortedByDescending { it.second ?: 0L }
     }
 
     /** Saves episodes as songs the player streams from their audio URL, newest first. */

@@ -126,6 +126,9 @@ fun SongMenu(
     val downloadUtil = LocalDownloadUtil.current
     // Podcast-feed episodes, audiobooks and local files aren't YouTube songs: hide YouTube-only actions
     val isFromYouTube = !com.metrolist.music.constants.isOnDeviceMediaId(originalSong.id)
+    // Live radio can't be downloaded; Subsonic songs star on the server when liked
+    val isRadio = com.metrolist.music.constants.isRadioId(originalSong.id)
+    val isSubsonic = com.metrolist.music.constants.isSubsonicId(originalSong.id)
     val download by downloadUtil
         .getDownload(originalSong.id)
         .collectAsStateWithLifecycle(initialValue = null)
@@ -531,7 +534,11 @@ fun SongMenu(
                         database.query {
                             update(s)
                         }
-                        syncUtils.likeSong(s)
+                        if (isFromYouTube) {
+                            syncUtils.likeSong(s)
+                        } else if (isSubsonic) {
+                            com.metrolist.music.subsonic.SubsonicRepository.from(context).starLater(s.id, s.liked)
+                        }
                     }
                 },
             ) {
@@ -979,7 +986,7 @@ fun SongMenu(
 
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
-        item {
+        if (!isRadio) item {
             Material3MenuGroup(
                 items =
                     listOf(
