@@ -82,6 +82,17 @@ constructor(
             _searching.value = false
             return
         }
+        if (PodcastDirectory.linkIn(query) != null) {
+            // A pasted link opens that show instead of searching
+            searchJob = viewModelScope.launch {
+                delay(400)
+                _results.value = null
+                load("Opening link…", unavailable = "Couldn't find a public podcast feed for that link.") {
+                    directory.resolveLink(query)
+                }
+            }
+            return
+        }
         searchJob = viewModelScope.launch {
             delay(400)
             _searching.value = true
@@ -122,16 +133,17 @@ constructor(
         _message.value = null
     }
 
-    private fun load(title: String, resolve: suspend () -> PodcastShow?) {
+    private fun load(
+        title: String,
+        unavailable: String = "This show doesn't have a public feed, so it can only be played in Spotify.",
+        resolve: suspend () -> PodcastShow?,
+    ) {
         openJob?.cancel()
         _page.value = ShowPage.Loading(title)
         openJob = viewModelScope.launch {
             val show = runCatching { resolve() }.getOrNull()
             if (show == null) {
-                _page.value = ShowPage.Unavailable(
-                    title,
-                    "This show doesn't have a public feed, so it can only be played in Spotify.",
-                )
+                _page.value = ShowPage.Unavailable(title, unavailable)
                 return@launch
             }
             runCatching {

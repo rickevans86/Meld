@@ -6,6 +6,8 @@
 package com.metrolist.music.ui.screens.podcast
 
 import android.text.format.DateUtils
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -132,7 +134,25 @@ fun PodcastDirectoryScreen(
                         singleLine = true,
                         placeholder = { Text(stringResource(R.string.podcast_search_hint)) },
                         trailingIcon = {
-                            if (searching) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            if (searching) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                PlainIconButton(
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val pasted = clipboard.primaryClip?.takeIf { it.itemCount > 0 }
+                                            ?.getItemAt(0)?.coerceToText(context)?.toString()?.trim()
+                                        if (pasted.isNullOrEmpty()) {
+                                            Toast.makeText(context, R.string.podcast_clipboard_empty, Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            query = pasted
+                                            viewModel.search(pasted)
+                                        }
+                                    },
+                                ) {
+                                    Icon(painterResource(R.drawable.content_paste), contentDescription = stringResource(R.string.podcast_paste))
+                                }
+                            }
                         },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         modifier = Modifier

@@ -1264,7 +1264,9 @@
     <string name="news_category_selected">Selected (%1$d)</string>
     <string name="news_source_unavailable">%1$s isn\'t published as a public podcast, so it can\'t be played here.</string>
     <string name="podcast_directory">Find podcasts</string>
-    <string name="podcast_search_hint">Search all podcasts</string>
+    <string name="podcast_search_hint">Search podcasts or paste a link</string>
+    <string name="podcast_paste">Paste</string>
+    <string name="podcast_clipboard_empty">Nothing to paste. Copy a podcast name or link first.</string>
     <string name="podcast_no_results">No podcasts match that search.</string>
     <string name="podcast_following">Following</string>
     <string name="podcast_spotify_shows">Your Spotify podcasts</string>

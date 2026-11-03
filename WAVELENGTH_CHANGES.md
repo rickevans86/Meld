@@ -106,6 +106,9 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 
 ### 4. Podcasts: search, follow, Spotify shows, full episode menu
 - Podcast search uses Apple's free directory (iTunes Search API). Shows are read from their public RSS feeds.
+- The search box has a paste button. A pasted link opens that show directly. Supported links: RSS feeds,
+  Apple Podcasts, Pocket Casts (via its public API, then the page), Spotify, and any page with a feed link
+  or `og:title` (`PodcastDirectory.resolveLink`).
 - Followed shows are saved in `filesDir/podcast_follows.json` and appear in **Library → Podcasts → Episodes**.
 - Your saved Spotify podcasts (`Spotify.myShows()`, libraryV3 "Podcasts" filter) are matched to their
   public feeds, because Spotify can't be streamed by other apps.
@@ -114,7 +117,7 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   Spotify playlist, YouTube sync and share) are hidden for non-YouTube songs.
 - New files: `podcasts/PodcastDirectory.kt`, `viewmodels/PodcastDirectoryViewModel.kt`,
   `ui/screens/podcast/PodcastDirectoryScreen.kt` (route `podcast_directory?feed={feed}`),
-  `spotify/models/SpotifyShow.kt`
+  `spotify/models/SpotifyShow.kt`, `res/drawable/content_paste.xml`
 - Edited: `LibraryPodcastsScreen.kt`, `LibraryViewModels.kt`, `Spotify.kt`, `SongMenu.kt`
   (`isFromYouTube` guards), `DownloadUtil.kt` (the `podcast:` branch resolves the feed URL),
   `MusicService.kt` (`isOnDeviceMediaId` covers `local:`, `audiobook:` and `podcast:`, plus extra extractors:
@@ -205,3 +208,4 @@ To see the exact diff at any time:
 - 2026-11-03: New red music-note app icon.
 - 2026-11-03: Added this changes file.
 - 2026-11-03: Fixed a crash when podcast search returns the same show twice (results, episodes, Spotify shows and news sources are de-duplicated).
+- 2026-11-03: Paste button and pasted-link support in podcast search (Pocket Casts, Apple, Spotify, RSS).
