@@ -1255,10 +1255,14 @@
     <string name="news_loading">Getting the latest bulletins…</string>
     <string name="news_choose_sources">Choose news sources</string>
     <string name="news_sources">News sources</string>
-    <string name="news_sources_intro">Ticked sources play in this order, newest bulletin from each. Podcasts you follow can be added too.</string>
+    <string name="news_sources_intro">Ticked sources play in this order, newest bulletin from each. These match Google News\' audio sources, and podcasts you follow can be added too.</string>
     <string name="news_none_available">No recent bulletins could be loaded. Check your connection or news sources.</string>
     <string name="news_move_up">Move up</string>
     <string name="news_move_down">Move down</string>
+    <string name="news_search_sources">Search news sources</string>
+    <string name="news_category_all">All</string>
+    <string name="news_category_selected">Selected (%1$d)</string>
+    <string name="news_source_unavailable">%1$s isn\'t published as a public podcast, so it can\'t be played here.</string>
     <string name="podcast_directory">Find podcasts</string>
     <string name="podcast_search_hint">Search all podcasts</string>
     <string name="podcast_no_results">No podcasts match that search.</string>

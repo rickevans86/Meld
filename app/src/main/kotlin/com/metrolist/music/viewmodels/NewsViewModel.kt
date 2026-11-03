@@ -11,7 +11,9 @@ import com.metrolist.music.db.entities.Song
 import com.metrolist.music.podcasts.NewsBriefing
 import com.metrolist.music.podcasts.NewsSourceChoice
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -41,11 +43,32 @@ constructor(
         }
     }
 
-    fun toggle(choice: NewsSourceChoice) = save(
-        enabledKeys().let { keys ->
-            if (choice.enabled) keys - choice.source.key else keys + choice.source.key
-        },
-    )
+    /** Key of the source being checked for a public feed, so the screen can show a spinner. */
+    private val _checking = MutableStateFlow<String?>(null)
+    val checking = _checking.asStateFlow()
+
+    private val _unavailable = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    /** Names of sources that turned out to have no public feed. */
+    val unavailable = _unavailable.asSharedFlow()
+
+    fun toggle(choice: NewsSourceChoice) {
+        val key = choice.source.key
+        if (choice.enabled) {
+            save(enabledKeys() - key)
+            return
+        }
+        if (!key.startsWith("search:")) {
+            save(enabledKeys() + key)
+            return
+        }
+        if (_checking.value != null) return
+        viewModelScope.launch {
+            _checking.value = key
+            val ok = briefing.isAvailable(choice.source)
+            _checking.value = null
+            if (ok) briefing.setEnabled(enabledKeys() + key) else _unavailable.tryEmit(choice.source.name)
+        }
+    }
 
     fun move(choice: NewsSourceChoice, offset: Int) {
         val keys = enabledKeys().toMutableList()

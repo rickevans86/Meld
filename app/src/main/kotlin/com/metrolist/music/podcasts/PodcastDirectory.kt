@@ -109,7 +109,9 @@ constructor(
         val wanted = normalize(name)
         return results.firstOrNull { normalize(it.title) == wanted && sameAuthor(it.author, publisher) }
             ?: results.firstOrNull { normalize(it.title) == wanted }
-            ?: results.firstOrNull { normalize(it.title).contains(wanted) && sameAuthor(it.author, publisher) }
+            ?: results.firstOrNull {
+                wanted.length >= 8 && normalize(it.title).contains(wanted) && sameAuthor(it.author, publisher)
+            }
     }
 
     suspend fun feed(show: PodcastShow): PodcastFeed = withContext(Dispatchers.IO) {

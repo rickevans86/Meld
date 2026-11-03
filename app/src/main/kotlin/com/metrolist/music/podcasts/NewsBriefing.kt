@@ -71,7 +71,7 @@ constructor(
     /** All sources in the user's order, enabled ones first; followed podcasts can be switched on too. */
     val choices: Flow<List<NewsSourceChoice>> =
         combine(context.dataStore.data.map { it[NewsSourcesKey] }, directory.followed) { saved, followed ->
-            val available = BUILT_IN + followed.map {
+            val available = BUILT_IN + CATALOGUE + followed.map {
                 NewsSource("feed:${it.feedUrl}", it.title, "Podcasts you follow", it.artworkUrl)
             }
             val enabledKeys = (saved ?: DEFAULT_SOURCES.joinToString(SEPARATOR))
@@ -111,6 +111,10 @@ constructor(
         bulletins.forEach { database.updatePlaybackPosition(it.id, null) }
         bulletins
     }
+
+    /** True if the source publishes a public feed this app can play. */
+    suspend fun isAvailable(source: NewsSource): Boolean =
+        withContext(Dispatchers.IO) { runCatching { feedUrlFor(source) != null }.getOrDefault(false) }
 
     private suspend fun feedUrlFor(source: NewsSource): String? {
         if (source.key.startsWith("feed:")) return source.key.removePrefix("feed:")
@@ -152,6 +156,147 @@ constructor(
             NewsSource("apple:135067274", "BBC Global News", "International"),
             NewsSource("apple:121493675", "NPR News Now", "International"),
         )
+
+        /**
+         * The rest of Google News' audio line-up, found by name in the public podcast directory.
+         * Some of these are made only for Google and have no public feed; those are flagged when ticked.
+         */
+        private val CATALOGUE_NAMES = listOf(
+            "The Intelligence from The Economist" to "International",
+            "Reuters TV (U.S.)" to "International",
+            "BBC News Summary" to "International",
+            "DW Newsbrief" to "International",
+            "Sky News" to "International",
+            "Reuters 5-minute News Briefing (Global)" to "International",
+            "NPR World" to "International",
+            "CBC News World Report" to "International",
+            "CNN 5 Things" to "International",
+            "NHK WORLD-Japan News" to "International",
+            "KBS WORLD Radio News" to "International",
+            "RNZ Headlines" to "International",
+            "Post Reports" to "International",
+            "POLITICO Playbook Audio Briefing" to "International",
+            "The Audio Long Read" to "International",
+            "Star News" to "International",
+            "ABC NEWS Briefing" to "Australia",
+            "SBS News" to "Australia",
+            "News24" to "Australia",
+            "7NEWS Just In" to "Australia",
+            "Nine News Bulletin" to "Australia",
+            "NOVA News" to "Australia",
+            "The Quicky News Headlines" to "Australia",
+            "The Quicky" to "Australia",
+            "Sunrise" to "Australia",
+            "Please Explain" to "Australia",
+            "Full Story" to "Australia",
+            "The Front" to "Australia",
+            "Your News Now" to "Australia",
+            "Smooth News" to "Australia",
+            "The Morning Show" to "Australia",
+            "Ben Fordham Live" to "Australia",
+            "The Ray Hadley Morning Show - News Highlights" to "Australia",
+            "Drive with Tom Elliott - News Highlights" to "Australia",
+            "3AW Mornings with Neil Mitchell - News Highlights" to "Australia",
+            "3AW Breakfast - News Highlights" to "Australia",
+            "3AW Afternoons with Dee Dee - News Highlights" to "Australia",
+            "Drive with Jim Wilson - News Highlights" to "Australia",
+            "Perth Live with Oliver Peterson - News Highlights" to "Australia",
+            "6PR Breakfast with Gareth Parker - News Highlights" to "Australia",
+            "6PR Mornings - News Highlights" to "Australia",
+            "4BC Breakfast with Neil Breen - News Highlights" to "Australia",
+            "4BC Afternoons - News Highlights" to "Australia",
+            "Nights with John Stanley - News Highlights" to "Australia",
+            "Australia Overnight (Weekends) - News Highlights" to "Australia",
+            "Weekend Breakfast with Darren James" to "Australia",
+            "Weekends with Peter Fegan - News Highlights" to "Australia",
+            "News Desk by The West Australian" to "Australia",
+            "ABC Kids News" to "Australia",
+            "The Issue" to "Australia",
+            "ABC NEWS Melbourne Briefing" to "Australian local",
+            "ABC NEWS Sydney Briefing" to "Australian local",
+            "ABC NEWS Brisbane Briefing" to "Australian local",
+            "ABC NEWS Perth Briefing" to "Australian local",
+            "ABC NEWS Adelaide Briefing" to "Australian local",
+            "ABC NEWS Canberra Briefing" to "Australian local",
+            "ABC NEWS Hobart Briefing" to "Australian local",
+            "ABC NEWS Darwin Briefing" to "Australian local",
+            "Triple M Melbourne News" to "Australian local",
+            "Triple M Sydney News" to "Australian local",
+            "Triple M Brisbane News" to "Australian local",
+            "Triple M Perth News" to "Australian local",
+            "Triple M Adelaide News" to "Australian local",
+            "Triple M Newcastle News" to "Australian local",
+            "Triple M Hobart News" to "Australian local",
+            "Triple M Gold Coast News" to "Australian local",
+            "Triple M Central Coast News" to "Australian local",
+            "Triple M Townsville News" to "Australian local",
+            "LiSTNR Melbourne News" to "Australian local",
+            "LiSTNR Sydney News" to "Australian local",
+            "LiSTNR Perth News" to "Australian local",
+            "Fox FM Melbourne News" to "Australian local",
+            "2Day FM Sydney News" to "Australian local",
+            "Hit105 Brisbane News" to "Australian local",
+            "Mix 94.5 Perth News" to "Australian local",
+            "SAFM Adelaide News" to "Australian local",
+            "Hit Newcastle News" to "Australian local",
+            "Hit Central Coast News" to "Australian local",
+            "Hit Gold Coast News" to "Australian local",
+            "Hit Townsville News" to "Australian local",
+            "Hit Hobart News" to "Australian local",
+            "2CC News" to "Australian local",
+            "Power FM News" to "Australian local",
+            "Reuters Morning Bid" to "Business",
+            "Bloomberg Market Minute" to "Business",
+            "CNBC Markets Now" to "Business",
+            "CommSec Market Update" to "Business",
+            "CommSec Bulletin" to "Business",
+            "Fear and Greed Business Headlines" to "Business",
+            "Money News Market Wrap" to "Business",
+            "2GB Money News - News Highlights" to "Business",
+            "Business News by The West Australian" to "Business",
+            "Front Row Entrepreneur" to "Business",
+            "Transport Topics" to "Business",
+            "WSJ Tech News Briefing" to "Technology",
+            "TechCrunch" to "Technology",
+            "CNBC Tech Check" to "Technology",
+            "TechLinked" to "Technology",
+            "Samsung Newsroom Global" to "Technology",
+            "AI Automation Minute" to "Technology",
+            "AI News You Should Know About" to "Technology",
+            "SciTech Brief" to "Technology",
+            "SCIENCE by SciTech Brief" to "Technology",
+            "Let Me Google That" to "Technology",
+            "The Instagram Stories" to "Technology",
+            "Press Start Daily Gaming News" to "Technology",
+            "IGN" to "Technology",
+            "7NEWS Sport" to "Sport",
+            "7NEWS Sport Headlines" to "Sport",
+            "ABC NEWS Sport Briefing" to "Sport",
+            "Wide World of Sports Update" to "Sport",
+            "Wide World of Sports 6PR" to "Sport",
+            "4BC Wide World of Sports - News Highlights" to "Sport",
+            "Wide World of Sports (Sydney) - News Highlights" to "Sport",
+            "Sports Update by The West Australian" to "Sport",
+            "Sportsday - News Highlights" to "Sport",
+            "3AW Football" to "Sport",
+            "The Leadoff" to "Sport",
+            "Entertainment Now" to "Entertainment & lifestyle",
+            "7Life Latest Entertainment News" to "Entertainment & lifestyle",
+            "The Spill" to "Entertainment & lifestyle",
+            "Bollywood Hungama" to "Entertainment & lifestyle",
+            "Healthy-ish" to "Entertainment & lifestyle",
+            "The House of Wellness - News Highlights" to "Entertainment & lifestyle",
+            "The Space" to "Entertainment & lifestyle",
+        )
+
+        val CATEGORIES = listOf("Australia", "Australian local", "International", "Business", "Technology", "Sport", "Entertainment & lifestyle")
+
+        private val CATALOGUE: List<NewsSource> = run {
+            val builtInNames = BUILT_IN.flatMap { listOf(it.name.lowercase(), it.name.lowercase().removePrefix("the ")) }.toSet()
+            CATALOGUE_NAMES
+                .filter { (name, _) -> name.lowercase() !in builtInNames }
+                .map { (name, category) -> NewsSource("search:$name::", name, category) }
+        }
 
         /** Mirrors a typical Android Auto news line-up: local first, then world and tech. */
         private val DEFAULT_SOURCES = listOf(

@@ -15,7 +15,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.metrolist.music.podcasts.NewsBriefing
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,6 +56,8 @@ import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.viewmodels.NewsViewModel
 import androidx.compose.material3.IconButton as PlainIconButton
 
+private const val SELECTED = "__selected__"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsSourcesScreen(
@@ -47,7 +65,25 @@ fun NewsSourcesScreen(
     viewModel: NewsViewModel = hiltViewModel(),
 ) {
     val choices by viewModel.choices.collectAsState()
-    val enabledCount = choices.count { it.enabled }
+    val checking by viewModel.checking.collectAsState()
+    val enabledKeys = choices.filter { it.enabled }.map { it.source.key }
+    var query by rememberSaveable { mutableStateOf("") }
+    var category by rememberSaveable { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val categories = remember(choices) {
+        (NewsBriefing.CATEGORIES + choices.map { it.source.region }).distinct()
+            .filter { name -> choices.any { it.source.region == name } }
+    }
+    val shown = choices.filter { choice ->
+        (query.isBlank() || choice.source.name.contains(query.trim(), ignoreCase = true)) &&
+            (category == null || choice.source.region == category || (category == SELECTED && choice.enabled))
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.unavailable.collect { name ->
+            Toast.makeText(context, context.getString(R.string.news_source_unavailable, name), Toast.LENGTH_LONG).show()
+        }
+    }
 
     LazyColumn(
         contentPadding = LocalPlayerAwareWindowInsets.current
@@ -63,7 +99,44 @@ fun NewsSourcesScreen(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
             )
         }
-        itemsIndexed(choices, key = { _, choice -> choice.source.key }) { index, choice ->
+        item(key = "search") {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.news_search_sources)) },
+                leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        item(key = "categories") {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                item {
+                    FilterChip(selected = category == null, onClick = { category = null }, label = { Text(stringResource(R.string.news_category_all)) })
+                }
+                item {
+                    FilterChip(
+                        selected = category == SELECTED,
+                        onClick = { category = if (category == SELECTED) null else SELECTED },
+                        label = { Text(stringResource(R.string.news_category_selected, enabledKeys.size)) },
+                    )
+                }
+                items(categories) { name ->
+                    FilterChip(
+                        selected = category == name,
+                        onClick = { category = if (category == name) null else name },
+                        label = { Text(name) },
+                    )
+                }
+            }
+        }
+        items(shown, key = { choice -> choice.source.key }) { choice ->
+            val position = enabledKeys.indexOf(choice.source.key)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -71,7 +144,13 @@ fun NewsSourcesScreen(
                     .clickable { viewModel.toggle(choice) }
                     .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             ) {
-                Checkbox(checked = choice.enabled, onCheckedChange = { viewModel.toggle(choice) })
+                if (checking == choice.source.key) {
+                    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                    }
+                } else {
+                    Checkbox(checked = choice.enabled, onCheckedChange = { viewModel.toggle(choice) })
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(choice.source.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
@@ -81,10 +160,10 @@ fun NewsSourcesScreen(
                     )
                 }
                 if (choice.enabled) {
-                    PlainIconButton(onClick = { viewModel.move(choice, -1) }, enabled = index > 0) {
+                    PlainIconButton(onClick = { viewModel.move(choice, -1) }, enabled = position > 0) {
                         Icon(painterResource(R.drawable.arrow_upward), contentDescription = stringResource(R.string.news_move_up))
                     }
-                    PlainIconButton(onClick = { viewModel.move(choice, 1) }, enabled = index < enabledCount - 1) {
+                    PlainIconButton(onClick = { viewModel.move(choice, 1) }, enabled = position < enabledKeys.size - 1) {
                         Icon(painterResource(R.drawable.arrow_downward), contentDescription = stringResource(R.string.news_move_down))
                     }
                 }
