@@ -80,8 +80,15 @@ jobs:
           echo "VERSION=$base.${{ github.run_number }}" >> "$GITHUB_ENV"
           echo "FORK_BUILD_NUMBER=${{ github.run_number }}" >> "$GITHUB_ENV"
 
+      # Retries once, since a dependency download occasionally fails for a moment
       - name: Build APK
-        run: chmod +x gradlew && ./gradlew --console=plain :app:assembleFossDebug -x lint
+        run: |
+          chmod +x gradlew
+          ./gradlew --console=plain :app:assembleFossDebug -x lint || {
+            echo "::warning::Build failed; retrying once in case it was a download hiccup."
+            sleep 30
+            ./gradlew --console=plain --refresh-dependencies :app:assembleFossDebug -x lint
+          }
         env:
           PULL_REQUEST: "false"
 
