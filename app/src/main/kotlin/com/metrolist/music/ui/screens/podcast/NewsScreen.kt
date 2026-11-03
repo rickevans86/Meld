@@ -63,6 +63,8 @@ fun NewsScreen(
     val currentId by playerConnection.mediaMetadata.collectAsState()
     val enabled = choices.filter { it.enabled }
     val enabledKeys = enabled.map { it.source.key }
+    val sortedSources by viewModel.sortedEnabled.collectAsState()
+    val sortSetting by viewModel.sort.collectAsState()
 
     LaunchedEffect(enabledKeys) { if (enabledKeys.isNotEmpty()) viewModel.refresh() }
 
@@ -86,6 +88,18 @@ fun NewsScreen(
                 if (refreshing) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp).padding(end = 4.dp), strokeWidth = 2.dp)
                 }
+                com.metrolist.music.ui.component.SortMenuButton(
+                    options = listOf(
+                        com.metrolist.music.podcasts.NewsSort.YOUR_ORDER to stringResource(R.string.sort_your_order),
+                        com.metrolist.music.podcasts.NewsSort.LATEST to stringResource(R.string.sort_latest_bulletin),
+                        com.metrolist.music.podcasts.NewsSort.NAME to stringResource(R.string.sort_name),
+                        com.metrolist.music.podcasts.NewsSort.REGION to stringResource(R.string.sort_region),
+                    ),
+                    selected = sortSetting.first,
+                    reversed = sortSetting.second,
+                    onSelect = viewModel::setSort,
+                    onReversedChange = viewModel::setSortReversed,
+                )
                 IconButton(onClick = viewModel::refresh, enabled = !refreshing && enabled.isNotEmpty()) {
                     Icon(painterResource(R.drawable.refresh), contentDescription = stringResource(R.string.news_refresh))
                 }
@@ -104,7 +118,7 @@ fun NewsScreen(
                 )
             }
         }
-        items(enabled, key = { it.source.key }) { choice ->
+        items(sortedSources.mapNotNull { s -> enabled.firstOrNull { it.source.key == s.key } }, key = { it.source.key }) { choice ->
             val loaded = choice.source.key in bulletins
             val bulletin = bulletins[choice.source.key]
             val isCurrent = bulletin != null && currentId?.id == bulletin.song.id

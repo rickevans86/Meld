@@ -95,7 +95,8 @@ fun LocalFilesScreen(
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
 
-    val songs by viewModel.songs.collectAsState()
+    // One copy per song in the all-songs list; folder view still shows every file
+    val songs by viewModel.uniqueSongs.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
 
     val (sortType, onSortTypeChange) = rememberEnumPreference(SongSortTypeKey, SongSortType.CREATE_DATE)

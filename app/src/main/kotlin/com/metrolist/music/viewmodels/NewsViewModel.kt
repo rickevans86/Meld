@@ -12,6 +12,8 @@ import com.metrolist.music.podcasts.NewsBriefing
 import com.metrolist.music.podcasts.NewsSourceChoice
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.metrolist.music.podcasts.Bulletin
+import com.metrolist.music.podcasts.NewsSort
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
@@ -42,6 +44,26 @@ constructor(
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing = _refreshing.asStateFlow()
+
+    val sort = briefing.sortSetting.stateIn(viewModelScope, SharingStarted.Eagerly, NewsSort.YOUR_ORDER to false)
+
+    /** Enabled sources in the chosen order, using fresh bulletin times when sorting by latest. */
+    val sortedEnabled = combine(choices, sort, _bulletins) { all, (order, reversed), bulletins ->
+        briefing.sortSources(
+            all.filter { it.enabled }.map { it.source },
+            order,
+            reversed,
+            bulletins.mapValues { it.value?.publishedAt },
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun setSort(order: NewsSort) {
+        viewModelScope.launch { briefing.setSort(order) }
+    }
+
+    fun setSortReversed(reversed: Boolean) {
+        viewModelScope.launch { briefing.setSortReversed(reversed) }
+    }
 
     private var refreshJob: Job? = null
 
@@ -77,7 +99,8 @@ constructor(
         if (_loading.value) return
         viewModelScope.launch {
             _loading.value = true
-            val sources = choices.value.filter { it.enabled }.map { it.source }
+            // Plays in the order chosen with the sort button
+            val sources = sortedEnabled.value.ifEmpty { briefing.sortedEnabledSources() }
             val loaded = _bulletins.value
             val songs = if (!_refreshing.value && sources.isNotEmpty() && sources.all { it.key in loaded }) {
                 // Already fetched for the News tab: play those straight away

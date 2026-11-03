@@ -26,6 +26,8 @@ import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.localfiles.LocalMusicFolders
 import com.metrolist.music.models.toMediaMetadata
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
@@ -46,10 +48,15 @@ constructor(
     private val podcastFeeds: com.metrolist.music.podcasts.PodcastDirectory,
     private val news: com.metrolist.music.podcasts.NewsBriefing,
     private val radio: com.metrolist.music.radio.RadioDirectory,
+    private val downloadUtil: DownloadUtil,
     private val subsonic: com.metrolist.music.subsonic.SubsonicRepository,
 ) {
     fun isBrowsable(mediaId: String): Boolean =
         mediaId == LOCAL_FILES ||
+            (mediaId.startsWith("$LOCAL_FOLDER/") && mediaId.count { it == '/' } == 2) ||
+            (mediaId.startsWith("$LIB_ALBUM/") && mediaId.count { it == '/' } == 1) ||
+            (mediaId.startsWith("$LIB_ARTIST/") && mediaId.count { it == '/' } == 1) ||
+            mediaId == NEW_EPISODES ||
             mediaId == NEWS ||
             mediaId == RADIO ||
             mediaId == SUBSONIC ||
@@ -75,9 +82,47 @@ constructor(
 
     /** Children for one of this class's folders, or null when [parentId] isn't one of them. */
     suspend fun children(parentId: String): List<MediaItem>? = when {
+        // Folders (with Shuffle all on top) instead of one long list
         parentId == LOCAL_FILES -> {
-            val songs = localSongs()
-            if (songs.isEmpty()) emptyList() else listOf(shuffleItem(LOCAL_FILES)) + songs.map { it.toAutoItem(LOCAL_FILES) }
+            val folders = localFolders()
+            if (folders.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(
+                    playable("$LOCAL_FILES/$SHUFFLE", context.getString(R.string.auto_shuffle_all), null, icon(R.drawable.shuffle)),
+                ) + folders.map { (path, songs) ->
+                    folder(
+                        "$LOCAL_FOLDER/${key(path)}",
+                        path.substringAfterLast('/').ifEmpty { context.getString(R.string.local_files) },
+                        listOfNotNull(
+                            context.resources.getQuantityString(R.plurals.n_song, songs.size, songs.size),
+                            path.substringBeforeLast('/', "").takeIf { it.isNotEmpty() },
+                        ).joinToString(" · "),
+                        icon(R.drawable.folder),
+                        MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                    )
+                }
+            }
+        }
+        parentId.startsWith("$LOCAL_FOLDER/") -> {
+            val songs = folderSongs(parentId.substringAfterLast('/'))
+            if (songs.isEmpty()) emptyList() else listOf(shuffleItem(parentId)) + songs.map { it.toAutoItem(parentId) }
+        }
+        parentId.startsWith("$LIB_ALBUM/") -> {
+            val songs = poolAlbumSongs(parentId.substringAfter('/'))
+            if (songs.isEmpty()) emptyList() else listOf(shuffleItem(parentId)) + songs.map { it.toAutoItem(parentId) }
+        }
+        parentId.startsWith("$LIB_ARTIST/") -> {
+            val songs = poolArtistSongs(parentId.substringAfter('/'))
+            if (songs.isEmpty()) emptyList() else listOf(shuffleItem(parentId)) + songs.map { it.toAutoItem(parentId) }
+        }
+        parentId == NEW_EPISODES -> newEpisodes(refresh = true).mapIndexed { index, item ->
+            playable(
+                "$NEW_EPISODES/$index",
+                item.mediaMetadata.title?.toString().orEmpty(),
+                item.mediaMetadata.artist?.toString() ?: item.mediaMetadata.albumTitle?.toString(),
+                item.mediaMetadata.artworkUri,
+            )
         }
         parentId == NEWS -> newsItems()
         parentId == RADIO -> radioStations().map { station ->
@@ -107,7 +152,9 @@ constructor(
         LOCAL_FILES -> {
             val songs = localSongs()
             val id = path.getOrNull(1)
-            if (id == SHUFFLE) {
+            if (id == "folder") {
+                playList(folderSongs(path.getOrNull(2).orEmpty()), path.getOrNull(3))
+            } else if (id == SHUFFLE) {
                 MediaItemsWithStartPosition(songs.shuffled().map { it.toMediaItem() }, 0, C.TIME_UNSET)
             } else {
                 MediaItemsWithStartPosition(
@@ -118,6 +165,8 @@ constructor(
             }
         }
         NEWS -> playNews(path)
+        LIB_ALBUM -> playList(poolAlbumSongs(path.getOrNull(1).orEmpty()), path.getOrNull(2))
+        LIB_ARTIST -> playList(poolArtistSongs(path.getOrNull(1).orEmpty()), path.getOrNull(2))
         RADIO -> {
             val stations = radioStations()
             val songs = radio.prepare(stations)
@@ -130,7 +179,125 @@ constructor(
         else -> null
     }
 
-    private suspend fun localSongs(): List<Song> {
+    /** Local songs for Android Auto lists: Music folders settings applied, exported copies collapsed. */
+    private suspend fun localSongs(): List<Song> = LocalMusicFolders.uniqueCopies(allowedLocalSongs())
+
+    /**
+     * Library songs as Android Auto should list them: local files follow the Music folders settings
+     * (so excluded folders like WhatsApp stay out), and copies of the same song collapse into one.
+     */
+    suspend fun visibleLibrarySongs(songs: List<Song>): List<Song> {
+        val allowedLocal = allowedLocalSongs().mapTo(HashSet()) { it.id }
+        return LocalMusicFolders.uniqueCopies(
+            songs.filter { song ->
+                !isAudiobookId(song.id) && (!song.id.startsWith("local:") || song.id in allowedLocal)
+            },
+        )
+    }
+
+    /** Local songs grouped by folder path, A–Z. Every copy is kept here, as in the app's folder view. */
+    private suspend fun localFolders(): List<Pair<String, List<Song>>> {
+        val songs = allowedLocalSongs()
+        val folderById = runCatching { localMusicFolders.includedFolderById() }.getOrNull().orEmpty()
+        return songs
+            .groupBy { song ->
+                song.id.removePrefix("local:").toLongOrNull()?.let(folderById::get)
+                    ?: song.song.localPath?.takeIf { song.id.startsWith("local:doc:") }?.let(LocalMusicFolders::documentFolder)
+                    ?: ""
+            }
+            .toList()
+            .sortedBy { it.first.lowercase() }
+    }
+
+    private suspend fun folderSongs(key: String): List<Song> =
+        localFolders().firstOrNull { key(it.first) == key }?.second.orEmpty()
+
+    /** Downloaded, saved and local songs: what Albums and Artists are built from. */
+    private suspend fun songPool(): List<Song> {
+        val downloaded = downloadUtil.downloads.value
+            .filterValues { it.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED }.keys.toList()
+        val library = database.songsByCreateDateAsc().first()
+        val downloadedSongs = downloaded.chunked(500).flatMap { database.getSongsByIds(it) }
+        return visibleLibrarySongs((library + downloadedSongs + allowedLocalSongs()).distinctBy { it.id })
+    }
+
+    /** Albums from downloaded and local songs, skipping titles already in the saved library. */
+    suspend fun poolAlbums(skipTitles: Set<String>): List<MediaItem> =
+        songPool()
+            .filter { !it.song.albumName.isNullOrBlank() && it.song.albumName!!.lowercase() !in skipTitles }
+            .groupBy { it.song.albumName!!.trim() }
+            .toSortedMap(String.CASE_INSENSITIVE_ORDER)
+            .map { (name, songs) ->
+                folder(
+                    "$LIB_ALBUM/${key(name.lowercase())}",
+                    name,
+                    songs.firstNotNullOfOrNull { s -> s.artists.firstOrNull()?.name },
+                    songs.firstNotNullOfOrNull { it.song.thumbnailUrl }?.toUri(),
+                    MediaMetadata.MEDIA_TYPE_ALBUM,
+                )
+            }
+
+    /** Artists from downloaded and local songs, skipping ones already in the saved library. */
+    suspend fun poolArtists(skipIds: Set<String>): List<MediaItem> {
+        val byArtist = LinkedHashMap<String, MutableList<Song>>()
+        val names = HashMap<String, String>()
+        songPool().forEach { song ->
+            song.artists.filter { it.id !in skipIds && it.name.isNotBlank() }.forEach { artist ->
+                byArtist.getOrPut(artist.id) { mutableListOf() }.add(song)
+                names[artist.id] = artist.name
+            }
+        }
+        return byArtist.entries
+            .sortedBy { names[it.key].orEmpty().lowercase() }
+            .map { (artistId, songs) ->
+                folder(
+                    "$LIB_ARTIST/${key(artistId)}",
+                    names[artistId].orEmpty(),
+                    context.resources.getQuantityString(R.plurals.n_song, songs.size, songs.size),
+                    null,
+                    MediaMetadata.MEDIA_TYPE_ARTIST,
+                )
+            }
+    }
+
+    private suspend fun poolAlbumSongs(albumKey: String): List<Song> =
+        songPool().filter { s -> s.song.albumName?.trim()?.lowercase()?.let { key(it) } == albumKey }
+
+    private suspend fun poolArtistSongs(artistKey: String): List<Song> =
+        songPool().filter { s -> s.artists.any { key(it.id) == artistKey } }
+
+    private fun playList(songs: List<Song>, chosen: String?): MediaItemsWithStartPosition? {
+        if (songs.isEmpty()) return null
+        if (chosen == SHUFFLE) return MediaItemsWithStartPosition(songs.shuffled().map { it.toMediaItem() }, 0, C.TIME_UNSET)
+        return MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, songs.indexOfFirst { it.id == chosen }.coerceAtLeast(0), C.TIME_UNSET)
+    }
+
+    private fun key(value: String): String =
+        java.security.MessageDigest.getInstance("SHA-1").digest(value.toByteArray())
+            .joinToString("") { "%02x".format(it) }.take(16)
+
+    /**
+     * Wavelength's combined New episodes: recent episodes from followed feeds, then YouTube's.
+     * Kept for a few minutes so the list and what plays match.
+     */
+    @Volatile
+    private var newEpisodesCache: Pair<Long, List<MediaItem>>? = null
+
+    private suspend fun newEpisodes(refresh: Boolean): List<MediaItem> {
+        val cached = newEpisodesCache
+        if (cached != null && (!refresh || System.currentTimeMillis() - cached.first < NEW_EPISODES_TTL_MS)) return cached.second
+        val items = coroutineScope {
+            val rss = async {
+                withTimeoutOrNull(NETWORK_TIMEOUT_MS * 2) { runCatching { podcastFeeds.recentFromFollowed() }.getOrNull() }.orEmpty()
+            }
+            val yt = async { withTimeoutOrNull(NETWORK_TIMEOUT_MS) { YouTube.newEpisodes().getOrNull() }.orEmpty() }
+            rss.await().map { it.first.toMediaItem() } + yt.await().map { it.toMediaItem() }
+        }
+        newEpisodesCache = System.currentTimeMillis() to items
+        return items
+    }
+
+    private suspend fun allowedLocalSongs(): List<Song> {
         val all = database.localSongs(SongSortType.NAME, false).first().filterNot { isAudiobookId(it.id) }
         val choices = localMusicFolders.currentChoices()
         val included = runCatching { localMusicFolders.includedFolderById() }.getOrNull()
@@ -192,8 +359,8 @@ constructor(
         return MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, start, C.TIME_UNSET)
     }
 
-    private suspend fun enabledNewsSources() =
-        news.choices.first().filter { it.enabled }.map { it.source }
+    // Same order as the News tab's sort
+    private suspend fun enabledNewsSources() = news.sortedEnabledSources()
 
     private suspend fun newsItems(): List<MediaItem> {
         val sources = enabledNewsSources()
@@ -279,14 +446,17 @@ constructor(
     }
 
     private suspend fun podcastFolders(): List<MediaItem> {
+        val newEpisodes = folder(NEW_EPISODES, context.getString(R.string.new_episodes), null, icon(R.drawable.podcasts))
         val saved = folder(SAVED_EPISODES, context.getString(R.string.auto_saved_episodes), null, icon(R.drawable.mic))
-        val channels = database.subscribedPodcasts().first().map { podcast ->
+        val subscribed = database.subscribedPodcasts().first()
+        val followed = podcastFeeds.followed.value
+        val channels = subscribed.map { podcast ->
             folder("$PODCAST_CHANNEL/${podcast.id}", podcast.title, podcast.author, podcast.thumbnailUrl?.toUri())
         }
-        val feeds = podcastFeeds.followed.value.map { show ->
+        val feeds = followed.map { show ->
             folder("$PODCAST_FEED/${feedKey(show.feedUrl)}", show.title, show.author, show.artworkUrl?.toUri())
         }
-        return listOf(saved) + channels + feeds
+        return listOf(newEpisodes, saved) + com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed)
     }
 
     private fun followedFeed(key: String) =
@@ -321,6 +491,10 @@ constructor(
     }
 
     private suspend fun playPodcast(path: List<String>): MediaItemsWithStartPosition? = when (path.getOrNull(1)) {
+        "new" -> {
+            val items = newEpisodes(refresh = false)
+            if (items.isEmpty()) null else MediaItemsWithStartPosition(items, (path.getOrNull(2)?.toIntOrNull() ?: 0).coerceIn(0, items.lastIndex), C.TIME_UNSET)
+        }
         "saved" -> {
             val episodes = savedEpisodes()
             val id = path.getOrNull(2)
@@ -434,5 +608,10 @@ constructor(
         private const val PODCAST_CHANNEL = "$PODCASTS/channel"
         private const val PODCAST_FEED = "$PODCASTS/feed"
         private const val SHUFFLE = "__shuffle__"
+        private const val LOCAL_FOLDER = "$LOCAL_FILES/folder"
+        const val LIB_ALBUM = "lib_album"
+        const val LIB_ARTIST = "lib_artist"
+        private const val NEW_EPISODES = "$PODCASTS/new"
+        private const val NEW_EPISODES_TTL_MS = 5 * 60 * 1000L
     }
 }

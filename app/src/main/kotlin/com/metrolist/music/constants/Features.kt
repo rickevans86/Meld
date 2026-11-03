@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.metrolist.music.utils.dataStore
 import kotlinx.coroutines.flow.map
@@ -59,4 +60,45 @@ fun rememberDisabledFeatures(): Set<WavelengthFeature> {
     val flow = remember(context) { context.dataStore.data.map { it.disabledFeatures() } }
     val disabled by flow.collectAsState(initial = emptySet())
     return disabled
+}
+
+/**
+ * Integrations Wavelength switches off and hides (their code stays so Meld updates merge cleanly).
+ * Set one to false to bring that integration back.
+ */
+object RemovedIntegrations {
+    const val DISCORD = true
+    const val LASTFM = true
+    const val LISTEN_TOGETHER = true
+
+    /** Signs out of the removed integrations and stops them reconnecting. Safe to call on every start. */
+    suspend fun clearSavedState(context: android.content.Context) {
+        context.dataStore.edit { prefs ->
+            if (DISCORD) {
+                prefs[EnableDiscordRPCKey] = false
+                prefs.remove(DiscordUsernameKey)
+                prefs.remove(DiscordNameKey)
+                prefs.remove(DiscordAvatarKey)
+            }
+            if (LASTFM) {
+                prefs[EnableLastFMScrobblingKey] = false
+                prefs.remove(LastFMSessionKey)
+                prefs.remove(LastFMUsernameKey)
+            }
+            if (LISTEN_TOGETHER) {
+                prefs[ListenTogetherInTopBarKey] = false
+                prefs.remove(ListenTogetherSessionTokenKey)
+                prefs.remove(ListenTogetherRoomCodeKey)
+                prefs.remove(ListenTogetherUserIdKey)
+                prefs.remove(ListenTogetherIsHostKey)
+                prefs.remove(ListenTogetherSessionTimestampKey)
+            }
+        }
+        if (DISCORD) {
+            runCatching {
+                com.metrolist.music.discord.DiscordTokenStore.init(context.applicationContext)
+                com.metrolist.music.discord.DiscordTokenStore.clear()
+            }
+        }
+    }
 }

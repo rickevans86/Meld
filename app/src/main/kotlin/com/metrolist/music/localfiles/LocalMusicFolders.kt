@@ -174,6 +174,20 @@ constructor(
     )
 
     companion object {
+        /**
+         * Collapses copies of the same song (e.g. Wavelength's exported file in several playlist
+         * folders) into one: same title, artists and length. Keeps the first copy.
+         */
+        fun uniqueCopies(songs: List<com.metrolist.music.db.entities.Song>): List<com.metrolist.music.db.entities.Song> {
+            val seen = HashSet<String>()
+            return songs.filter { song ->
+                val title = song.song.title.lowercase().filter { it.isLetterOrDigit() }
+                val artists = song.artists.joinToString(",") { it.name.lowercase().trim() }
+                val length = song.song.duration.takeIf { it > 0 }?.let { (it + 1) / 3 } ?: -1
+                seen.add("$title|$artists|$length")
+            }
+        }
+
         private const val TAG = "LocalMusicFolders"
 
         /** Folder of a file inside a picked folder tree, as "Music/Albums/X". */

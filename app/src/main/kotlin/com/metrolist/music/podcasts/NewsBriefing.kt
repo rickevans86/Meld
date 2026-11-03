@@ -18,6 +18,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -48,6 +49,12 @@ data class NewsSource(
 )
 
 data class NewsSourceChoice(val source: NewsSource, val enabled: Boolean)
+
+/** How news sources are listed and played: in the app, on Android Auto and in "Play the news". */
+enum class NewsSort { YOUR_ORDER, LATEST, NAME, REGION }
+
+val NewsSortKey = androidx.datastore.preferences.core.stringPreferencesKey("newsSort")
+val NewsSortReversedKey = androidx.datastore.preferences.core.booleanPreferencesKey("newsSortReversed")
 
 /** A source's newest bulletin, ready to play. */
 data class Bulletin(val song: Song, val publishedAt: Long?, val artworkUrl: String?)
@@ -84,6 +91,59 @@ constructor(
                 available.filter { it !in enabled }.map { NewsSourceChoice(it, false) }
         }
 
+    val sortSetting: Flow<Pair<NewsSort, Boolean>> = context.dataStore.data.map { prefs ->
+        (prefs[NewsSortKey]?.let { name -> NewsSort.entries.firstOrNull { it.name == name } } ?: NewsSort.YOUR_ORDER) to
+            (prefs[NewsSortReversedKey] ?: false)
+    }
+
+    suspend fun setSort(sort: NewsSort) = context.dataStore.edit { it[NewsSortKey] = sort.name }
+
+    suspend fun setSortReversed(reversed: Boolean) = context.dataStore.edit { it[NewsSortReversedKey] = reversed }
+
+    /** When each source last published, remembered from earlier loads (for "Latest bulletin"). */
+    private val latestFile = java.io.File(context.filesDir, "news_latest.json")
+    private val latestSerializer = kotlinx.serialization.builtins.MapSerializer(
+        kotlinx.serialization.serializer<String>(),
+        kotlinx.serialization.serializer<Long>(),
+    )
+    private val latestPublished = ConcurrentHashMap<String, Long>(
+        runCatching { json.decodeFromString(latestSerializer, latestFile.readText()) }.getOrDefault(emptyMap()),
+    )
+
+    private fun rememberPublished(key: String, at: Long?) {
+        if (at == null || latestPublished[key] == at) return
+        latestPublished[key] = at
+        runCatching { latestFile.writeText(json.encodeToString(latestSerializer, latestPublished.toMap())) }
+    }
+
+    /**
+     * Orders sources: your order (as set on News sources), newest bulletin first, A–Z, or by region.
+     * [latest] adds publish times known right now on top of the remembered ones.
+     */
+    fun sortSources(
+        sources: List<NewsSource>,
+        sort: NewsSort,
+        reversed: Boolean,
+        latest: Map<String, Long?> = emptyMap(),
+    ): List<NewsSource> {
+        val sorted = when (sort) {
+            NewsSort.YOUR_ORDER -> sources
+            NewsSort.NAME -> sources.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+            NewsSort.LATEST -> sources.sortedByDescending { latest[it.key] ?: latestPublished[it.key] ?: Long.MIN_VALUE }
+            NewsSort.REGION -> sources.sortedWith(
+                compareBy<NewsSource> { CATEGORIES.indexOf(it.region).let { i -> if (i < 0) Int.MAX_VALUE else i } }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
+            )
+        }
+        return if (reversed) sorted.reversed() else sorted
+    }
+
+    /** Enabled sources in the chosen order; Android Auto uses this so it matches the app. */
+    suspend fun sortedEnabledSources(): List<NewsSource> {
+        val (sort, reversed) = sortSetting.first()
+        return sortSources(choices.first().filter { it.enabled }.map { it.source }, sort, reversed)
+    }
+
     suspend fun setEnabled(keysInOrder: List<String>) {
         context.dataStore.edit { it[NewsSourcesKey] = keysInOrder.joinToString(SEPARATOR) }
     }
@@ -111,6 +171,7 @@ constructor(
                 val newest = feed.episodes.firstOrNull()
                     ?.takeIf { (it.publishedAt ?: System.currentTimeMillis()) >= cutoff }
                     ?: return@runCatching null
+                rememberPublished(source.key, newest.publishedAt)
                 directory.prepare(feed.copy(episodes = listOf(newest))).firstOrNull()
                     ?.let { Bulletin(it, newest.publishedAt, feed.show.artworkUrl) }
             }.onFailure { Timber.tag(TAG).w(it, "No bulletin from ${source.name}") }.getOrNull()

@@ -1142,7 +1142,7 @@ class MainActivity : FragmentActivity() {
                                                         contentDescription = stringResource(R.string.stats),
                                                     )
                                                 }
-                                                if (listenTogetherInTopBar) {
+                                                if (listenTogetherInTopBar && !com.metrolist.music.constants.RemovedIntegrations.LISTEN_TOGETHER) {
                                                     IconButton(onClick = { navController.navigate("listen_together_from_topbar") }) {
                                                         Icon(
                                                             painter = painterResource(R.drawable.group_outlined),

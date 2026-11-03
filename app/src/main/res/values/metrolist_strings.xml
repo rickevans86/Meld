@@ -1332,6 +1332,18 @@
     <!-- Wavelength: side menu, News tab, internet radio, Navidrome / Subsonic -->
     <string name="open_menu">Open menu</string>
     <string name="features">Features</string>
+    <string name="sort_by">Sort</string>
+    <string name="sort_reverse">Reverse order</string>
+    <string name="sort_name">Name (A–Z)</string>
+    <string name="sort_latest_episode">Latest episode</string>
+    <string name="sort_recently_followed">Recently followed</string>
+    <string name="sort_publisher">Publisher (A–Z)</string>
+    <string name="sort_your_order">Your order</string>
+    <string name="sort_latest_bulletin">Latest bulletin</string>
+    <string name="sort_region">Region</string>
+    <string name="auto_shuffle_all">Shuffle all</string>
+    <string name="features_default_home">Default home</string>
+    <string name="features_default_home_desc">Shown on the Home tab; the other one is in the side menu</string>
     <string name="features_entry_desc">Turn off parts of Wavelength you don\'t use</string>
     <string name="features_intro">Turned-off features are hidden from the bottom bar, the side menu and Android Auto. Nothing is deleted; turn them back on any time.</string>
     <string name="features_second_source_desc">The music source that isn\'t your default home</string>

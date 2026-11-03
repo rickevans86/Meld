@@ -5,7 +5,11 @@
 
 package com.metrolist.music.ui.screens.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -34,6 +38,7 @@ import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.R
 import com.metrolist.music.constants.DisabledFeaturesKey
 import com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
+import com.metrolist.music.constants.HOME_SOURCE_YOUTUBE
 import com.metrolist.music.constants.WavelengthFeature
 import com.metrolist.music.constants.rememberDefaultHomeSource
 import com.metrolist.music.constants.rememberDisabledFeatures
@@ -52,6 +57,10 @@ fun FeaturesSettings(navController: NavController) {
     val scope = rememberCoroutineScope()
     val disabled = rememberDisabledFeatures()
     val secondIsYouTube = rememberDefaultHomeSource() == HOME_SOURCE_SPOTIFY
+
+    fun setDefaultHome(source: String) {
+        scope.launch { context.dataStore.edit { it[com.metrolist.music.constants.DefaultHomeSourceKey] = source } }
+    }
 
     fun setEnabled(feature: WavelengthFeature, enabled: Boolean) {
         scope.launch {
@@ -74,6 +83,32 @@ fun FeaturesSettings(navController: NavController) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
         )
+        // Which music source is the Home tab; the other one is the "second source" below
+        Material3SettingsGroup(
+            title = stringResource(R.string.features_default_home),
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.home_outlined),
+                    title = { Text(stringResource(R.string.features_default_home)) },
+                    description = { Text(stringResource(R.string.features_default_home_desc)) },
+                    trailingContent = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(
+                                selected = !secondIsYouTube,
+                                onClick = { setDefaultHome(HOME_SOURCE_YOUTUBE) },
+                                label = { Text(stringResource(R.string.home_youtube)) },
+                            )
+                            FilterChip(
+                                selected = secondIsYouTube,
+                                onClick = { setDefaultHome(HOME_SOURCE_SPOTIFY) },
+                                label = { Text(stringResource(R.string.home_spotify)) },
+                            )
+                        }
+                    },
+                ),
+            ),
+        )
+        Spacer(Modifier.height(16.dp))
         Material3SettingsGroup(
             title = stringResource(R.string.features),
             items = WavelengthFeature.entries.map { feature ->

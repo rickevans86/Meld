@@ -92,6 +92,7 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   hint), `SpotifySettings.kt`, `WavelengthDrawer.kt`, `NavigationBuilder.kt`, `MainActivity.kt` (title)
 
 ### 0c. Features settings
+- The Features page starts with **Default home** (YouTube / Spotify), the same setting as in Spotify settings.
 - Settings → Wavelength → **Features** (`settings/features`, `FeaturesSettings.kt`) turns off: the second music
   source (whichever of YouTube/Spotify isn't the default home), News, Navidrome, Audiobooks, Podcasts, Local files
   and Radio. Stored as `DisabledFeaturesKey` (set of ids); see `constants/Features.kt` (`WavelengthFeature`).
@@ -102,6 +103,17 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - New files: `constants/Features.kt`, `ui/screens/settings/FeaturesSettings.kt`
 - Edited: `MainActivity.kt`, `WavelengthDrawer.kt`, `MediaLibrarySessionCallback.kt`, `LibraryScreen.kt`,
   `SettingsScreen.kt`, `NavigationBuilder.kt`
+
+### 0d. Removed integrations: Discord, Last.fm, Listen Together
+- Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
+  `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
+- `MusicService`: Discord RPC isn't initialised and its enabled flag is forced off; Last.fm scrobbling is forced off;
+  `RemovedIntegrations.clearSavedState` runs on start and signs out of Discord and Last.fm and clears any Listen
+  Together session so it never rejoins.
+- Hidden: Discord and Last.fm on the Integrations screen (`IntegrationScreen.kt`), Listen Together in the side menu,
+  the top bar button (`MainActivity`) and the player menu (`PlayerMenu.kt`).
+- To delete them for real later: remove the `discord/`, `listentogether/` and `lastfm` modules, their settings screens,
+  routes in `NavigationBuilder.kt`, and the guarded blocks above.
 
 ### 1. Local files: folder view and music folders
 - The Local files tab can switch between a song list and a folder view.
@@ -182,6 +194,15 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   tap to play one). The card was removed from the Podcasts tab.
 - Edited: `PreferenceKeys.kt` (`NewsSourcesKey`), `NewsViewModel.kt` (`refresh`, `bulletins`, `playOne`)
 
+### 5a. Sorting podcasts and news
+- Podcasts: sort button on the Podcasts tab (`SortMenuButton`, `constants/PodcastSort.kt`): Name, Latest episode,
+  Recently followed, Publisher, plus Reverse. Keys `PodcastShowSortKey` / `PodcastShowSortReversedKey`. Applies to
+  followed shows, the Channels tab (name sorts only; YouTube channels only carry a name) and Android Auto.
+  `PodcastShow` gained `followedAt` and `latestEpisodeAt` (filled when a feed loads).
+- News: sort button on the News tab: Your order, Latest bulletin, Name, Region, plus Reverse (`NewsSort`,
+  `NewsSortKey`, `NewsSortReversedKey` in `NewsBriefing.kt`). Applies to the News tab, Android Auto and Play the news.
+  Last publish times are remembered in `filesDir/news_latest.json`.
+
 ### 5b. New episodes (combined)
 - The "New episodes" card (Podcasts tab and Account screen) opens `new_episodes` instead of YouTube's RDPN list:
   recent episodes from followed feeds (last 30 days, up to 5 per show, newest first) followed by YouTube's
@@ -238,8 +259,17 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   favourites, or popular stations when there are none) and Navidrome (`subsonic/starred`, `subsonic/playlists`,
   `subsonic/albums`, `subsonic/album/<id>/<song>`, `subsonic/playlist/<id>/<song>`).
 - Voice and text search of YouTube songs (the `android.media.browse.SEARCH_SUPPORTED` root extra).
+- Local files is a folder view: Shuffle all, then one folder per music folder (`local_files/folder/<key>`), each with
+  Shuffle.
+- Songs follows the Music folders settings (`AutoLibraryExtras.visibleLibrarySongs`), so excluded folders such as
+  WhatsApp stay out; copies of the same song collapse (`LocalMusicFolders.uniqueCopies`: same title, artists and
+  length). The app's Local files all-songs list uses the same rule (`LocalFilesViewModel.uniqueSongs`).
+- Albums and Artists list saved ones first, then ones built from downloaded and local songs
+  (`poolAlbums` / `poolArtists`, ids `lib_album/<key>`, `lib_artist/<key>`).
+- Podcasts page: New episodes on top (`podcasts/new`, the combined list, cached 5 minutes), then Saved episodes,
+  then channels and followed feeds in the chosen podcast sort.
 - New file: `playback/AutoLibraryExtras.kt`
-- Edited: `MediaLibrarySessionCallback.kt`, `AndroidAutoSettings.kt` (enum entries LOCAL_FILES, AUDIOBOOKS,
+- Edited: `MediaLibrarySessionCallback.kt` (`autoArtists`, `autoAlbums`, Songs filtering), `AndroidAutoSettings.kt` (enum entries LOCAL_FILES, AUDIOBOOKS,
   PODCASTS and NEWS, with labels and icons)
 
 ### 7. In-app updater from this fork
@@ -323,3 +353,4 @@ To see the exact diff at any time:
 - 2026-11-04: Separate YouTube and Spotify homes, with a setting for which one is the Home tab.
 - 2026-11-04: Storage settings renamed Storage/Download; Wi-Fi only downloads that pause off Wi-Fi.
 - 2026-11-04: Features settings to turn off the second source, News, Navidrome, Audiobooks, Podcasts, Local files, Radio.
+- 2026-11-04: Android Auto: Local files folders, Songs follows Music folders, Albums/Artists from downloads and local songs, New episodes; podcast and news sorting; Default home on Features page; Discord, Last.fm and Listen Together switched off and hidden; duplicate copies collapsed in song lists.

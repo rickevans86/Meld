@@ -60,7 +60,7 @@ object WavelengthDrawer {
         DrawerDestination("local_files", R.string.filter_local_files, R.drawable.folder),
     )
     val more = listOf(
-        DrawerDestination("listen_together", R.string.together, R.drawable.group_outlined),
+        // Listen Together is switched off in Wavelength (see RemovedIntegrations)
         DrawerDestination("history", R.string.history, R.drawable.history, topLevel = false),
         DrawerDestination("stats", R.string.stats, R.drawable.stats, topLevel = false),
         DrawerDestination("settings", R.string.settings, R.drawable.settings, topLevel = false),

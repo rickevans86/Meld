@@ -201,6 +201,34 @@ constructor(
             },
         )
 
+    /** Saved artists, then artists from downloaded and local songs. */
+    private suspend fun autoArtists(): List<MediaItem> {
+        val saved = database.artistsByCreateDateAsc().first()
+        return saved.map { artist ->
+            browsableMediaItem(
+                "${MusicService.ARTIST}/${artist.id}",
+                ArtistNameAliases.resolve(artist.id, artist.artist.name),
+                context.resources.getQuantityString(R.plurals.n_song, artist.songCount, artist.songCount),
+                artist.artist.thumbnailUrl?.toUri(),
+                MediaMetadata.MEDIA_TYPE_ARTIST,
+            )
+        } + autoExtras.poolArtists(saved.mapTo(HashSet()) { it.id })
+    }
+
+    /** Saved albums, then albums from downloaded and local songs. */
+    private suspend fun autoAlbums(): List<MediaItem> {
+        val saved = database.albumsByCreateDateAsc().first()
+        return saved.map { album ->
+            browsableMediaItem(
+                "${MusicService.ALBUM}/${album.id}",
+                album.album.title,
+                album.artists.joinToString { ArtistNameAliases.resolve(it.id, it.name) },
+                album.album.thumbnailUrl?.toUri(),
+                MediaMetadata.MEDIA_TYPE_ALBUM,
+            )
+        } + autoExtras.poolAlbums(saved.mapTo(HashSet()) { it.album.title.lowercase() })
+    }
+
     override fun onGetChildren(
         session: MediaLibrarySession,
         browser: MediaSession.ControllerInfo,
@@ -303,36 +331,12 @@ constructor(
                     }
 
 
-                    MusicService.SONG -> database.songsByCreateDateAsc().first()
+                    MusicService.SONG -> autoExtras.visibleLibrarySongs(database.songsByCreateDateAsc().first())
                         .map { it.toMediaItem(parentId) }
 
-                    MusicService.ARTIST ->
-                        database.artistsByCreateDateAsc().first().map { artist ->
-                            browsableMediaItem(
-                                "${MusicService.ARTIST}/${artist.id}",
-                                artist.artist.name,
-                                context.resources.getQuantityString(
-                                    R.plurals.n_song,
-                                    artist.songCount,
-                                    artist.songCount
-                                ),
-                                artist.artist.thumbnailUrl?.toUri(),
-                                MediaMetadata.MEDIA_TYPE_ARTIST,
-                            )
-                        }
+                    MusicService.ARTIST -> autoArtists()
 
-                    MusicService.ALBUM ->
-                        database.albumsByCreateDateAsc().first().map { album ->
-                            browsableMediaItem(
-                                "${MusicService.ALBUM}/${album.id}",
-                                album.album.title,
-                                album.artists.joinToString {
-                                    it.name
-                                },
-                                album.album.thumbnailUrl?.toUri(),
-                                MediaMetadata.MEDIA_TYPE_ALBUM,
-                            )
-                        }
+                    MusicService.ALBUM -> autoAlbums()
 
                     MusicService.PLAYLIST -> {
                         val likedSongCount = database.likedSongsCount().first()
@@ -502,39 +506,18 @@ constructor(
     ): List<MediaItem>? {
         val request = androidAutoPageRequest(page, pageSize)
         return when {
-            parentId == MusicService.ARTIST ->
-                database.artistsByCreateDateAsc(request.limit, request.offset).map { artist ->
-                    browsableMediaItem(
-                        "${MusicService.ARTIST}/${artist.id}",
-                        ArtistNameAliases.resolve(artist.id, artist.artist.name),
-                        context.resources.getQuantityString(
-                            R.plurals.n_song,
-                            artist.songCount,
-                            artist.songCount,
-                        ),
-                        artist.artist.thumbnailUrl?.toUri(),
-                        MediaMetadata.MEDIA_TYPE_ARTIST,
-                    )
-                }
+            // Saved artists/albums plus ones from downloaded and local songs (Wavelength)
+            parentId == MusicService.ARTIST -> autoArtists().drop(request.offset).take(request.limit)
 
-            parentId == MusicService.ALBUM ->
-                database.albumsByCreateDateAsc(request.limit, request.offset).map { album ->
-                    browsableMediaItem(
-                        "${MusicService.ALBUM}/${album.id}",
-                        album.album.title,
-                        album.artists.joinToString {
-                            ArtistNameAliases.resolve(it.id, it.name)
-                        },
-                        album.album.thumbnailUrl?.toUri(),
-                        MediaMetadata.MEDIA_TYPE_ALBUM,
-                    )
-                }
+            parentId == MusicService.ALBUM -> autoAlbums().drop(request.offset).take(request.limit)
 
             parentId == MusicService.PLAYLIST ->
                 loadPlaylistContainers(request)
 
+            // Local files follow the Music folders settings; copies collapse (Wavelength)
             parentId == MusicService.SONG ->
-                database.songsByCreateDateAsc(request.limit, request.offset)
+                autoExtras.visibleLibrarySongs(database.songsByCreateDateAsc().first())
+                    .drop(request.offset).take(request.limit)
                     .map { it.toMediaItem(parentId) }
 
             parentId.startsWith("${MusicService.ARTIST}/") ->
@@ -794,7 +777,7 @@ constructor(
             when (path.firstOrNull()) {
                 MusicService.SONG -> {
                     val songId = path.getOrNull(1) ?: return@future defaultResult
-                    val allSongs = database.songsByCreateDateAsc().first()
+                    val allSongs = autoExtras.visibleLibrarySongs(database.songsByCreateDateAsc().first())
                     MediaItemsWithStartPosition(
                         allSongs.map { it.toMediaItem() },
                         allSongs.indexOfFirst { it.id == songId }.takeIf { it != -1 } ?: 0,

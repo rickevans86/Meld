@@ -1162,13 +1162,18 @@ class MusicService :
                 Timber.tag("MusicService").i("Player recreated with AudioTrackPlaybackParams: $useAudioTrackParams")
             }
 
+        // Wavelength: Discord, Last.fm and Listen Together are switched off; clear any saved sign-ins
+        scope.launch(Dispatchers.IO) {
+            com.metrolist.music.constants.RemovedIntegrations.clearSavedState(this@MusicService)
+        }
+
         // Initialize Discord RPC manager (rehydrates token, reconnects gateway)
-        if (!DiscordRpcManager.isInitialized()) {
+        if (!com.metrolist.music.constants.RemovedIntegrations.DISCORD && !DiscordRpcManager.isInitialized()) {
             DiscordRpcManager.init(this@MusicService)
         }
 
         dataStore.data
-            .map { it[EnableDiscordRPCKey] ?: true }
+            .map { !com.metrolist.music.constants.RemovedIntegrations.DISCORD && (it[EnableDiscordRPCKey] ?: true) }
             .debounce(300)
             .distinctUntilChanged()
             .collect(scope) { enabled ->
@@ -1255,7 +1260,7 @@ class MusicService :
         }
 
         dataStore.data
-            .map { it[EnableLastFMScrobblingKey] ?: false }
+            .map { !com.metrolist.music.constants.RemovedIntegrations.LASTFM && (it[EnableLastFMScrobblingKey] ?: false) }
             .debounce(300)
             .distinctUntilChanged()
             .collect(scope) { enabled ->

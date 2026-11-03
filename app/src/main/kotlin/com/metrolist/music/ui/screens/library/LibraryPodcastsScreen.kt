@@ -91,6 +91,8 @@ import com.metrolist.music.utils.joinByBullet
 import com.metrolist.music.utils.makeTimeString
 import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
+import com.metrolist.music.constants.sortedShows
+import com.metrolist.music.constants.sortInfo
 import com.metrolist.music.viewmodels.LibraryPodcastsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -120,11 +122,32 @@ fun LibraryPodcastsScreen(
     val (sortDescending, onSortDescendingChange) = rememberPreference(SongSortDescendingKey, true)
 
     val subscribedChannels by viewModel.subscribedChannels.collectAsStateWithLifecycle()
-    val followedFeeds by viewModel.followedFeeds.collectAsStateWithLifecycle()
+    val followedFeedsUnsorted by viewModel.followedFeeds.collectAsStateWithLifecycle()
+    // Sort for shows (also used by Android Auto's Podcasts page)
+    val (sortName, onSortName) = rememberPreference(
+        com.metrolist.music.constants.PodcastShowSortKey,
+        com.metrolist.music.constants.PodcastShowSort.RECENTLY_FOLLOWED.name,
+    )
+    val (sortReversed, onSortReversed) = rememberPreference(com.metrolist.music.constants.PodcastShowSortReversedKey, false)
+    val showSort = com.metrolist.music.constants.PodcastShowSort.entries.firstOrNull { it.name == sortName }
+        ?: com.metrolist.music.constants.PodcastShowSort.RECENTLY_FOLLOWED
+    val followedFeeds = remember(followedFeedsUnsorted, showSort, sortReversed) {
+        followedFeedsUnsorted.sortedShows(showSort, sortReversed) { it.sortInfo() }
+    }
     val downloadedEpisodes by viewModel.downloadedEpisodes.collectAsStateWithLifecycle()
     val savedEpisodes by viewModel.savedEpisodes.collectAsStateWithLifecycle()
     val sePlaylist by viewModel.sePlaylist.collectAsStateWithLifecycle()
-    val podcastChannels by viewModel.podcastChannels.collectAsStateWithLifecycle()
+    val podcastChannelsUnsorted by viewModel.podcastChannels.collectAsStateWithLifecycle()
+    // YouTube channels only carry a name here, so name and publisher sorts apply; others keep YouTube's order
+    val podcastChannels = remember(podcastChannelsUnsorted, showSort, sortReversed) {
+        when (showSort) {
+            com.metrolist.music.constants.PodcastShowSort.NAME,
+            com.metrolist.music.constants.PodcastShowSort.PUBLISHER ->
+                podcastChannelsUnsorted.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+                    .let { if (sortReversed) it.reversed() else it }
+            else -> podcastChannelsUnsorted
+        }
+    }
     val rdpnPlaylist by viewModel.rdpnPlaylist.collectAsStateWithLifecycle()
 
     // Refresh channels when screen becomes visible (ON_RESUME)
@@ -208,6 +231,18 @@ fun LibraryPodcastsScreen(
                     currentValue = podcastFilter,
                     onValueUpdate = { podcastFilter = it },
                     modifier = Modifier.weight(1f),
+                )
+                com.metrolist.music.ui.component.SortMenuButton(
+                    options = listOf(
+                        com.metrolist.music.constants.PodcastShowSort.NAME to stringResource(R.string.sort_name),
+                        com.metrolist.music.constants.PodcastShowSort.LATEST_EPISODE to stringResource(R.string.sort_latest_episode),
+                        com.metrolist.music.constants.PodcastShowSort.RECENTLY_FOLLOWED to stringResource(R.string.sort_recently_followed),
+                        com.metrolist.music.constants.PodcastShowSort.PUBLISHER to stringResource(R.string.sort_publisher),
+                    ),
+                    selected = showSort,
+                    reversed = sortReversed,
+                    onSelect = { onSortName(it.name) },
+                    onReversedChange = onSortReversed,
                 )
                 IconButton(onClick = { navController.navigate("podcast_directory") }) {
                     Icon(

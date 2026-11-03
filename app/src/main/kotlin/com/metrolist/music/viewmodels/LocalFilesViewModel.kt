@@ -102,6 +102,11 @@ constructor(
             }
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    /** The all-songs list: copies of the same song (e.g. exported into several playlist folders) shown once. */
+    val uniqueSongs =
+        songs.map { LocalMusicFolders.uniqueCopies(it) }
+            .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     val folders =
         combine(songs, folderPaths) { songs, paths ->
             songs

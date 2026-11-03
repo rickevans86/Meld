@@ -693,7 +693,8 @@ fun PlayerMenu(
             Material3MenuGroup(
                 items =
                     buildList {
-                        add(
+                        // Wavelength: Listen Together is switched off (see RemovedIntegrations)
+                        if (!com.metrolist.music.constants.RemovedIntegrations.LISTEN_TOGETHER) add(
                             Material3MenuItemData(
                                 title = { Text(text = stringResource(R.string.listen_together)) },
                                 icon = {

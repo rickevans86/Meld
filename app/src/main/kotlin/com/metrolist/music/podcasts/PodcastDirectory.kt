@@ -49,6 +49,10 @@ data class PodcastShow(
     val title: String,
     val author: String? = null,
     val artworkUrl: String? = null,
+    /** When it was followed (for "Recently followed" sorting). */
+    val followedAt: Long? = null,
+    /** Newest episode's date, remembered each time the feed loads (for "Latest episode" sorting). */
+    val latestEpisodeAt: Long? = null,
 )
 
 data class PodcastEpisode(
@@ -218,17 +222,30 @@ constructor(
             if (!response.isSuccessful) throw IOException("Couldn't load the podcast feed (${response.code})")
             val stream = response.body?.byteStream() ?: throw IOException("Empty podcast feed")
             parseFeed(show, stream)
-        }
+        }.also { rememberLatest(it) }
+    }
+
+    /** Updates a followed show's newest-episode date so sorting by latest episode stays right. */
+    private fun rememberLatest(feed: PodcastFeed) {
+        val latest = feed.episodes.mapNotNull { it.publishedAt }.maxOrNull() ?: return
+        val current = _followed.value
+        if (current.none { it.feedUrl == feed.show.feedUrl && it.latestEpisodeAt != latest }) return
+        _followed.value = current.map { if (it.feedUrl == feed.show.feedUrl) it.copy(latestEpisodeAt = latest) else it }
+        saveFollowed()
+    }
+
+    private fun saveFollowed() {
+        runCatching {
+            followsFile.writeText(json.encodeToString(ListSerializer(PodcastShow.serializer()), _followed.value))
+        }.onFailure { Timber.tag(TAG).w(it, "Could not save followed podcasts") }
     }
 
     fun isFollowed(feedUrl: String): Boolean = _followed.value.any { it.feedUrl == feedUrl }
 
     fun setFollowed(show: PodcastShow, follow: Boolean) {
         val current = _followed.value.filterNot { it.feedUrl == show.feedUrl }
-        _followed.value = if (follow) listOf(show) + current else current
-        runCatching {
-            followsFile.writeText(json.encodeToString(ListSerializer(PodcastShow.serializer()), _followed.value))
-        }.onFailure { Timber.tag(TAG).w(it, "Could not save followed podcasts") }
+        _followed.value = if (follow) listOf(show.copy(followedAt = System.currentTimeMillis())) + current else current
+        saveFollowed()
     }
 
     /**
@@ -384,7 +401,10 @@ constructor(
 
     private fun loadFollowed(): List<PodcastShow> = runCatching {
         if (followsFile.exists()) {
+            // Older saves have no follow date: keep their order (newest first) as the follow order
+            val now = System.currentTimeMillis()
             json.decodeFromString(ListSerializer(PodcastShow.serializer()), followsFile.readText())
+                .mapIndexed { index, show -> if (show.followedAt == null) show.copy(followedAt = now - index * 1000L) else show }
         } else {
             emptyList()
         }
