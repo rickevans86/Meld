@@ -16,6 +16,8 @@ val buildCommit =
         ?.takeIf { it.matches(Regex("[0-9a-fA-F]{7,40}")) }
         ?.take(7)
         ?.lowercase()
+// Set by the fork's release workflow so every build has a higher version than the last
+val forkBuildNumber = System.getenv("FORK_BUILD_NUMBER")?.toIntOrNull()
 val debugKeystorePathOverride = System.getenv("METROLIST_DEBUG_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
 val debugKeystorePassword = System.getenv("METROLIST_DEBUG_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "android"
 val debugKeyAlias = System.getenv("METROLIST_DEBUG_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "androiddebugkey"
@@ -42,6 +44,10 @@ android {
         targetSdk = 36
         versionCode = 28
         versionName = "0.9.2"
+        forkBuildNumber?.let { build ->
+            versionCode = requireNotNull(versionCode) * 10_000 + build
+            versionName = "$versionName.$build"
+        }
         val baseVersionName = requireNotNull(versionName)
         buildConfigField("String", "BASE_VERSION_NAME", "\"$baseVersionName\"")
         buildCommit?.let { versionName = "$baseVersionName+$it" }
