@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
@@ -18,6 +19,9 @@ val EnableLandscapeScalingKey = booleanPreferencesKey("enableLandscapeScaling")
 val LocalFilesFolderViewKey = booleanPreferencesKey("localFilesFolderView")
 val DownloadExportFolderKey = stringPreferencesKey("downloadExportFolder")
 val AudiobooksFolderKey = stringPreferencesKey("audiobooksFolder")
+val LocalMusicIncludedFoldersKey = stringSetPreferencesKey("localMusicIncludedFolders")
+val LocalMusicExcludedFoldersKey = stringSetPreferencesKey("localMusicExcludedFolders")
+val LocalMusicAddedFoldersKey = stringSetPreferencesKey("localMusicAddedFolders")
 val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
 val SelectedThemeColorKey = intPreferencesKey("selectedThemeColor")
 val DarkModeKey = stringPreferencesKey("darkMode")

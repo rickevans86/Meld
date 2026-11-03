@@ -366,6 +366,18 @@ fun StorageSettings(
         )
 
         Material3SettingsGroup(
+            title = stringResource(R.string.local_files),
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.folder),
+                    title = { Text(stringResource(R.string.music_folders)) },
+                    description = { Text(stringResource(R.string.music_folders_desc)) },
+                    onClick = { navController.navigate("settings/local_folders") },
+                ),
+            ),
+        )
+
+        Material3SettingsGroup(
             title = stringResource(R.string.download_folder_section),
             items = listOfNotNull(
                 Material3SettingsItem(

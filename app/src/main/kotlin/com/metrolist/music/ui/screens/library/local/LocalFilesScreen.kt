@@ -201,6 +201,12 @@ fun LocalFilesScreen(
                             }
                         }
                         Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { navController.navigate("settings/local_folders") }) {
+                            Icon(
+                                painter = painterResource(R.drawable.tune),
+                                contentDescription = stringResource(R.string.music_folders),
+                            )
+                        }
                         IconButton(
                             onClick = {
                                 folderView = !folderView

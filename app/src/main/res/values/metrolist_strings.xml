@@ -1204,6 +1204,14 @@
     <string name="local_files_storage_root">Internal storage</string>
     <string name="download_folder_section">Download folder</string>
     <string name="filter_audiobooks">Audiobooks</string>
+    <string name="music_folders">Music folders</string>
+    <string name="music_folders_desc">Choose which folders on your phone show up in Local files</string>
+    <string name="music_folders_intro">Ticked folders show up in Local files. Folders with songs are ticked to start with; tick any other folder to add it.</string>
+    <string name="music_folders_none">Your phone hasn\'t listed any folders with audio files yet.</string>
+    <string name="music_folders_added_title">Folders your phone doesn\'t list</string>
+    <string name="music_folders_added_desc">If a folder is missing above (for example one with a .nomedia file), add it here and Meld will read it directly.</string>
+    <string name="music_folders_add">Add a folder</string>
+    <string name="music_folders_remove">Remove folder</string>
     <string name="audiobooks_setup_title">Listen to audiobooks on your phone</string>
     <string name="audiobooks_setup_body">Choose the folder where your audiobooks are saved. Each folder of audio files becomes one book, with every file as a chapter. Single .m4b or .mp3 books work too.</string>
     <string name="audiobooks_choose_folder">Choose audiobooks folder</string>
