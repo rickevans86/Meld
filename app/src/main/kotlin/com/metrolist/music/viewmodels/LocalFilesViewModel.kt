@@ -8,6 +8,8 @@ package com.metrolist.music.viewmodels
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,6 +18,7 @@ import com.metrolist.music.constants.SongSortType
 import com.metrolist.music.constants.SongSortTypeKey
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.ArtistEntity
+import com.metrolist.music.db.entities.Song
 import com.metrolist.music.db.entities.SongArtistMap
 import com.metrolist.music.db.entities.SongEntity
 import com.metrolist.music.extensions.toEnum
@@ -27,6 +30,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -36,6 +40,12 @@ import timber.log.Timber
 import java.io.File
 import java.time.LocalDateTime
 import javax.inject.Inject
+
+data class LocalFolder(
+    val path: String,
+    val name: String,
+    val songs: List<Song>,
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -60,11 +70,42 @@ constructor(
             }
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    // Song id -> folder path relative to storage root, read from MediaStore so the DB schema stays unchanged
+    private val folderPaths = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    val folders =
+        combine(songs, folderPaths) { songs, paths ->
+            songs
+                .groupBy { paths[it.song.id] }
+                .mapNotNull { (path, folderSongs) ->
+                    path?.let {
+                        LocalFolder(
+                            path = it,
+                            name = it.substringAfterLast('/'),
+                            songs = folderSongs,
+                        )
+                    }
+                }
+                .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.path })
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    fun loadFolders() {
+        if (folderPaths.value.isNotEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                loadFolderPaths()
+            } catch (e: Exception) {
+                Timber.tag("LocalFilesVM").e(e, "Error reading local folders")
+            }
+        }
+    }
+
     fun scanLocalFiles() {
         viewModelScope.launch(Dispatchers.IO) {
             _isScanning.value = true
             try {
                 performScan()
+                loadFolderPaths()
             } catch (e: Exception) {
                 Timber.tag("LocalFilesVM").e(e, "Error scanning local files")
             } finally {
@@ -163,6 +204,39 @@ constructor(
                 }
             }
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun loadFolderPaths() {
+        val useRelativePath = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        val pathColumn = if (useRelativePath) {
+            MediaStore.Audio.Media.RELATIVE_PATH
+        } else {
+            MediaStore.Audio.Media.DATA
+        }
+        val storageRoot = Environment.getExternalStorageDirectory().absolutePath
+        val paths = HashMap<String, String>()
+
+        context.contentResolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.Audio.Media._ID, pathColumn),
+            "${MediaStore.Audio.Media.IS_MUSIC} != 0",
+            null,
+            null,
+        )?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+            val pathCol = cursor.getColumnIndexOrThrow(pathColumn)
+            while (cursor.moveToNext()) {
+                val raw = cursor.getString(pathCol) ?: continue
+                val folder = if (useRelativePath) {
+                    raw.trim('/')
+                } else {
+                    File(raw).parent?.removePrefix(storageRoot)?.trim('/') ?: continue
+                }
+                paths["local:${cursor.getLong(idCol)}"] = folder
+            }
+        }
+        folderPaths.value = paths
     }
 
     /**

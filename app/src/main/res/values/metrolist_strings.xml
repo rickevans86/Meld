@@ -1198,6 +1198,14 @@
     <string name="local_files_empty">No local audio files found. Tap the scan button to search your device.</string>
     <string name="local_files_found">%d files found</string>
     <string name="grant_permission">Grant permission</string>
+    <string name="local_files_show_folders">Show folders</string>
+    <string name="local_files_show_songs">Show all songs</string>
+    <string name="local_files_back_to_folders">Back to folders</string>
+    <string name="local_files_storage_root">Internal storage</string>
+    <plurals name="n_local_folder">
+        <item quantity="one">%d folder</item>
+        <item quantity="other">%d folders</item>
+    </plurals>
     <plurals name="n_local_file">
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>
