@@ -155,7 +155,7 @@ fun PodcastDirectoryScreen(
                     }
                     if (spotifyShows.isNotEmpty()) {
                         item(key = "spotify_title") { SectionTitle(stringResource(R.string.podcast_spotify_shows)) }
-                        items(spotifyShows, key = { "spotify:${it.id}" }) { show ->
+                        items(spotifyShows.distinctBy { it.id }, key = { "spotify:${it.id}" }) { show ->
                             ShowRow(show.name, show.publisher, show.imageUrl) { viewModel.openSpotify(show) }
                         }
                     }

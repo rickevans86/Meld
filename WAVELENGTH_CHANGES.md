@@ -204,3 +204,4 @@ To see the exact diff at any time:
 - 2026-11-03: Google News audio source catalogue with search and categories.
 - 2026-11-03: New red music-note app icon.
 - 2026-11-03: Added this changes file.
+- 2026-11-03: Fixed a crash when podcast search returns the same show twice (results, episodes, Spotify shows and news sources are de-duplicated).

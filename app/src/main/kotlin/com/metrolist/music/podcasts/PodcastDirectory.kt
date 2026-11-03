@@ -100,7 +100,7 @@ constructor(
                 author = result.string("artistName"),
                 artworkUrl = result.string("artworkUrl600") ?: result.string("artworkUrl100"),
             )
-        }
+        }.distinctBy { it.feedUrl } // the directory sometimes lists a show twice
     }
 
     /** Finds the public feed for a show known only by name, e.g. one saved on Spotify. */
@@ -243,7 +243,7 @@ constructor(
             author = show.author ?: author,
             artworkUrl = show.artworkUrl ?: artwork,
         )
-        return PodcastFeed(resolvedShow, episodes.sortedByDescending { it.publishedAt ?: 0L })
+        return PodcastFeed(resolvedShow, episodes.distinctBy { it.id }.sortedByDescending { it.publishedAt ?: 0L })
     }
 
     private fun parseDate(text: String): Long? =

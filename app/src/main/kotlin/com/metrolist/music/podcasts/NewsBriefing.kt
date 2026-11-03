@@ -73,7 +73,7 @@ constructor(
         combine(context.dataStore.data.map { it[NewsSourcesKey] }, directory.followed) { saved, followed ->
             val available = BUILT_IN + CATALOGUE + followed.map {
                 NewsSource("feed:${it.feedUrl}", it.title, "Podcasts you follow", it.artworkUrl)
-            }
+            }.distinctBy { it.key }
             val enabledKeys = (saved ?: DEFAULT_SOURCES.joinToString(SEPARATOR))
                 .split(SEPARATOR).filter { it.isNotBlank() }
             val enabled = enabledKeys.mapNotNull { key -> available.firstOrNull { it.key == key } }
