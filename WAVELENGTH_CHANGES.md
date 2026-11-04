@@ -129,6 +129,16 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   Unfollow and Share (feed address). If a followed show's feed fails to load, its page shows an **Unfollow**
   button (`ShowPage.Unavailable.show`, `PodcastDirectoryViewModel.unfollow`).
 
+### 0c-4. Podcast Discover
+- Podcasts tab has a **Discover** chip (`PodcastFilter.DISCOVER`): Pocket Casts-style rows of artwork cards.
+  "Top podcasts in <country>" then News, True Crime, Comedy, Society & Culture, History, Science, Sports,
+  Technology, Business, Health & Fitness, Fiction, Kids & Family, TV & Film, Music, Education, Arts.
+- Source: Apple's public charts for the phone's country (`itunes.apple.com/<cc>/rss/toppodcasts/limit=25[/genre=<id>]/json`,
+  falling back to `rss.applemarketingtools.com` for the top row), cached 6 hours. Tap a card to open its episodes,
+  + to follow (feed looked up with `itunes.apple.com/lookup`); a tick shows shows already followed (by name).
+- New files: `podcasts/PodcastDiscover.kt`, `viewmodels/PodcastDiscoverViewModel.kt`,
+  `ui/screens/podcast/PodcastDiscoverList.kt`. Edited: `PreferenceKeys.kt`, `LibraryPodcastsScreen.kt`.
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -441,3 +451,4 @@ To see the exact diff at any time:
 - 2026-11-04: Podcast OPML backup and import in Backup and restore, skipping podcasts already followed.
 - 2026-11-04: Bottom bar limit raised from 5 to 6 tabs.
 - 2026-11-05: ⋮ menu (Unfollow, Share) on followed feed podcasts; Unfollow button when a feed won't load.
+- 2026-11-05: Podcasts Discover chip with top charts by country and category.

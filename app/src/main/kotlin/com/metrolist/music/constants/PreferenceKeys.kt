@@ -373,6 +373,7 @@ enum class PodcastFilter {
     EPISODES,
     CHANNELS,
     DOWNLOADED,
+    DISCOVER,
 }
 
 enum class SongSortType {

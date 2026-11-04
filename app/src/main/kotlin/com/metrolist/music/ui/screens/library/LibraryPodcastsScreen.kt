@@ -227,6 +227,7 @@ fun LibraryPodcastsScreen(
                             PodcastFilter.EPISODES to stringResource(R.string.filter_episodes),
                             PodcastFilter.CHANNELS to stringResource(R.string.filter_channels),
                             PodcastFilter.DOWNLOADED to stringResource(R.string.filter_downloaded),
+                            PodcastFilter.DISCOVER to stringResource(R.string.podcast_discover),
                         ),
                     currentValue = podcastFilter,
                     onValueUpdate = { podcastFilter = it },
@@ -254,6 +255,13 @@ fun LibraryPodcastsScreen(
         }
 
         when (podcastFilter) {
+            // ── DISCOVER tab — top charts to follow from ─────────────────
+            PodcastFilter.DISCOVER -> com.metrolist.music.ui.screens.podcast.PodcastDiscoverList(
+                navController = navController,
+                lazyListState = lazyListState,
+                header = { chipsHeader() },
+            )
+
             // ── EPISODES FOR LATER tab ────────────────────────────────────
             PodcastFilter.EPISODES -> {
                 LazyColumn(

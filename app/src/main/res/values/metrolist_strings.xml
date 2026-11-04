@@ -1443,4 +1443,10 @@
         <item quantity="one">Saved %d podcast</item>
         <item quantity="other">Saved %d podcasts</item>
     </plurals>
+    <string name="podcast_discover">Discover</string>
+    <string name="podcast_discover_top">Top podcasts in %s</string>
+    <string name="podcast_discover_failed">Couldn\'t load the podcast charts. Check your connection.</string>
+    <string name="podcast_discover_credit">Charts from Apple Podcasts. Tap a show to see its episodes, or + to follow it.</string>
+    <string name="podcast_discover_follow">Follow</string>
+    <string name="podcast_discover_following">Following</string>
 </resources>
