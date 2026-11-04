@@ -465,10 +465,12 @@ constructor(
     @ApplicationContext context: Context,
     private val database: MusicDatabase,
     private val syncUtils: SyncUtils,
-    podcastDirectory: com.metrolist.music.podcasts.PodcastDirectory,
+    private val podcastDirectory: com.metrolist.music.podcasts.PodcastDirectory,
 ) : ViewModel() {
     // Shows followed from Find podcasts (played from their public feeds)
     val followedFeeds = podcastDirectory.followed
+
+    fun unfollowFeed(show: com.metrolist.music.podcasts.PodcastShow) = podcastDirectory.setFollowed(show, false)
 
     // Subscribed podcast channels synced from YT Music
     val subscribedChannels = database.subscribedPodcasts()

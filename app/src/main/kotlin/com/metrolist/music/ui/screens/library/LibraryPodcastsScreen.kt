@@ -328,7 +328,15 @@ fun LibraryPodcastsScreen(
                                 thumbnailUrl = show.artworkUrl,
                             ),
                             onClick = { navController.navigate("podcast_directory?feed=${android.net.Uri.encode(show.feedUrl)}") },
-                            onMenuClick = null,
+                            onMenuClick = {
+                                menuState.show {
+                                    FollowedFeedMenu(
+                                        show = show,
+                                        onUnfollow = { viewModel.unfollowFeed(show) },
+                                        onDismiss = menuState::dismiss,
+                                    )
+                                }
+                            },
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -699,6 +707,45 @@ private fun PodcastEpisodePlaylistItem(
             }
         }
     }
+}
+
+/** Menu for a podcast followed from its public feed: unfollow it, or share its feed address. */
+@Composable
+private fun FollowedFeedMenu(
+    show: com.metrolist.music.podcasts.PodcastShow,
+    onUnfollow: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    Spacer(Modifier.height(12.dp))
+    Material3MenuGroup(
+        items =
+            listOf(
+                Material3MenuItemData(
+                    title = { Text(text = stringResource(R.string.podcast_unfollow)) },
+                    icon = { Icon(painter = painterResource(R.drawable.delete), contentDescription = null) },
+                    onClick = {
+                        onUnfollow()
+                        onDismiss()
+                    },
+                ),
+                Material3MenuItemData(
+                    title = { Text(text = stringResource(R.string.share)) },
+                    icon = { Icon(painter = painterResource(R.drawable.share), contentDescription = null) },
+                    onClick = {
+                        val intent =
+                            Intent().apply {
+                                action = Intent.ACTION_SEND
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, show.feedUrl)
+                            }
+                        context.startActivity(Intent.createChooser(intent, null))
+                        onDismiss()
+                    },
+                ),
+            ),
+    )
+    Spacer(Modifier.height(12.dp))
 }
 
 /** Menu shown when tapping the three-dot icon on an episode playlist */

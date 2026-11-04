@@ -202,7 +202,24 @@ fun PodcastDirectoryScreen(
                 }
             }
 
-            is ShowPage.Unavailable -> item(key = "unavailable") { Hint(current.message) }
+            is ShowPage.Unavailable -> {
+                item(key = "unavailable") { Hint(current.message) }
+                // A followed show whose feed has gone (e.g. imported from OPML) can be removed from here
+                val deadShow = current.show?.takeIf { s -> followed.any { it.feedUrl == s.feedUrl } }
+                if (deadShow != null) {
+                    item(key = "unfollow_dead") {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = {
+                                viewModel.unfollow(deadShow)
+                                if (openedDirectly) navController.navigateUp() else viewModel.close()
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        ) {
+                            Text(stringResource(R.string.podcast_unfollow))
+                        }
+                    }
+                }
+            }
 
             is ShowPage.Ready -> {
                 val show = current.feed.show

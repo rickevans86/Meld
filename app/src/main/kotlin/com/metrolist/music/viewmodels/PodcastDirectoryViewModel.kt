@@ -31,7 +31,8 @@ sealed interface ShowPage {
     data class Ready(val feed: PodcastFeed, val songs: List<Song>) : ShowPage {
         override val title get() = feed.show.title
     }
-    data class Unavailable(override val title: String, val message: String) : ShowPage
+    /** [show] is set when the show itself is known (its feed just failed), so it can still be unfollowed. */
+    data class Unavailable(override val title: String, val message: String, val show: PodcastShow? = null) : ShowPage
 }
 
 @HiltViewModel
@@ -128,6 +129,8 @@ constructor(
 
     fun setSpeed(show: PodcastShow, speed: Float?) = directory.setSpeed(show.feedUrl, speed)
 
+    fun unfollow(show: PodcastShow) = directory.setFollowed(show, false)
+
     fun toggleFollow(show: PodcastShow) = directory.setFollowed(show, !directory.isFollowed(show.feedUrl))
 
     /** Turns the open show's episodes into songs and hands them to [onReady] with the start index. */
@@ -159,7 +162,7 @@ constructor(
             }
                 .onSuccess { _page.value = it }
                 .onFailure {
-                    _page.value = ShowPage.Unavailable(title, "Couldn't load this show's episodes. Try again later.")
+                    _page.value = ShowPage.Unavailable(title, "Couldn't load this show's episodes. Try again later.", show)
                 }
         }
     }
