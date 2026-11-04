@@ -138,6 +138,11 @@ android {
             isShrinkResources = true
             isCrunchPngs = false
             isDebuggable = false
+            // Wavelength: CI signs release builds with the fork's own key (same key as earlier
+            // builds), so they install as updates over the app already on the phone
+            if (workflowDebugKeystoreFile != null) {
+                signingConfig = signingConfigs.getByName("workflowDebug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

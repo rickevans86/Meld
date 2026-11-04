@@ -55,8 +55,10 @@ and re-apply the small edits listed for each upstream file.
 | Signing | `DEBUG_KEYSTORE_BASE64` secret, validated with `keytool`. If it's invalid, the workflow falls back to a cached key |
 | Output | `Meld.apk` attached to the GitHub release `v<version>` |
 
-The build task is `:app:assembleFossDebug` with `PULL_REQUEST=false`, and it retries once with
-`--refresh-dependencies`.
+The build task is `:app:assembleFossRelease` (a proper, non-debuggable, minified release build) with
+`PULL_REQUEST=false`, and it retries once with `--refresh-dependencies`. `METROLIST_APPLICATION_ID=com.meld.app.debug`
+keeps the app id the earlier debug builds used, so releases install as updates and keep the user's data, and
+`app/build.gradle.kts` signs release builds with the same key (`workflowDebug` signing config) when CI provides it.
 
 ## App icon
 
@@ -391,3 +393,4 @@ To see the exact diff at any time:
 - 2026-11-04: Voice commands, Continue listening, podcast auto-download on Wi-Fi, played/unplayed for podcasts and audiobooks, hide played, per-show speed, radio now-playing on the player and Android Auto.
 - 2026-11-04: Merged Meld upstream (Spotify GQL hash update).
 - 2026-11-04: Navidrome folder view (app and Android Auto).
+- 2026-11-04: Builds switched from debug (test) builds to signed release builds, same app id and key.

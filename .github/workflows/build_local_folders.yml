@@ -80,22 +80,25 @@ jobs:
           echo "VERSION=$base.${{ github.run_number }}" >> "$GITHUB_ENV"
           echo "FORK_BUILD_NUMBER=${{ github.run_number }}" >> "$GITHUB_ENV"
 
+      # A proper release build (not a debuggable test build), signed with the fork's key.
+      # The app id stays com.meld.app.debug so it updates the installed app and keeps its data.
       # Retries once, since a dependency download occasionally fails for a moment
       - name: Build APK
         run: |
           chmod +x gradlew
-          ./gradlew --console=plain :app:assembleFossDebug -x lint || {
+          ./gradlew --console=plain :app:assembleFossRelease -x lint || {
             echo "::warning::Build failed; retrying once in case it was a download hiccup."
             sleep 30
-            ./gradlew --console=plain --refresh-dependencies :app:assembleFossDebug -x lint
+            ./gradlew --console=plain --refresh-dependencies :app:assembleFossRelease -x lint
           }
         env:
           PULL_REQUEST: "false"
           METROLIST_APP_NAME: Wavelength
+          METROLIST_APPLICATION_ID: com.meld.app.debug
 
       - name: Collect APK
         run: |
-          apk=$(find app/build/outputs/apk -name '*.apk' | grep -i foss | head -1)
+          apk=$(find app/build/outputs/apk -name '*.apk' | grep -i foss | grep -v unsigned | head -1)
           [ -n "$apk" ] || { echo "No APK produced"; exit 1; }
           cp "$apk" Meld.apk
 
