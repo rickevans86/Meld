@@ -138,7 +138,11 @@ constructor(
             SubsonicTab.ALBUMS -> _albums.value = null
             SubsonicTab.ARTISTS -> _artists.value = null
             SubsonicTab.PLAYLISTS -> _playlists.value = null
-            SubsonicTab.FOLDERS -> _rootFolders.value = null
+            SubsonicTab.FOLDERS -> {
+                _rootFolders.value = null
+                _treeContents.value = emptyMap()
+                _expanded.value = emptySet()
+            }
             SubsonicTab.STARRED -> _starred.value = null
         }
         loadTab()
@@ -194,6 +198,37 @@ constructor(
             folders = entries.filter { it.isFolder },
             songs = repository.prepare(entries.mapNotNull { it.song }),
         )
+    }
+
+    // ── Folder tree: folders expand in place; their contents load the first time they open ──
+    private val _expanded = MutableStateFlow<Set<String>>(emptySet())
+    val expanded = _expanded.asStateFlow()
+
+    /** Folder id -> its sub-folders and songs, once loaded. */
+    private val _treeContents = MutableStateFlow<Map<String, Pair<List<SubsonicFolderEntry>, List<Song>>>>(emptyMap())
+    val treeContents = _treeContents.asStateFlow()
+
+    fun toggleFolder(entry: SubsonicFolderEntry) {
+        if (entry.id in _expanded.value) {
+            _expanded.update { it - entry.id }
+            return
+        }
+        _expanded.update { it + entry.id }
+        if (entry.id in _treeContents.value) return
+        viewModelScope.launch {
+            runCatching {
+                val (_, entries) = repository.folder(entry.id)
+                entries.filter { it.isFolder } to repository.prepare(entries.mapNotNull { it.song })
+            }.onSuccess { contents -> _treeContents.update { it + (entry.id to contents) } }
+                .onFailure {
+                    _expanded.update { set -> set - entry.id }
+                    _message.value = it.message ?: "Couldn't open that folder."
+                }
+        }
+    }
+
+    fun collapseAll() {
+        _expanded.value = emptySet()
     }
 
     /** Songs sitting at the top level of the library, shown as their own list. */

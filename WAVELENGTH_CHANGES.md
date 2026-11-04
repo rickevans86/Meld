@@ -267,6 +267,9 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   with `getMusicFolders` / `getIndexes` / `getMusicDirectory` (`SubsonicRepository.rootFolders` and `folder`). Several
   libraries are listed first (ids `lib~<id>`). Folder pages have Play / Shuffle / Download; songs opened from a folder
   export to `Navidrome - <folder name>`. Android Auto ids: `subsonic/folders`, `subsonic/dir/<encoded id>`.
+  In the app the Folders tab is a **tree**: folders expand in place (contents load on first open, cached in
+  `SubsonicViewModel.treeContents`), songs play as a queue of their folder, the arrow icon opens a folder as a page
+  (Play / Shuffle / Download), and "Collapse all" closes everything.
 - Export folders follow the YouTube/Spotify pattern with a `Navidrome - ` prefix: `Navidrome - <album>` and
   `Navidrome - <playlist>` (membership recorded when an album/playlist is opened, saved in
   `filesDir/subsonic_folders.json`), `Navidrome - Starred` for starred songs, otherwise the song's album.
@@ -394,3 +397,4 @@ To see the exact diff at any time:
 - 2026-11-04: Merged Meld upstream (Spotify GQL hash update).
 - 2026-11-04: Navidrome folder view (app and Android Auto).
 - 2026-11-04: Builds switched from debug (test) builds to signed release builds, same app id and key.
+- 2026-11-04: Navidrome Folders tab as an expandable tree.

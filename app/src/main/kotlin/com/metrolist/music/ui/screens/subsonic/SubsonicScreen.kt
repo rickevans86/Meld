@@ -182,6 +182,65 @@ private fun Browser(viewModel: SubsonicViewModel) {
     var query by rememberSaveable { mutableStateOf("") }
 
     BackHandler(enabled = pages.isNotEmpty()) { viewModel.back() }
+    val expanded by viewModel.expanded.collectAsState()
+    val treeContents by viewModel.treeContents.collectAsState()
+
+    fun LazyListScope.folderTree(folders: List<com.metrolist.music.subsonic.SubsonicFolderEntry>, depth: Int) {
+        folders.forEach { entry ->
+            val open = entry.id in expanded
+            item(key = "tree:${entry.id}") {
+                TreeFolderRow(
+                    name = entry.name,
+                    depth = depth,
+                    expanded = open,
+                    loading = open && entry.id !in treeContents,
+                    onToggle = { viewModel.toggleFolder(entry) },
+                    onOpenPage = { viewModel.openFolder(entry) },
+                )
+            }
+            if (open) {
+                treeContents[entry.id]?.let { (subFolders, folderSongs) ->
+                    folderTree(subFolders, depth + 1)
+                    folderSongs.forEachIndexed { index, song ->
+                        item(key = "tree_song:${entry.id}:${song.id}") {
+                            SongListItem(
+                                song = song,
+                                isActive = current?.id == song.id,
+                                isPlaying = isPlaying,
+                                trailingContent = {
+                                    IconButton(onClick = { menuState.show { SongMenu(originalSong = song, onDismiss = menuState::dismiss) } }) {
+                                        Icon(painterResource(R.drawable.more_vert), contentDescription = null)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = (24 * (depth + 1)).dp)
+                                    .clickable {
+                                        if (current?.id == song.id) {
+                                            playerConnection.togglePlayPause()
+                                        } else {
+                                            playerConnection.playQueue(
+                                                ListQueue(title = entry.name, items = folderSongs.map { it.toMediaItem() }, startIndex = index),
+                                            )
+                                        }
+                                    },
+                            )
+                        }
+                    }
+                    if (subFolders.isEmpty() && folderSongs.isEmpty()) {
+                        item(key = "tree_empty:${entry.id}") {
+                            Text(
+                                stringResource(R.string.subsonic_empty),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = (24 * (depth + 1) + 16).dp, top = 4.dp, bottom = 8.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     fun LazyListScope.songs(songs: List<Song>, queueTitle: String) {
         itemsIndexed(songs, key = { _, song -> "song:${song.id}" }) { index, song ->
@@ -385,7 +444,15 @@ private fun Browser(viewModel: SubsonicViewModel) {
             } ?: loadingItem()
             SubsonicTab.FOLDERS -> rootFolders?.let { list ->
                 if (list.isEmpty()) item(key = "no_folders") { Hint(stringResource(R.string.subsonic_empty)) }
-                folderRows(list.filter { it.isFolder }, viewModel)
+                if (expanded.isNotEmpty()) {
+                    item(key = "collapse_all") {
+                        TextButton(onClick = viewModel::collapseAll, modifier = Modifier.padding(horizontal = 8.dp)) {
+                            Text(stringResource(R.string.subsonic_collapse_all))
+                        }
+                    }
+                }
+                // Tree: tap a folder to open it in place; the arrow on the right opens it as a page
+                folderTree(list.filter { it.isFolder }, depth = 0)
                 val looseSongs = list.mapNotNull { it.song }
                 if (looseSongs.isNotEmpty()) {
                     item(key = "root_songs") {
@@ -406,6 +473,53 @@ private fun Browser(viewModel: SubsonicViewModel) {
                 playAllRow(list, "Starred", playerConnection)
                 songs(list, "Starred")
             } ?: loadingItem()
+        }
+    }
+}
+
+/** A folder line in the tree: indented by depth, arrow turns when open, and an icon to open it as a page. */
+@Composable
+private fun TreeFolderRow(
+    name: String,
+    depth: Int,
+    expanded: Boolean,
+    loading: Boolean,
+    onToggle: () -> Unit,
+    onOpenPage: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(start = (8 + 24 * depth).dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+    ) {
+        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+            if (loading) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(
+                    painterResource(if (expanded) R.drawable.expand_more else R.drawable.navigate_next),
+                    contentDescription = null,
+                )
+            }
+        }
+        Icon(
+            painterResource(R.drawable.folder),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
+        Text(
+            name,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (expanded) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+        )
+        IconButton(onClick = onOpenPage) {
+            Icon(painterResource(R.drawable.open_in_new), contentDescription = stringResource(R.string.subsonic_open_folder))
         }
     }
 }
