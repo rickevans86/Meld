@@ -118,7 +118,7 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 
 ### 0c-3. Podcast OPML backup and import
 - Settings → Backup and restore → **Podcasts**: "Back up podcasts (OPML)" saves followed podcasts as an OPML file;
-  "Import podcasts (OPML)" follows every feed in one (tested against a Pocket Casts export).
+  "Import podcasts (OPML)" follows every feed in one (reads the Pocket Casts export format).
 - `PodcastDirectory.exportOpml()` / `importOpml()` / `fillDetails()`, `viewmodels/PodcastOpmlViewModel.kt`,
   section added at the end of `BackupAndRestore.kt`.
 - Import skips podcasts already followed (same feed address ignoring http/https, `www.` and a trailing slash, or
