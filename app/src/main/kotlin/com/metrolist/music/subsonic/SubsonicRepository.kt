@@ -25,6 +25,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -57,6 +58,7 @@ data class SubsonicSong(
     val track: Int?,
     val year: Int?,
     val starred: Boolean,
+    val path: String? = null,
 )
 
 data class SubsonicAlbum(
@@ -73,6 +75,22 @@ data class SubsonicArtist(val id: String, val name: String, val coverArt: String
 data class SubsonicPlaylist(val id: String, val name: String, val songCount: Int, val coverArt: String?)
 
 /** One entry in a server folder: a sub-folder, or a song. */
+/** One real folder on the Navidrome server: its sub-folders (A–Z) and the songs directly inside it. */
+class SubsonicFolderNode(val name: String, val path: List<String>) {
+    val folders: java.util.TreeMap<String, SubsonicFolderNode> = java.util.TreeMap(String.CASE_INSENSITIVE_ORDER)
+    val songs: MutableList<SubsonicSong> = mutableListOf()
+    val itemCount: Int get() = folders.size + songs.size
+
+    /** True when the server sent made-up "Artist/Album/Track" locations instead of real ones. */
+    var looksVirtual: Boolean = false
+        internal set
+
+    internal fun sortSongs() {
+        songs.sortWith(compareBy<SubsonicSong>({ it.path?.substringAfterLast('/')?.lowercase() ?: "" }, { it.track ?: 0 }, { it.title.lowercase() }))
+        folders.values.forEach { it.sortSongs() }
+    }
+}
+
 data class SubsonicFolderEntry(val id: String, val name: String, val coverArt: String?, val song: SubsonicSong?) {
     val isFolder get() = song == null
 }
@@ -128,11 +146,13 @@ constructor(
         call(candidate, "ping")
         authStore.save(candidate)
         _session.value = candidate
+        synchronized(treeLock) { treeJob = null }
     }
 
     fun signOut() {
         authStore.clear()
         _session.value = null
+        synchronized(treeLock) { treeJob = null }
     }
 
     suspend fun albums(type: String, offset: Int = 0): List<SubsonicAlbum> =
@@ -229,6 +249,83 @@ constructor(
         }
         val songs = indexes.list("child").map { child -> child.toSong().let { SubsonicFolderEntry(it.id, it.title, it.coverArt, it) } }
         return folders + songs
+    }
+
+    private var treeJob: kotlinx.coroutines.Deferred<SubsonicFolderNode>? = null
+    private val treeLock = Any()
+
+    /**
+     * The library as real folders, built from each song's file location on the server.
+     * Pages through every song once and caches the result; [refresh] rebuilds it.
+     */
+    suspend fun folderTree(refresh: Boolean = false): SubsonicFolderNode {
+        // Built in the repository's own scope, so a caller that stops waiting doesn't throw the work away
+        val job = synchronized(treeLock) {
+            treeJob?.takeIf { !refresh && !it.isCancelled }
+                ?: scope.async { buildFolderTree() }.also { treeJob = it }
+        }
+        return job.await()
+    }
+
+    private suspend fun buildFolderTree(): SubsonicFolderNode {
+        val songs = mutableListOf<SubsonicSong>()
+        var offset = 0
+        while (true) {
+            val page = call(
+                "search3",
+                "query" to "",
+                "artistCount" to "0",
+                "albumCount" to "0",
+                "songCount" to TREE_PAGE.toString(),
+                "songOffset" to offset.toString(),
+            ).obj("searchResult3").list("song").map { it.toSong() }
+            songs += page
+            if (page.size < TREE_PAGE || offset > 200_000) break
+            offset += page.size
+        }
+        val parts = songs.map { song ->
+            song to (song.path?.replace('\\', '/')?.split('/')?.filter { it.isNotBlank() }?.dropLast(1)
+                ?: listOfNotNull(song.artist ?: "Unknown artist", song.album ?: "Unknown album"))
+        }
+        // Drop folders every song shares (for example "/music"), so the tree starts at the useful level.
+        var common = parts.firstOrNull()?.second.orEmpty()
+        parts.forEach { (_, folders) ->
+            val n = common.indices.takeWhile { it < folders.size && folders[it] == common[it] }.size
+            common = common.take(n)
+        }
+        val root = SubsonicFolderNode("", emptyList())
+        parts.forEach { (song, folders) ->
+            var node = root
+            folders.drop(common.size).forEach { name ->
+                node = node.folders.getOrPut(name) { SubsonicFolderNode(name, node.path + name) }
+            }
+            node.songs += song
+        }
+        root.sortSongs()
+        val withPath = songs.filter { !it.path.isNullOrBlank() }
+        root.looksVirtual = withPath.isEmpty() || withPath.count { song ->
+            val segments = song.path!!.split('/').filter { it.isNotBlank() }
+            segments.size == 3 && segments[1].equals(song.album, ignoreCase = true)
+        } > withPath.size * 0.9
+        return root
+    }
+
+    /** Name of the server's music library (or the server address when there are several). */
+    suspend fun libraryName(): String? = runCatching {
+        val libraries = call("getMusicFolders").obj("musicFolders").list("musicFolder")
+        if (libraries.size == 1) libraries.first().string("name") else _session.value?.serverUrl?.substringAfter("://")?.trimEnd('/')
+    }.getOrNull()
+
+    /** The folder at [path] in the cached tree, or null if it's gone. */
+    suspend fun treeNode(path: List<String>, refresh: Boolean = false): SubsonicFolderNode? {
+        var node: SubsonicFolderNode = folderTree(refresh)
+        path.forEach { name -> node = node.folders[name] ?: return null }
+        return node
+    }
+
+    /** Remembers that songs from a folder download into "Navidrome - <folder>". */
+    fun rememberTreeFolder(node: SubsonicFolderNode) {
+        if (node.name.isNotBlank()) rememberFolder(node.songs, "$FOLDER_PREFIX${node.name}")
     }
 
     suspend fun starredSongs(): List<SubsonicSong> =
@@ -399,6 +496,7 @@ constructor(
         track = int("track"),
         year = int("year"),
         starred = get("starred") != null,
+        path = string("path"),
     )
 
     private fun JsonObject.toAlbum() = SubsonicAlbum(
@@ -429,6 +527,7 @@ constructor(
         private const val CLIENT_NAME = "Wavelength"
         const val FOLDER_PREFIX = "Navidrome - "
         const val LIBRARY_PREFIX = "lib~"
+        private const val TREE_PAGE = 500
 
         /** For places Hilt can't inject into, like the song menu. */
         fun from(context: Context): SubsonicRepository =

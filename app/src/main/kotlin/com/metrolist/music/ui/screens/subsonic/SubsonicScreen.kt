@@ -55,6 +55,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -174,7 +175,10 @@ private fun Browser(viewModel: SubsonicViewModel) {
     val artists by viewModel.artists.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
     val starred by viewModel.starred.collectAsState()
-    val rootFolders by viewModel.rootFolders.collectAsState()
+    val folderPath by viewModel.folderPath.collectAsState()
+    val folderNode by viewModel.folderNode.collectAsState()
+    val folderSongs by viewModel.folderSongs.collectAsState()
+    val libraryName by viewModel.libraryName.collectAsState()
     val search by viewModel.search.collectAsState()
     val pages by viewModel.pages.collectAsState()
     val current by playerConnection.mediaMetadata.collectAsState()
@@ -182,65 +186,8 @@ private fun Browser(viewModel: SubsonicViewModel) {
     var query by rememberSaveable { mutableStateOf("") }
 
     BackHandler(enabled = pages.isNotEmpty()) { viewModel.back() }
-    val expanded by viewModel.expanded.collectAsState()
-    val treeContents by viewModel.treeContents.collectAsState()
-
-    fun LazyListScope.folderTree(folders: List<com.metrolist.music.subsonic.SubsonicFolderEntry>, depth: Int) {
-        folders.forEach { entry ->
-            val open = entry.id in expanded
-            item(key = "tree:${entry.id}") {
-                TreeFolderRow(
-                    name = entry.name,
-                    depth = depth,
-                    expanded = open,
-                    loading = open && entry.id !in treeContents,
-                    onToggle = { viewModel.toggleFolder(entry) },
-                    onOpenPage = { viewModel.openFolder(entry) },
-                )
-            }
-            if (open) {
-                treeContents[entry.id]?.let { (subFolders, folderSongs) ->
-                    folderTree(subFolders, depth + 1)
-                    folderSongs.forEachIndexed { index, song ->
-                        item(key = "tree_song:${entry.id}:${song.id}") {
-                            SongListItem(
-                                song = song,
-                                isActive = current?.id == song.id,
-                                isPlaying = isPlaying,
-                                trailingContent = {
-                                    IconButton(onClick = { menuState.show { SongMenu(originalSong = song, onDismiss = menuState::dismiss) } }) {
-                                        Icon(painterResource(R.drawable.more_vert), contentDescription = null)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = (24 * (depth + 1)).dp)
-                                    .clickable {
-                                        if (current?.id == song.id) {
-                                            playerConnection.togglePlayPause()
-                                        } else {
-                                            playerConnection.playQueue(
-                                                ListQueue(title = entry.name, items = folderSongs.map { it.toMediaItem() }, startIndex = index),
-                                            )
-                                        }
-                                    },
-                            )
-                        }
-                    }
-                    if (subFolders.isEmpty() && folderSongs.isEmpty()) {
-                        item(key = "tree_empty:${entry.id}") {
-                            Text(
-                                stringResource(R.string.subsonic_empty),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = (24 * (depth + 1) + 16).dp, top = 4.dp, bottom = 8.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // In the Folders tab, Back goes up one folder before leaving the screen
+    BackHandler(enabled = pages.isEmpty() && tab == SubsonicTab.FOLDERS && folderPath.isNotEmpty()) { viewModel.folderUp() }
 
     fun LazyListScope.songs(songs: List<Song>, queueTitle: String) {
         itemsIndexed(songs, key = { _, song -> "song:${song.id}" }) { index, song ->
@@ -291,16 +238,6 @@ private fun Browser(viewModel: SubsonicViewModel) {
                     playAllRow(list, page.title, playerConnection)
                     songs(list, page.title)
                 } ?: loadingItem()
-                is SubsonicPage.Folder -> if (page.folders == null || page.songs == null) {
-                    loadingItem()
-                } else {
-                    folderRows(page.folders, viewModel)
-                    if (page.folders.isEmpty() && page.songs.isEmpty()) {
-                        item(key = "empty_folder") { Hint(stringResource(R.string.subsonic_empty)) }
-                    }
-                    playAllRow(page.songs, page.title, playerConnection)
-                    songs(page.songs, page.title)
-                }
                 is SubsonicPage.Artist -> page.albums?.let { list ->
                     items(list, key = { "album:${it.id}" }) { album ->
                         MediaRow(
@@ -442,32 +379,42 @@ private fun Browser(viewModel: SubsonicViewModel) {
                     )
                 }
             } ?: loadingItem()
-            SubsonicTab.FOLDERS -> rootFolders?.let { list ->
-                if (list.isEmpty()) item(key = "no_folders") { Hint(stringResource(R.string.subsonic_empty)) }
-                if (expanded.isNotEmpty()) {
-                    item(key = "collapse_all") {
-                        TextButton(onClick = viewModel::collapseAll, modifier = Modifier.padding(horizontal = 8.dp)) {
-                            Text(stringResource(R.string.subsonic_collapse_all))
-                        }
-                    }
+            SubsonicTab.FOLDERS -> {
+                // File-manager view: path bar on top, then the folders here, then the songs here
+                item(key = "breadcrumbs") {
+                    FolderBreadcrumbs(
+                        root = libraryName,
+                        path = folderPath,
+                        onOpen = { depth -> viewModel.openFolderPath(folderPath.take(depth)) },
+                    )
                 }
-                // Tree: tap a folder to open it in place; the arrow on the right opens it as a page
-                folderTree(list.filter { it.isFolder }, depth = 0)
-                val looseSongs = list.mapNotNull { it.song }
-                if (looseSongs.isNotEmpty()) {
-                    item(key = "root_songs") {
-                        // Songs sitting at the top level open as their own folder-style list
-                        val title = stringResource(R.string.subsonic_loose_songs)
-                        MediaRow(
-                            title = title,
-                            subtitle = stringResource(R.string.subsonic_song_count, looseSongs.size),
-                            artwork = null,
-                            placeholder = R.drawable.folder,
-                            onClick = { viewModel.openLooseSongs(title, looseSongs) },
+                val node = folderNode
+                if (node == null || node.path != folderPath) {
+                    loadingItem()
+                } else {
+                    if (folderPath.isEmpty() && node.looksVirtual) {
+                        item(key = "virtual_hint") { Hint(stringResource(R.string.subsonic_real_path_hint)) }
+                    }
+                    items(node.folders.values.toList(), key = { "dir:${it.name}" }) { child ->
+                        FileFolderRow(
+                            name = child.name,
+                            itemCount = child.itemCount,
+                            onClick = { viewModel.openSubFolder(child.name) },
                         )
                     }
+                    if (node.songs.isNotEmpty()) {
+                        val list = folderSongs
+                        if (list == null) {
+                            loadingItem()
+                        } else {
+                            val title = node.name.ifBlank { libraryName }
+                            playAllRow(list, title, playerConnection)
+                            songs(list, title)
+                        }
+                    }
+                    if (node.itemCount == 0) item(key = "empty_folder") { Hint(stringResource(R.string.subsonic_empty)) }
                 }
-            } ?: loadingItem()
+            }
             SubsonicTab.STARRED -> starred?.let { list ->
                 if (list.isEmpty()) item(key = "no_starred") { Hint(stringResource(R.string.subsonic_empty)) }
                 playAllRow(list, "Starred", playerConnection)
@@ -477,62 +424,77 @@ private fun Browser(viewModel: SubsonicViewModel) {
     }
 }
 
-/** A folder line in the tree: indented by depth, arrow turns when open, and an icon to open it as a page. */
+/** Path bar like a file manager: home, then each folder; tap any part to jump back to it. */
 @Composable
-private fun TreeFolderRow(
-    name: String,
-    depth: Int,
-    expanded: Boolean,
-    loading: Boolean,
-    onToggle: () -> Unit,
-    onOpenPage: () -> Unit,
-) {
+private fun FolderBreadcrumbs(root: String, path: List<String>, onOpen: (Int) -> Unit) {
+    val scroll = rememberScrollState()
+    androidx.compose.runtime.LaunchedEffect(path) { scroll.animateScrollTo(scroll.maxValue) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(start = (8 + 24 * depth).dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .horizontalScroll(scroll)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
     ) {
-        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-            if (loading) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-            } else {
-                Icon(
-                    painterResource(if (expanded) R.drawable.expand_more else R.drawable.navigate_next),
-                    contentDescription = null,
-                )
-            }
+        IconButton(onClick = { onOpen(0) }, modifier = Modifier.size(36.dp)) {
+            Icon(
+                painterResource(R.drawable.home_outlined),
+                contentDescription = stringResource(R.string.subsonic_folder_home),
+                modifier = Modifier.size(20.dp),
+            )
         }
-        Icon(
-            painterResource(R.drawable.folder),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        )
-        Text(
-            name,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (expanded) FontWeight.SemiBold else FontWeight.Normal,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(vertical = 10.dp),
-        )
-        IconButton(onClick = onOpenPage) {
-            Icon(painterResource(R.drawable.open_in_new), contentDescription = stringResource(R.string.subsonic_open_folder))
+        (listOf(root) + path).forEachIndexed { index, name ->
+            Icon(
+                painterResource(R.drawable.navigate_next),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+            val last = index == path.size
+            Text(
+                name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (last) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (last) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .clickable(enabled = !last) { onOpen(index) }
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
+            )
         }
     }
 }
 
-private fun LazyListScope.folderRows(folders: List<com.metrolist.music.subsonic.SubsonicFolderEntry>, viewModel: SubsonicViewModel) {
-    items(folders, key = { "folder:${it.id}" }) { folder ->
-        MediaRow(
-            title = folder.name,
-            subtitle = "",
-            artwork = viewModel.coverUrl(folder.coverArt),
-            placeholder = R.drawable.folder,
-            onClick = { viewModel.openFolder(folder) },
-        )
+/** A folder line: folder icon, the full name (wraps to two lines) and how many items it holds. */
+@Composable
+private fun FileFolderRow(name: String, itemCount: Int, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    ) {
+        Box(
+            Modifier
+                .size(44.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer, androidx.compose.foundation.shape.RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(painterResource(R.drawable.folder), contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+        Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+            Text(name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                pluralStringResource(R.plurals.subsonic_folder_items, itemCount, itemCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(painterResource(R.drawable.navigate_next), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

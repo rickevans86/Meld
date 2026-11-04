@@ -10,7 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.metrolist.music.db.entities.Song
 import com.metrolist.music.subsonic.SubsonicAlbum
 import com.metrolist.music.subsonic.SubsonicArtist
-import com.metrolist.music.subsonic.SubsonicFolderEntry
+import com.metrolist.music.subsonic.SubsonicFolderNode
 import com.metrolist.music.subsonic.SubsonicPlaylist
 import com.metrolist.music.subsonic.SubsonicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,14 +36,6 @@ sealed interface SubsonicPage {
     }
     data class Playlist(val playlist: SubsonicPlaylist, val songs: List<Song>? = null) : SubsonicPage {
         override val title get() = playlist.name
-    }
-    /** A server folder: its sub-folders and songs (null while loading). */
-    data class Folder(
-        val entry: SubsonicFolderEntry,
-        val folders: List<SubsonicFolderEntry>? = null,
-        val songs: List<Song>? = null,
-    ) : SubsonicPage {
-        override val title get() = entry.name
     }
 }
 
@@ -82,9 +74,6 @@ constructor(
     private val _playlists = MutableStateFlow<List<SubsonicPlaylist>?>(null)
     val playlists = _playlists.asStateFlow()
 
-    private val _rootFolders = MutableStateFlow<List<SubsonicFolderEntry>?>(null)
-    val rootFolders = _rootFolders.asStateFlow()
-
     private val _starred = MutableStateFlow<List<Song>?>(null)
     val starred = _starred.asStateFlow()
 
@@ -116,7 +105,9 @@ constructor(
         _albums.value = null
         _artists.value = null
         _playlists.value = null
-        _rootFolders.value = null
+        _folderNode.value = null
+        _folderSongs.value = null
+        _folderPath.value = emptyList()
         _starred.value = null
         _search.value = null
         _pages.value = emptyList()
@@ -139,9 +130,8 @@ constructor(
             SubsonicTab.ARTISTS -> _artists.value = null
             SubsonicTab.PLAYLISTS -> _playlists.value = null
             SubsonicTab.FOLDERS -> {
-                _rootFolders.value = null
-                _treeContents.value = emptyMap()
-                _expanded.value = emptySet()
+                openFolderPath(_folderPath.value, refresh = true)
+                return
             }
             SubsonicTab.STARRED -> _starred.value = null
         }
@@ -156,7 +146,7 @@ constructor(
                     SubsonicTab.ALBUMS -> if (_albums.value == null) _albums.value = repository.albums(_albumSort.value)
                     SubsonicTab.ARTISTS -> if (_artists.value == null) _artists.value = repository.artists()
                     SubsonicTab.PLAYLISTS -> if (_playlists.value == null) _playlists.value = repository.playlists()
-                    SubsonicTab.FOLDERS -> if (_rootFolders.value == null) _rootFolders.value = repository.rootFolders()
+                    SubsonicTab.FOLDERS -> if (_folderNode.value == null) openFolderPath(_folderPath.value)
                     SubsonicTab.STARRED -> _starred.value = repository.prepare(repository.starredSongs())
                 }
             }.onFailure { _message.value = it.message ?: "Couldn't load from the server." }
@@ -191,51 +181,53 @@ constructor(
         SubsonicPage.Playlist(playlist, repository.prepare(repository.playlistSongs(playlist.id)))
     }
 
-    fun openFolder(entry: SubsonicFolderEntry) = push(SubsonicPage.Folder(entry)) {
-        val (_, entries) = repository.folder(entry.id)
-        SubsonicPage.Folder(
-            entry,
-            folders = entries.filter { it.isFolder },
-            songs = repository.prepare(entries.mapNotNull { it.song }),
-        )
-    }
+    // ── Folders: a file-manager view built from the songs' real locations on the server ──
+    /** Folder names from the top of the library down to the open folder. */
+    private val _folderPath = MutableStateFlow<List<String>>(emptyList())
+    val folderPath = _folderPath.asStateFlow()
 
-    // ── Folder tree: folders expand in place; their contents load the first time they open ──
-    private val _expanded = MutableStateFlow<Set<String>>(emptySet())
-    val expanded = _expanded.asStateFlow()
+    private val _folderNode = MutableStateFlow<SubsonicFolderNode?>(null)
+    val folderNode = _folderNode.asStateFlow()
 
-    /** Folder id -> its sub-folders and songs, once loaded. */
-    private val _treeContents = MutableStateFlow<Map<String, Pair<List<SubsonicFolderEntry>, List<Song>>>>(emptyMap())
-    val treeContents = _treeContents.asStateFlow()
+    /** Playable songs directly inside the open folder (null while preparing). */
+    private val _folderSongs = MutableStateFlow<List<Song>?>(null)
+    val folderSongs = _folderSongs.asStateFlow()
 
-    fun toggleFolder(entry: SubsonicFolderEntry) {
-        if (entry.id in _expanded.value) {
-            _expanded.update { it - entry.id }
-            return
-        }
-        _expanded.update { it + entry.id }
-        if (entry.id in _treeContents.value) return
-        viewModelScope.launch {
+    private val _libraryName = MutableStateFlow("Music")
+    val libraryName = _libraryName.asStateFlow()
+
+    private var folderJob: Job? = null
+
+    fun openFolderPath(path: List<String>, refresh: Boolean = false) {
+        _folderPath.value = path
+        _folderSongs.value = null
+        if (refresh) _folderNode.value = null
+        folderJob?.cancel()
+        folderJob = viewModelScope.launch {
             runCatching {
-                val (_, entries) = repository.folder(entry.id)
-                entries.filter { it.isFolder } to repository.prepare(entries.mapNotNull { it.song })
-            }.onSuccess { contents -> _treeContents.update { it + (entry.id to contents) } }
-                .onFailure {
-                    _expanded.update { set -> set - entry.id }
-                    _message.value = it.message ?: "Couldn't open that folder."
+                if (refresh || _folderNode.value == null) {
+                    repository.libraryName()?.let { _libraryName.value = it }
                 }
+                val node = repository.treeNode(path, refresh) ?: repository.treeNode(emptyList())!!.also { _folderPath.value = emptyList() }
+                _folderNode.value = node
+                repository.rememberTreeFolder(node)
+                _folderSongs.value = repository.prepare(node.songs)
+            }.onFailure {
+                if (it is kotlinx.coroutines.CancellationException) throw it
+                _message.value = it.message ?: "Couldn't load the folders."
+                _folderSongs.value = emptyList()
+            }
         }
     }
 
-    fun collapseAll() {
-        _expanded.value = emptySet()
-    }
+    fun openSubFolder(name: String) = openFolderPath(_folderPath.value + name)
 
-    /** Songs sitting at the top level of the library, shown as their own list. */
-    fun openLooseSongs(title: String, songs: List<com.metrolist.music.subsonic.SubsonicSong>) =
-        push(SubsonicPage.Folder(SubsonicFolderEntry("root", title, null, null))) {
-            SubsonicPage.Folder(SubsonicFolderEntry("root", title, null, null), emptyList(), repository.prepare(songs))
-        }
+    /** Goes up one folder; false when already at the top. */
+    fun folderUp(): Boolean {
+        if (_folderPath.value.isEmpty()) return false
+        openFolderPath(_folderPath.value.dropLast(1))
+        return true
+    }
 
     fun back() {
         _pages.update { it.dropLast(1) }

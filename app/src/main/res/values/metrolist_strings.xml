@@ -1402,9 +1402,12 @@
     <string name="subsonic_artist_albums">%1$d albums</string>
     <string name="subsonic_starred">Starred</string>
     <string name="subsonic_folders">Folders</string>
-    <string name="subsonic_collapse_all">Collapse all</string>
-    <string name="subsonic_open_folder">Open folder</string>
-    <string name="subsonic_loose_songs">Songs in the main folder</string>
+    <string name="subsonic_folder_home">Top of library</string>
+    <string name="subsonic_real_path_hint">Seeing artist and album names instead of your real folders? In Navidrome, open Settings → Players, choose Wavelength and turn on “Report Real Path”, then tap Refresh here.</string>
+    <plurals name="subsonic_folder_items">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
     <string name="subsonic_empty">Nothing here yet.</string>
     <string name="subsonic_song_count">%1$d songs</string>
     <string name="subsonic_play_all">Play</string>

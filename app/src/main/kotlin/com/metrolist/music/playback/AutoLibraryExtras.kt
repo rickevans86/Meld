@@ -141,11 +141,8 @@ constructor(
         parentId == SUB_PLAYLISTS -> serverCall { subsonic.playlists() }.orEmpty().map {
             folder("$SUB_PLAYLIST/${it.id}", it.name, null, subsonic.coverUrl(it.coverArt)?.toUri(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
         }
-        parentId == SUB_FOLDERS -> serverCall { subsonic.rootFolders() }.orEmpty().let { folderItems(SUB_FOLDERS, it) }
-        parentId.startsWith("$SUB_DIR/") -> {
-            val id = android.net.Uri.decode(parentId.substringAfterLast('/'))
-            serverCall { subsonic.folder(id).second }.orEmpty().let { folderItems(parentId, it) }
-        }
+        parentId == SUB_FOLDERS -> treeItems(SUB_FOLDERS, emptyList())
+        parentId.startsWith("$SUB_DIR/") -> treeItems(parentId, treePath(parentId.substringAfterLast('/')))
         parentId == SUB_ALBUMS -> serverCall { subsonic.albums("newest") }.orEmpty().map {
             folder("$SUB_ALBUM/${it.id}", it.name, it.artist, subsonic.coverUrl(it.coverArt)?.toUri(), MediaMetadata.MEDIA_TYPE_ALBUM)
         }
@@ -496,9 +493,9 @@ constructor(
             "album" -> serverSongs { subsonic.albumSongs(path.getOrNull(2).orEmpty()) } to path.getOrNull(3)
             "playlist" -> serverSongs { subsonic.playlistSongs(path.getOrNull(2).orEmpty()) } to path.getOrNull(3)
             "dir" -> serverSongs {
-                subsonic.folder(android.net.Uri.decode(path.getOrNull(2).orEmpty())).second.mapNotNull { it.song }
+                subsonic.treeNode(treePath(path.getOrNull(2).orEmpty()))?.songs.orEmpty()
             } to path.getOrNull(3)
-            "folders" -> serverSongs { subsonic.rootFolders().mapNotNull { it.song } } to path.getOrNull(2)
+            "folders" -> serverSongs { subsonic.treeNode(emptyList())?.songs.orEmpty() } to path.getOrNull(2)
             else -> return null
         }
         if (songs.isEmpty()) return null
@@ -509,11 +506,23 @@ constructor(
 
     // Same order as the News tab's sort
     /** A server folder for Android Auto: sub-folders to open, then Shuffle and its songs. */
-    private suspend fun folderItems(parentId: String, entries: List<com.metrolist.music.subsonic.SubsonicFolderEntry>): List<MediaItem> {
-        val folders = entries.filter { it.isFolder }.map {
-            folder("$SUB_DIR/${android.net.Uri.encode(it.id)}", it.name, null, subsonic.coverUrl(it.coverArt)?.toUri() ?: icon(R.drawable.folder), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+    /** Folder ids carry the whole folder path, encoded so it stays one part of the id. */
+    private fun treePath(encoded: String): List<String> =
+        android.net.Uri.decode(encoded).split('/').filter { it.isNotEmpty() }
+
+    /** One real server folder: its sub-folders (with item counts), then shuffle and its songs. */
+    private suspend fun treeItems(parentId: String, path: List<String>): List<MediaItem> {
+        val node = serverCall { subsonic.treeNode(path) } ?: return emptyList()
+        val folders = node.folders.values.map { child ->
+            folder(
+                "$SUB_DIR/${android.net.Uri.encode((child.path).joinToString("/"))}",
+                child.name,
+                context.resources.getQuantityString(R.plurals.subsonic_folder_items, child.itemCount, child.itemCount),
+                icon(R.drawable.folder),
+                MediaMetadata.MEDIA_TYPE_FOLDER_MIXED,
+            )
         }
-        val songs = entries.mapNotNull { it.song }.takeIf { it.isNotEmpty() }?.let { subsonic.prepare(it) }.orEmpty()
+        val songs = node.songs.takeIf { it.isNotEmpty() }?.let { serverCall { subsonic.prepare(it) } }.orEmpty()
         return folders + (if (songs.isEmpty()) emptyList() else listOf(shuffleItem(parentId))) + songs.map { it.toAutoItem(parentId) }
     }
 

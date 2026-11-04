@@ -263,13 +263,18 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   credentials in the song). Cover URLs use a fixed salt so images cache.
 - Downloads use `format=raw` (the original file), so the M4A export and playlist folders apply.
 - Album, playlist and Starred pages have a **Download** button for the whole list.
-- **Folders** tab (and a Folders entry in Android Auto's Navidrome section): browses the server's folder structure
-  with `getMusicFolders` / `getIndexes` / `getMusicDirectory` (`SubsonicRepository.rootFolders` and `folder`). Several
-  libraries are listed first (ids `lib~<id>`). Folder pages have Play / Shuffle / Download; songs opened from a folder
-  export to `Navidrome - <folder name>`. Android Auto ids: `subsonic/folders`, `subsonic/dir/<encoded id>`.
-  In the app the Folders tab is a **tree**: folders expand in place (contents load on first open, cached in
-  `SubsonicViewModel.treeContents`), songs play as a queue of their folder, the arrow icon opens a folder as a page
-  (Play / Shuffle / Download), and "Collapse all" closes everything.
+- **Folders** tab (and a Folders entry in Android Auto's Navidrome section) is a **file-manager view of the real
+  folders on the server**. Navidrome's `getIndexes` / `getMusicDirectory` only invent folders from artist names, so
+  instead `SubsonicRepository.folderTree()` pages through every song with `search3` (empty query, 500 per page) and
+  builds the tree from each song's `path` (`SubsonicSong.path`), dropping the leading folders every song shares
+  (e.g. `/music`). Built once in the repository's own scope and cached (Refresh rebuilds it; cleared on sign-in/out).
+  `SubsonicFolderNode` = name, path, sub-folders (A–Z, case-insensitive), songs, item count.
+  App: path bar at the top (home icon › library name › each folder, tap any part to jump back), folder rows with
+  icon, name (2 lines) and "N items", then the folder's songs with Play / Shuffle / Download. Back goes up one folder.
+  Songs in a folder export to `Navidrome - <folder name>`. If paths look made up (`Artist/Album/Track` for 90%+ of
+  songs) a hint says to turn on **Report Real Path** for the Wavelength player in Navidrome (Settings → Players).
+  Android Auto ids: `subsonic/folders` (top level) and `subsonic/dir/<Uri-encoded folder path joined with "/">`,
+  folders show their item count as the subtitle. `rootFolders` / `folder()` (old API browsing) are no longer used.
 - Export folders follow the YouTube/Spotify pattern with a `Navidrome - ` prefix: `Navidrome - <album>` and
   `Navidrome - <playlist>` (membership recorded when an album/playlist is opened, saved in
   `filesDir/subsonic_folders.json`), `Navidrome - Starred` for starred songs, otherwise the song's album.
@@ -398,3 +403,4 @@ To see the exact diff at any time:
 - 2026-11-04: Navidrome folder view (app and Android Auto).
 - 2026-11-04: Builds switched from debug (test) builds to signed release builds, same app id and key.
 - 2026-11-04: Navidrome Folders tab as an expandable tree.
+- 2026-11-04: Navidrome Folders rebuilt as a file-manager view of the real server folders (path bar, item counts), app and Android Auto.
