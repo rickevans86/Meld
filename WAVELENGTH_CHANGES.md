@@ -6,7 +6,7 @@ the update in or to rebuild these features on top of the new code.
 
 - **Fork:** `rickevans86/Meld`, branch `feat/local-folders`
 - **Upstream:** `FrancescoGrazioso/Meld`, branch `main`
-- **Last upstream commit this is based on:** `7a31ba6e4ca6b2956ad00354b320eee7dcc5fafc`
+- **Last upstream commit this is based on:** `371ffc90968bae1abd92a344bd30586ddabae16d`
 
 > Keep this file up to date: every change to Wavelength should update the matching section below
 > and add a line to the change log at the end.
@@ -385,3 +385,4 @@ To see the exact diff at any time:
 - 2026-11-04: Features settings to turn off the second source, News, Navidrome, Audiobooks, Podcasts, Local files, Radio.
 - 2026-11-04: Android Auto: Local files folders, Songs follows Music folders, Albums/Artists from downloads and local songs, New episodes; podcast and news sorting; Default home on Features page; Discord, Last.fm and Listen Together switched off and hidden; duplicate copies collapsed in song lists.
 - 2026-11-04: Voice commands, Continue listening, podcast auto-download on Wi-Fi, played/unplayed for podcasts and audiobooks, hide played, per-show speed, radio now-playing on the player and Android Auto.
+- 2026-11-04: Merged Meld upstream (Spotify GQL hash update).
