@@ -423,4 +423,5 @@ To see the exact diff at any time:
 - 2026-11-04: Navidrome Folders rebuilt as a file-manager view of the real server folders (path bar, item counts), app and Android Auto.
 - 2026-11-04: News bulletins labelled with their source name instead of the feed's publisher.
 - 2026-11-04: News sources screen checks every source and strikes through the ones that can't be played.
-\n- 2026-11-04: Bottom bar setting: pick up to 5 screens and their order; everything stays in the side menu.\n
+
+- 2026-11-04: Bottom bar setting: pick up to 5 screens and their order; everything stays in the side menu.
