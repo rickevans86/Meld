@@ -172,7 +172,8 @@ constructor(
                     ?.takeIf { (it.publishedAt ?: System.currentTimeMillis()) >= cutoff }
                     ?: return@runCatching null
                 rememberPublished(source.key, newest.publishedAt)
-                directory.prepare(feed.copy(episodes = listOf(newest))).firstOrNull()
+                // Label the bulletin with the source's name (as in News sources), not the feed's publisher
+                directory.prepare(feed.copy(show = feed.show.copy(author = source.name), episodes = listOf(newest))).firstOrNull()
                     ?.let { Bulletin(it, newest.publishedAt, feed.show.artworkUrl) }
             }.onFailure { Timber.tag(TAG).w(it, "No bulletin from ${source.name}") }.getOrNull()
         }

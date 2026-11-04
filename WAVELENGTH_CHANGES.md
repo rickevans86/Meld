@@ -185,6 +185,8 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 ### 5. News briefing (like Google News on Android Auto)
 - Plays the newest bulletin from each chosen outlet back to back. Bulletins older than 2 days are skipped,
   and each one starts from the beginning.
+- Bulletins are saved with the **source's name** as the artist (`latestBulletin` overrides the feed author), so
+  the queue reads "BBC Global News" rather than "BBC World Service". Only applies to newly saved episodes.
 - Source keys are `apple:<id>`, `search:<name>::<publisher>` and `feed:<url>` (followed podcasts).
 - Built-in sources are listed in `NewsBriefing.BUILT_IN`. Google News' audio line-up is in `CATALOGUE_NAMES`,
   with categories. A `search:` source is checked for a public feed when it's ticked; Google-only feeds are
@@ -404,3 +406,4 @@ To see the exact diff at any time:
 - 2026-11-04: Builds switched from debug (test) builds to signed release builds, same app id and key.
 - 2026-11-04: Navidrome Folders tab as an expandable tree.
 - 2026-11-04: Navidrome Folders rebuilt as a file-manager view of the real server folders (path bar, item counts), app and Android Auto.
+- 2026-11-04: News bulletins labelled with their source name instead of the feed's publisher.
