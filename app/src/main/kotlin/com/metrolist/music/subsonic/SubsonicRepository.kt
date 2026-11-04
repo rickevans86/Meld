@@ -72,6 +72,11 @@ data class SubsonicArtist(val id: String, val name: String, val coverArt: String
 
 data class SubsonicPlaylist(val id: String, val name: String, val songCount: Int, val coverArt: String?)
 
+/** One entry in a server folder: a sub-folder, or a song. */
+data class SubsonicFolderEntry(val id: String, val name: String, val coverArt: String?, val song: SubsonicSong?) {
+    val isFolder get() = song == null
+}
+
 data class SubsonicSearch(
     val artists: List<SubsonicArtist>,
     val albums: List<SubsonicAlbum>,
@@ -185,6 +190,45 @@ constructor(
                 foldersFile.writeText(json.encodeToString(folderSerializer, folders.mapValues { it.value.toList() }))
             }.onFailure { Timber.tag(TAG).w(it, "Could not save Navidrome folders") }
         }
+    }
+
+    /**
+     * The server's top-level folders. With one music library this is its folders straight away;
+     * with several, each library is listed first (ids start with "lib~").
+     */
+    suspend fun rootFolders(): List<SubsonicFolderEntry> {
+        val libraries = call("getMusicFolders").obj("musicFolders").list("musicFolder")
+        if (libraries.size > 1) {
+            return libraries.map { SubsonicFolderEntry(LIBRARY_PREFIX + it.string("id").orEmpty(), it.string("name") ?: "Music", null, null) }
+        }
+        return libraryFolders(libraries.firstOrNull()?.string("id"))
+    }
+
+    /** A folder's contents: sub-folders first, then songs. Songs here export to "Navidrome - <folder>". */
+    suspend fun folder(id: String): Pair<String, List<SubsonicFolderEntry>> {
+        if (id.startsWith(LIBRARY_PREFIX)) return "" to libraryFolders(id.removePrefix(LIBRARY_PREFIX))
+        val directory = call("getMusicDirectory", "id" to id).obj("directory")
+        val name = directory.string("name").orEmpty()
+        val children = directory.list("child")
+        val entries = children.map { child ->
+            if (child["isDir"]?.let { (it as? JsonPrimitive)?.contentOrNull } == "true") {
+                SubsonicFolderEntry(child.string("id").orEmpty(), child.string("title") ?: child.string("name") ?: "Folder", child.string("coverArt"), null)
+            } else {
+                val song = child.toSong()
+                SubsonicFolderEntry(song.id, song.title, song.coverArt, song)
+            }
+        }
+        if (name.isNotBlank()) rememberFolder(entries.mapNotNull { it.song }, "$FOLDER_PREFIX$name")
+        return name to entries.sortedWith(compareBy<SubsonicFolderEntry> { !it.isFolder })
+    }
+
+    private suspend fun libraryFolders(libraryId: String?): List<SubsonicFolderEntry> {
+        val indexes = call("getIndexes", *listOfNotNull(libraryId?.let { "musicFolderId" to it }).toTypedArray()).obj("indexes")
+        val folders = indexes.list("index").flatMap { it.list("artist") }.map {
+            SubsonicFolderEntry(it.string("id").orEmpty(), it.string("name") ?: "Folder", it.string("coverArt"), null)
+        }
+        val songs = indexes.list("child").map { child -> child.toSong().let { SubsonicFolderEntry(it.id, it.title, it.coverArt, it) } }
+        return folders + songs
     }
 
     suspend fun starredSongs(): List<SubsonicSong> =
@@ -384,6 +428,7 @@ constructor(
         private const val API_VERSION = "1.16.1"
         private const val CLIENT_NAME = "Wavelength"
         const val FOLDER_PREFIX = "Navidrome - "
+        const val LIBRARY_PREFIX = "lib~"
 
         /** For places Hilt can't inject into, like the song menu. */
         fun from(context: Context): SubsonicRepository =

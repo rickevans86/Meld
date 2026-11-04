@@ -1401,6 +1401,8 @@
     <string name="subsonic_no_results">Nothing found on your server.</string>
     <string name="subsonic_artist_albums">%1$d albums</string>
     <string name="subsonic_starred">Starred</string>
+    <string name="subsonic_folders">Folders</string>
+    <string name="subsonic_loose_songs">Songs in the main folder</string>
     <string name="subsonic_empty">Nothing here yet.</string>
     <string name="subsonic_song_count">%1$d songs</string>
     <string name="subsonic_play_all">Play</string>

@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.metrolist.music.db.entities.Song
 import com.metrolist.music.subsonic.SubsonicAlbum
 import com.metrolist.music.subsonic.SubsonicArtist
+import com.metrolist.music.subsonic.SubsonicFolderEntry
 import com.metrolist.music.subsonic.SubsonicPlaylist
 import com.metrolist.music.subsonic.SubsonicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,7 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class SubsonicTab { ALBUMS, ARTISTS, PLAYLISTS, STARRED }
+enum class SubsonicTab { ALBUMS, ARTISTS, PLAYLISTS, FOLDERS, STARRED }
 
 /** A page opened from the server browser; songs/albums are null while loading. */
 sealed interface SubsonicPage {
@@ -35,6 +36,14 @@ sealed interface SubsonicPage {
     }
     data class Playlist(val playlist: SubsonicPlaylist, val songs: List<Song>? = null) : SubsonicPage {
         override val title get() = playlist.name
+    }
+    /** A server folder: its sub-folders and songs (null while loading). */
+    data class Folder(
+        val entry: SubsonicFolderEntry,
+        val folders: List<SubsonicFolderEntry>? = null,
+        val songs: List<Song>? = null,
+    ) : SubsonicPage {
+        override val title get() = entry.name
     }
 }
 
@@ -73,6 +82,9 @@ constructor(
     private val _playlists = MutableStateFlow<List<SubsonicPlaylist>?>(null)
     val playlists = _playlists.asStateFlow()
 
+    private val _rootFolders = MutableStateFlow<List<SubsonicFolderEntry>?>(null)
+    val rootFolders = _rootFolders.asStateFlow()
+
     private val _starred = MutableStateFlow<List<Song>?>(null)
     val starred = _starred.asStateFlow()
 
@@ -104,6 +116,7 @@ constructor(
         _albums.value = null
         _artists.value = null
         _playlists.value = null
+        _rootFolders.value = null
         _starred.value = null
         _search.value = null
         _pages.value = emptyList()
@@ -125,6 +138,7 @@ constructor(
             SubsonicTab.ALBUMS -> _albums.value = null
             SubsonicTab.ARTISTS -> _artists.value = null
             SubsonicTab.PLAYLISTS -> _playlists.value = null
+            SubsonicTab.FOLDERS -> _rootFolders.value = null
             SubsonicTab.STARRED -> _starred.value = null
         }
         loadTab()
@@ -138,6 +152,7 @@ constructor(
                     SubsonicTab.ALBUMS -> if (_albums.value == null) _albums.value = repository.albums(_albumSort.value)
                     SubsonicTab.ARTISTS -> if (_artists.value == null) _artists.value = repository.artists()
                     SubsonicTab.PLAYLISTS -> if (_playlists.value == null) _playlists.value = repository.playlists()
+                    SubsonicTab.FOLDERS -> if (_rootFolders.value == null) _rootFolders.value = repository.rootFolders()
                     SubsonicTab.STARRED -> _starred.value = repository.prepare(repository.starredSongs())
                 }
             }.onFailure { _message.value = it.message ?: "Couldn't load from the server." }
@@ -171,6 +186,21 @@ constructor(
     fun openPlaylist(playlist: SubsonicPlaylist) = push(SubsonicPage.Playlist(playlist)) {
         SubsonicPage.Playlist(playlist, repository.prepare(repository.playlistSongs(playlist.id)))
     }
+
+    fun openFolder(entry: SubsonicFolderEntry) = push(SubsonicPage.Folder(entry)) {
+        val (_, entries) = repository.folder(entry.id)
+        SubsonicPage.Folder(
+            entry,
+            folders = entries.filter { it.isFolder },
+            songs = repository.prepare(entries.mapNotNull { it.song }),
+        )
+    }
+
+    /** Songs sitting at the top level of the library, shown as their own list. */
+    fun openLooseSongs(title: String, songs: List<com.metrolist.music.subsonic.SubsonicSong>) =
+        push(SubsonicPage.Folder(SubsonicFolderEntry("root", title, null, null))) {
+            SubsonicPage.Folder(SubsonicFolderEntry("root", title, null, null), emptyList(), repository.prepare(songs))
+        }
 
     fun back() {
         _pages.update { it.dropLast(1) }

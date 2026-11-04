@@ -65,6 +65,8 @@ constructor(
             mediaId == SUB_STARRED ||
             mediaId == SUB_PLAYLISTS ||
             mediaId == SUB_ALBUMS ||
+            mediaId == SUB_FOLDERS ||
+            (mediaId.startsWith("$SUB_DIR/") && mediaId.count { it == '/' } == 2) ||
             ((mediaId.startsWith("$SUB_ALBUM/") || mediaId.startsWith("$SUB_PLAYLIST/")) && mediaId.count { it == '/' } == 2) ||
             mediaId == AUDIOBOOKS ||
             mediaId == ABS_ALL ||
@@ -138,6 +140,11 @@ constructor(
         parentId == SUB_STARRED -> serverSongsWithShuffle(SUB_STARRED) { subsonic.starredSongs() }
         parentId == SUB_PLAYLISTS -> serverCall { subsonic.playlists() }.orEmpty().map {
             folder("$SUB_PLAYLIST/${it.id}", it.name, null, subsonic.coverUrl(it.coverArt)?.toUri(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
+        }
+        parentId == SUB_FOLDERS -> serverCall { subsonic.rootFolders() }.orEmpty().let { folderItems(SUB_FOLDERS, it) }
+        parentId.startsWith("$SUB_DIR/") -> {
+            val id = android.net.Uri.decode(parentId.substringAfterLast('/'))
+            serverCall { subsonic.folder(id).second }.orEmpty().let { folderItems(parentId, it) }
         }
         parentId == SUB_ALBUMS -> serverCall { subsonic.albums("newest") }.orEmpty().map {
             folder("$SUB_ALBUM/${it.id}", it.name, it.artist, subsonic.coverUrl(it.coverArt)?.toUri(), MediaMetadata.MEDIA_TYPE_ALBUM)
@@ -461,6 +468,7 @@ constructor(
             folder(SUB_STARRED, context.getString(R.string.subsonic_starred), null, icon(R.drawable.favorite), MediaMetadata.MEDIA_TYPE_PLAYLIST),
             folder(SUB_PLAYLISTS, context.getString(R.string.playlists), null, icon(R.drawable.queue_music), MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS),
             folder(SUB_ALBUMS, context.getString(R.string.subsonic_recent_albums), null, icon(R.drawable.album), MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS),
+            folder(SUB_FOLDERS, context.getString(R.string.subsonic_folders), null, icon(R.drawable.folder), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED),
         )
     }
 
@@ -487,6 +495,10 @@ constructor(
             "starred" -> serverSongs { subsonic.starredSongs() } to path.getOrNull(2)
             "album" -> serverSongs { subsonic.albumSongs(path.getOrNull(2).orEmpty()) } to path.getOrNull(3)
             "playlist" -> serverSongs { subsonic.playlistSongs(path.getOrNull(2).orEmpty()) } to path.getOrNull(3)
+            "dir" -> serverSongs {
+                subsonic.folder(android.net.Uri.decode(path.getOrNull(2).orEmpty())).second.mapNotNull { it.song }
+            } to path.getOrNull(3)
+            "folders" -> serverSongs { subsonic.rootFolders().mapNotNull { it.song } } to path.getOrNull(2)
             else -> return null
         }
         if (songs.isEmpty()) return null
@@ -496,6 +508,15 @@ constructor(
     }
 
     // Same order as the News tab's sort
+    /** A server folder for Android Auto: sub-folders to open, then Shuffle and its songs. */
+    private suspend fun folderItems(parentId: String, entries: List<com.metrolist.music.subsonic.SubsonicFolderEntry>): List<MediaItem> {
+        val folders = entries.filter { it.isFolder }.map {
+            folder("$SUB_DIR/${android.net.Uri.encode(it.id)}", it.name, null, subsonic.coverUrl(it.coverArt)?.toUri() ?: icon(R.drawable.folder), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+        }
+        val songs = entries.mapNotNull { it.song }.takeIf { it.isNotEmpty() }?.let { subsonic.prepare(it) }.orEmpty()
+        return folders + (if (songs.isEmpty()) emptyList() else listOf(shuffleItem(parentId))) + songs.map { it.toAutoItem(parentId) }
+    }
+
     private suspend fun enabledNewsSources() = news.sortedEnabledSources()
 
     private suspend fun newsItems(): List<MediaItem> {
@@ -739,6 +760,8 @@ constructor(
         private const val SUB_ALBUMS = "$SUBSONIC/albums"
         private const val SUB_ALBUM = "$SUBSONIC/album"
         private const val SUB_PLAYLIST = "$SUBSONIC/playlist"
+        private const val SUB_FOLDERS = "$SUBSONIC/folders"
+        private const val SUB_DIR = "$SUBSONIC/dir"
         private const val ABS_ALL = "$AUDIOBOOKS/abs_all"
         private const val SAVED_EPISODES = "$PODCASTS/saved"
         private const val PODCAST_CHANNEL = "$PODCASTS/channel"

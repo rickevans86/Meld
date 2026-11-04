@@ -174,6 +174,7 @@ private fun Browser(viewModel: SubsonicViewModel) {
     val artists by viewModel.artists.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
     val starred by viewModel.starred.collectAsState()
+    val rootFolders by viewModel.rootFolders.collectAsState()
     val search by viewModel.search.collectAsState()
     val pages by viewModel.pages.collectAsState()
     val current by playerConnection.mediaMetadata.collectAsState()
@@ -231,6 +232,16 @@ private fun Browser(viewModel: SubsonicViewModel) {
                     playAllRow(list, page.title, playerConnection)
                     songs(list, page.title)
                 } ?: loadingItem()
+                is SubsonicPage.Folder -> if (page.folders == null || page.songs == null) {
+                    loadingItem()
+                } else {
+                    folderRows(page.folders, viewModel)
+                    if (page.folders.isEmpty() && page.songs.isEmpty()) {
+                        item(key = "empty_folder") { Hint(stringResource(R.string.subsonic_empty)) }
+                    }
+                    playAllRow(page.songs, page.title, playerConnection)
+                    songs(page.songs, page.title)
+                }
                 is SubsonicPage.Artist -> page.albums?.let { list ->
                     items(list, key = { "album:${it.id}" }) { album ->
                         MediaRow(
@@ -314,6 +325,7 @@ private fun Browser(viewModel: SubsonicViewModel) {
                                         SubsonicTab.ALBUMS -> R.string.albums
                                         SubsonicTab.ARTISTS -> R.string.artists
                                         SubsonicTab.PLAYLISTS -> R.string.playlists
+                                        SubsonicTab.FOLDERS -> R.string.subsonic_folders
                                         SubsonicTab.STARRED -> R.string.subsonic_starred
                                     },
                                 ),
@@ -371,12 +383,42 @@ private fun Browser(viewModel: SubsonicViewModel) {
                     )
                 }
             } ?: loadingItem()
+            SubsonicTab.FOLDERS -> rootFolders?.let { list ->
+                if (list.isEmpty()) item(key = "no_folders") { Hint(stringResource(R.string.subsonic_empty)) }
+                folderRows(list.filter { it.isFolder }, viewModel)
+                val looseSongs = list.mapNotNull { it.song }
+                if (looseSongs.isNotEmpty()) {
+                    item(key = "root_songs") {
+                        // Songs sitting at the top level open as their own folder-style list
+                        val title = stringResource(R.string.subsonic_loose_songs)
+                        MediaRow(
+                            title = title,
+                            subtitle = stringResource(R.string.subsonic_song_count, looseSongs.size),
+                            artwork = null,
+                            placeholder = R.drawable.folder,
+                            onClick = { viewModel.openLooseSongs(title, looseSongs) },
+                        )
+                    }
+                }
+            } ?: loadingItem()
             SubsonicTab.STARRED -> starred?.let { list ->
                 if (list.isEmpty()) item(key = "no_starred") { Hint(stringResource(R.string.subsonic_empty)) }
                 playAllRow(list, "Starred", playerConnection)
                 songs(list, "Starred")
             } ?: loadingItem()
         }
+    }
+}
+
+private fun LazyListScope.folderRows(folders: List<com.metrolist.music.subsonic.SubsonicFolderEntry>, viewModel: SubsonicViewModel) {
+    items(folders, key = { "folder:${it.id}" }) { folder ->
+        MediaRow(
+            title = folder.name,
+            subtitle = "",
+            artwork = viewModel.coverUrl(folder.coverArt),
+            placeholder = R.drawable.folder,
+            onClick = { viewModel.openFolder(folder) },
+        )
     }
 }
 
@@ -456,6 +498,7 @@ private fun MediaRow(
     subtitle: String,
     artwork: String?,
     round: Boolean = false,
+    placeholder: Int = R.drawable.music_note,
     onClick: () -> Unit,
 ) {
     Row(
@@ -472,7 +515,7 @@ private fun MediaRow(
                 .clip(if (round) RoundedCornerShape(28.dp) else RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         ) {
-            Icon(painterResource(R.drawable.music_note), contentDescription = null)
+            Icon(painterResource(placeholder), contentDescription = null)
             if (artwork != null) {
                 AsyncImage(model = artwork, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(56.dp))
             }

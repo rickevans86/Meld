@@ -261,6 +261,10 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   credentials in the song). Cover URLs use a fixed salt so images cache.
 - Downloads use `format=raw` (the original file), so the M4A export and playlist folders apply.
 - Album, playlist and Starred pages have a **Download** button for the whole list.
+- **Folders** tab (and a Folders entry in Android Auto's Navidrome section): browses the server's folder structure
+  with `getMusicFolders` / `getIndexes` / `getMusicDirectory` (`SubsonicRepository.rootFolders` and `folder`). Several
+  libraries are listed first (ids `lib~<id>`). Folder pages have Play / Shuffle / Download; songs opened from a folder
+  export to `Navidrome - <folder name>`. Android Auto ids: `subsonic/folders`, `subsonic/dir/<encoded id>`.
 - Export folders follow the YouTube/Spotify pattern with a `Navidrome - ` prefix: `Navidrome - <album>` and
   `Navidrome - <playlist>` (membership recorded when an album/playlist is opened, saved in
   `filesDir/subsonic_folders.json`), `Navidrome - Starred` for starred songs, otherwise the song's album.
@@ -386,3 +390,4 @@ To see the exact diff at any time:
 - 2026-11-04: Android Auto: Local files folders, Songs follows Music folders, Albums/Artists from downloads and local songs, New episodes; podcast and news sorting; Default home on Features page; Discord, Last.fm and Listen Together switched off and hidden; duplicate copies collapsed in song lists.
 - 2026-11-04: Voice commands, Continue listening, podcast auto-download on Wi-Fi, played/unplayed for podcasts and audiobooks, hide played, per-show speed, radio now-playing on the player and Android Auto.
 - 2026-11-04: Merged Meld upstream (Spotify GQL hash update).
+- 2026-11-04: Navidrome folder view (app and Android Auto).
