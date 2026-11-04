@@ -9,7 +9,8 @@ import androidx.navigation.NavController
 import com.metrolist.music.ui.screens.Screens
 
 fun NavController.backToMain() {
-    val mainRoutes = Screens.MainScreens.map { it.route }
+    // Any top-level screen counts, since the bottom bar can be changed
+    val mainRoutes = Screens.MainScreens.map { it.route } + com.metrolist.music.ui.component.WavelengthDrawer.drawerOnlyRoutes
 
     while (previousBackStackEntry != null &&
         currentBackStackEntry?.destination?.route !in mainRoutes

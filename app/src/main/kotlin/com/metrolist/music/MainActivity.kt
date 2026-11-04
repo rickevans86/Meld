@@ -753,13 +753,18 @@ class MainActivity : FragmentActivity() {
                 val (listenTogetherInTopBar) = rememberPreference(ListenTogetherInTopBarKey, defaultValue = true)
                 // Tabs for features switched off in Settings → Features are hidden
                 val disabledFeatures = com.metrolist.music.constants.rememberDisabledFeatures()
+                // Bottom bar tabs are chosen and ordered in Settings → Features (up to 5)
+                val bottomTabRoutes = com.metrolist.music.constants.rememberBottomTabs()
+                val barAlternateIsSpotify = com.metrolist.music.constants.rememberDefaultHomeSource() !=
+                    com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
                 val navigationItems =
-                    remember(listenTogetherInTopBar, disabledFeatures) {
-                        if (listenTogetherInTopBar) {
-                            Screens.MainScreens.filter { it != Screens.ListenTogether }
-                        } else {
-                            Screens.MainScreens
-                        }.filterNot { disabledFeatures.hidesRoute(it.route) }
+                    remember(bottomTabRoutes, disabledFeatures, barAlternateIsSpotify) {
+                        val choices = com.metrolist.music.constants.bottomTabChoices(barAlternateIsSpotify)
+                        bottomTabRoutes
+                            .mapNotNull { route -> choices.firstOrNull { it.route == route } }
+                            .filterNot { disabledFeatures.hidesRoute(it.route) }
+                            .take(com.metrolist.music.constants.MAX_BOTTOM_TABS)
+                            .ifEmpty { listOf(Screens.Home) }
                     }
                 val routeIndexMap = remember(navigationItems) {
                     navigationItems.mapIndexed { i, s -> s.route to i }.toMap()

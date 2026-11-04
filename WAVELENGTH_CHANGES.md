@@ -106,6 +106,16 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - Edited: `MainActivity.kt`, `WavelengthDrawer.kt`, `MediaLibrarySessionCallback.kt`, `LibraryScreen.kt`,
   `SettingsScreen.kt`, `NavigationBuilder.kt`
 
+### 0c-2. Bottom bar setting
+- Features page → **Bottom bar**: switch any top-level screen on or off the bar (max 5, at least 1) and move it
+  with the arrows. Choices (`constants/BottomTabs.kt`, `bottomTabChoices`): Home, the second home (named
+  YouTube/Spotify), Search, Library, Podcasts, News, Audiobooks, Radio, Navidrome, Local files. Saved as
+  `BottomTabsKey` (comma-separated routes), default `home,search_input,podcasts,news,library`.
+- `MainActivity.navigationItems` is built from that list (switched-off features removed, max 5, falls back to Home).
+  New `Screens` objects: `AltHomeSpotify`, `AltHomeYouTube` (route `home_alt`), `Radio`, `Subsonic`, `LocalFiles`.
+- The side menu always lists every screen. `WavelengthDrawer.drawerOnlyRoutes` now holds all top-level routes so
+  the bar stays visible on any of them; `backToMain()` treats them all as main screens.
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -413,3 +423,4 @@ To see the exact diff at any time:
 - 2026-11-04: Navidrome Folders rebuilt as a file-manager view of the real server folders (path bar, item counts), app and Android Auto.
 - 2026-11-04: News bulletins labelled with their source name instead of the feed's publisher.
 - 2026-11-04: News sources screen checks every source and strikes through the ones that can't be played.
+\n- 2026-11-04: Bottom bar setting: pick up to 5 screens and their order; everything stays in the side menu.\n

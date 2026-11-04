@@ -1426,4 +1426,9 @@
     <string name="news_check_again">Check again</string>
     <string name="news_status_no_feed">%s · Not a public podcast</string>
     <string name="news_status_quiet">%s · Nothing new in the last 2 days</string>
+    <string name="bottom_bar">Bottom bar</string>
+    <string name="bottom_bar_intro">Choose up to %d screens for the bottom bar and use the arrows to set their order. Everything is always in the side menu too.</string>
+    <string name="bottom_bar_position">On the bottom bar · position %d</string>
+    <string name="bottom_bar_menu_only">Side menu only</string>
+    <string name="bottom_bar_full">Side menu only · the bar is full (%d)</string>
 </resources>

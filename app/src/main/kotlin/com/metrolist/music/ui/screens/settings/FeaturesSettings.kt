@@ -40,6 +40,7 @@ import com.metrolist.music.constants.DisabledFeaturesKey
 import com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
 import com.metrolist.music.constants.HOME_SOURCE_YOUTUBE
 import com.metrolist.music.constants.WavelengthFeature
+import com.metrolist.music.constants.hidesRoute
 import com.metrolist.music.constants.rememberDefaultHomeSource
 import com.metrolist.music.constants.rememberDisabledFeatures
 import com.metrolist.music.ui.component.IconButton
@@ -60,6 +61,33 @@ fun FeaturesSettings(navController: NavController) {
 
     fun setDefaultHome(source: String) {
         scope.launch { context.dataStore.edit { it[com.metrolist.music.constants.DefaultHomeSourceKey] = source } }
+    }
+
+    // Bottom bar: which screens are on it (up to 5) and in what order
+    val barTabs = com.metrolist.music.constants.rememberBottomTabs()
+    val barChoices = com.metrolist.music.constants.bottomTabChoices(alternateIsSpotify = !secondIsYouTube)
+        .filterNot { disabled.hidesRoute(it.route) }
+    val shownTabs = barTabs.filter { route -> barChoices.any { it.route == route } }
+
+    fun saveTabs(routes: List<String>) {
+        scope.launch { context.dataStore.edit { it[com.metrolist.music.constants.BottomTabsKey] = routes.joinToString(",") } }
+    }
+
+    fun setOnBar(route: String, on: Boolean) {
+        if (on) {
+            if (route !in barTabs && shownTabs.size < com.metrolist.music.constants.MAX_BOTTOM_TABS) saveTabs(barTabs + route)
+        } else if (shownTabs.size > 1) {
+            saveTabs(barTabs - route)
+        }
+    }
+
+    fun moveTab(route: String, offset: Int) {
+        val from = shownTabs.indexOf(route)
+        val to = from + offset
+        if (from < 0 || to !in shownTabs.indices) return
+        val other = shownTabs[to]
+        // Swap within the full saved list so tabs of switched-off features keep their place
+        saveTabs(barTabs.map { if (it == route) other else if (it == other) route else it })
     }
 
     fun setEnabled(feature: WavelengthFeature, enabled: Boolean) {
@@ -107,6 +135,58 @@ fun FeaturesSettings(navController: NavController) {
                     },
                 ),
             ),
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            stringResource(R.string.bottom_bar_intro, com.metrolist.music.constants.MAX_BOTTOM_TABS),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        )
+        // On-bar tabs first in bar order, then the rest in side-menu order
+        val orderedChoices = shownTabs.mapNotNull { route -> barChoices.firstOrNull { it.route == route } } +
+            barChoices.filter { it.route !in shownTabs }
+        Material3SettingsGroup(
+            title = stringResource(R.string.bottom_bar),
+            items = orderedChoices.map { screen ->
+                val position = shownTabs.indexOf(screen.route)
+                val on = position >= 0
+                val canChange = if (on) shownTabs.size > 1 else shownTabs.size < com.metrolist.music.constants.MAX_BOTTOM_TABS
+                Material3SettingsItem(
+                    icon = painterResource(screen.iconIdInactive),
+                    title = { Text(stringResource(screen.titleId)) },
+                    description = {
+                        Text(
+                            when {
+                                on -> stringResource(R.string.bottom_bar_position, position + 1)
+                                !canChange -> stringResource(R.string.bottom_bar_full, com.metrolist.music.constants.MAX_BOTTOM_TABS)
+                                else -> stringResource(R.string.bottom_bar_menu_only)
+                            },
+                        )
+                    },
+                    trailingContent = {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            if (on) {
+                                androidx.compose.material3.IconButton(onClick = { moveTab(screen.route, -1) }, enabled = position > 0) {
+                                    Icon(painterResource(R.drawable.arrow_upward), contentDescription = stringResource(R.string.news_move_up))
+                                }
+                                androidx.compose.material3.IconButton(
+                                    onClick = { moveTab(screen.route, 1) },
+                                    enabled = position < shownTabs.size - 1,
+                                ) {
+                                    Icon(painterResource(R.drawable.arrow_downward), contentDescription = stringResource(R.string.news_move_down))
+                                }
+                            }
+                            Switch(
+                                checked = on,
+                                enabled = canChange,
+                                onCheckedChange = { setOnBar(screen.route, it) },
+                            )
+                        }
+                    },
+                    onClick = { if (canChange) setOnBar(screen.route, !on) },
+                )
+            },
         )
         Spacer(Modifier.height(16.dp))
         Material3SettingsGroup(

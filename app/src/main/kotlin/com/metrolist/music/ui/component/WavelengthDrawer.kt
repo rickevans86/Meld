@@ -67,7 +67,11 @@ object WavelengthDrawer {
     )
 
     /** Screens only reachable from the side menu; they still show the top and bottom bars. */
-    val drawerOnlyRoutes = setOf("audiobooks", "radio", "subsonic", "local_files", "home_alt")
+    /** Top-level screens: they keep the bottom bar showing whether or not they're on it. */
+    val drawerOnlyRoutes = setOf(
+        "home", "search_input", "library", "podcasts", "news",
+        "audiobooks", "radio", "subsonic", "local_files", "home_alt",
+    )
 
     const val ALT_HOME_ROUTE = "home_alt"
 }
