@@ -116,6 +116,15 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - The side menu always lists every screen. `WavelengthDrawer.drawerOnlyRoutes` now holds all top-level routes so
   the bar stays visible on any of them; `backToMain()` treats them all as main screens.
 
+### 0c-3. Podcast OPML backup and import
+- Settings → Backup and restore → **Podcasts**: "Back up podcasts (OPML)" saves followed podcasts as an OPML file;
+  "Import podcasts (OPML)" follows every feed in one (tested against a Pocket Casts export).
+- `PodcastDirectory.exportOpml()` / `importOpml()` / `fillDetails()`, `viewmodels/PodcastOpmlViewModel.kt`,
+  section added at the end of `BackupAndRestore.kt`.
+- Import skips podcasts already followed (same feed address ignoring http/https, `www.` and a trailing slash, or
+  the same name ignoring case and punctuation) and repeats inside the file, then reports "followed X, skipped Y".
+  OPML has no artwork, so each new feed is loaded once in the background to fill in artwork, publisher and title.
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -425,3 +434,4 @@ To see the exact diff at any time:
 - 2026-11-04: News sources screen checks every source and strikes through the ones that can't be played.
 
 - 2026-11-04: Bottom bar setting: pick up to 5 screens and their order; everything stays in the side menu.
+- 2026-11-04: Podcast OPML backup and import in Backup and restore, skipping podcasts already followed.

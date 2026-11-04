@@ -1431,4 +1431,16 @@
     <string name="bottom_bar_position">On the bottom bar · position %d</string>
     <string name="bottom_bar_menu_only">Side menu only</string>
     <string name="bottom_bar_full">Side menu only · the bar is full (%d)</string>
+    <string name="podcast_opml_section">Podcasts</string>
+    <string name="podcast_opml_export">Back up podcasts (OPML)</string>
+    <string name="podcast_opml_export_desc">Saves the podcasts you follow as an OPML file other podcast apps can open</string>
+    <string name="podcast_opml_import">Import podcasts (OPML)</string>
+    <string name="podcast_opml_import_desc">Follows the podcasts in an OPML file, e.g. from Pocket Casts. Ones you already follow are skipped</string>
+    <string name="podcast_opml_imported">Followed %1$d new podcasts, skipped %2$d you already follow</string>
+    <string name="podcast_opml_import_failed">Couldn\'t read that file. Choose an OPML podcast export.</string>
+    <string name="podcast_opml_export_failed">Couldn\'t save the podcast backup</string>
+    <plurals name="podcast_opml_exported">
+        <item quantity="one">Saved %d podcast</item>
+        <item quantity="other">Saved %d podcasts</item>
+    </plurals>
 </resources>

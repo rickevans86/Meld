@@ -295,6 +295,94 @@ constructor(
         saveFollowed()
     }
 
+    /** Followed podcasts as an OPML file (the format Pocket Casts, Apple Podcasts and others use). */
+    fun exportOpml(): String {
+        fun esc(text: String) = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+        return buildString {
+            append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n")
+            append("<opml version=\"1.0\">\n  <head>\n    <title>Wavelength Podcasts</title>\n  </head>\n  <body>\n")
+            append("    <outline text=\"feeds\">\n")
+            _followed.value.forEach { show ->
+                append("      <outline type=\"rss\" text=\"").append(esc(show.title)).append("\" title=\"").append(esc(show.title))
+                append("\" xmlUrl=\"").append(esc(show.feedUrl)).append("\" />\n")
+            }
+            append("    </outline>\n  </body>\n</opml>\n")
+        }
+    }
+
+    /** Result of an OPML import: shows newly followed, and ones skipped because they were already followed. */
+    data class OpmlImport(val added: List<PodcastShow>, val skipped: Int)
+
+    /**
+     * Follows every feed in an OPML file. A podcast already followed (same feed address, ignoring http/https,
+     * "www." and a trailing slash, or the same name) is skipped, as are repeats within the file.
+     */
+    fun importOpml(input: java.io.InputStream): OpmlImport {
+        val parser = Xml.newPullParser().apply {
+            setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+            setInput(input, null)
+        }
+        val found = mutableListOf<Pair<String, String?>>()
+        while (parser.next() != XmlPullParser.END_DOCUMENT) {
+            if (parser.eventType != XmlPullParser.START_TAG || !parser.name.equals("outline", ignoreCase = true)) continue
+            val attrs = (0 until parser.attributeCount).associate { parser.getAttributeName(it).lowercase(Locale.ROOT) to parser.getAttributeValue(it) }
+            val url = attrs["xmlurl"]?.trim()?.takeIf { it.startsWith("http", ignoreCase = true) } ?: continue
+            found += url to (attrs["text"] ?: attrs["title"])?.trim()?.takeIf { it.isNotEmpty() }
+        }
+        fun urlKey(url: String) = url.lowercase(Locale.ROOT).substringAfter("://").removePrefix("www.").trimEnd('/')
+        val knownUrls = _followed.value.map { urlKey(it.feedUrl) }.toMutableSet()
+        val knownTitles = _followed.value.map { normalize(it.title) }.filter { it.isNotEmpty() }.toMutableSet()
+        val added = mutableListOf<PodcastShow>()
+        var skipped = 0
+        val now = System.currentTimeMillis()
+        found.forEach { (url, title) ->
+            val titleKey = title?.let(::normalize).orEmpty()
+            if (urlKey(url) in knownUrls || (titleKey.isNotEmpty() && titleKey in knownTitles)) {
+                skipped++
+                return@forEach
+            }
+            knownUrls += urlKey(url)
+            if (titleKey.isNotEmpty()) knownTitles += titleKey
+            // Keep the file's order: the first podcast in it shows as the most recently followed
+            added += PodcastShow(feedUrl = url, title = title ?: url, followedAt = now - added.size)
+        }
+        if (added.isNotEmpty()) {
+            _followed.value = added + _followed.value
+            saveFollowed()
+        }
+        return OpmlImport(added, skipped)
+    }
+
+    /** Loads each feed once to fill in the artwork, publisher and real title for shows imported without them. */
+    suspend fun fillDetails(shows: List<PodcastShow>) = withContext(Dispatchers.IO) {
+        val gate = kotlinx.coroutines.sync.Semaphore(4)
+        kotlinx.coroutines.coroutineScope {
+            shows.map { show ->
+                async {
+                    gate.acquire()
+                    try {
+                        val loaded = kotlinx.coroutines.withTimeoutOrNull(30_000) { runCatching { feed(show).show }.getOrNull() }
+                            ?: return@async
+                        _followed.value = _followed.value.map {
+                            if (it.feedUrl != show.feedUrl) {
+                                it
+                            } else {
+                                it.copy(
+                                    title = loaded.title.takeIf { t -> t.isNotBlank() } ?: it.title,
+                                    author = it.author ?: loaded.author,
+                                    artworkUrl = it.artworkUrl ?: loaded.artworkUrl,
+                                )
+                            }
+                        }
+                        saveFollowed()
+                    } finally {
+                        gate.release()
+                    }
+                }
+            }.awaitAll()
+        }
+    }
+
     /**
      * Recent episodes from every followed show, newest first: up to [perShow] per show from the
      * last [days] days. Shows that fail to load are skipped.

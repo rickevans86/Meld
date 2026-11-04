@@ -148,6 +148,16 @@ fun BackupAndRestore(
             csvImportState = previewState
             showCsvColumnMapping = true
         }
+    // Podcasts: OPML backup and import (Pocket Casts and most podcast apps use this format)
+    val podcastOpml: com.metrolist.music.viewmodels.PodcastOpmlViewModel = hiltViewModel()
+    val exportOpmlLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/x-opml")) { uri ->
+            if (uri != null) podcastOpml.export(context, uri)
+        }
+    val importOpmlLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) podcastOpml.import(context, uri)
+        }
     val importM3uLauncherOnline =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri == null) return@rememberLauncherForActivityResult
@@ -210,6 +220,33 @@ fun BackupAndRestore(
                         onClick = {
                             importPlaylistFromCsv.launch(
                                 arrayOf("text/csv", "text/comma-separated-values", "application/csv", "text/plain"),
+                            )
+                        },
+                    ),
+                ),
+        )
+        Spacer(Modifier.height(16.dp))
+        Material3SettingsGroup(
+            title = stringResource(R.string.podcast_opml_section),
+            items =
+                listOf(
+                    Material3SettingsItem(
+                        title = { Text(stringResource(R.string.podcast_opml_export)) },
+                        description = { Text(stringResource(R.string.podcast_opml_export_desc)) },
+                        icon = painterResource(R.drawable.backup),
+                        onClick = {
+                            val formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+                            exportOpmlLauncher.launch("${appName}_podcasts_${LocalDateTime.now().format(formatter)}.opml")
+                        },
+                    ),
+                    Material3SettingsItem(
+                        title = { Text(stringResource(R.string.podcast_opml_import)) },
+                        description = { Text(stringResource(R.string.podcast_opml_import_desc)) },
+                        icon = painterResource(R.drawable.podcasts),
+                        onClick = {
+                            // Many file managers don't know the OPML type, so XML and any file are allowed too
+                            importOpmlLauncher.launch(
+                                arrayOf("text/x-opml", "application/xml", "text/xml", "application/octet-stream", "*/*"),
                             )
                         },
                     ),
