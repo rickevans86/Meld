@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.map
  */
 val BottomTabsKey = stringPreferencesKey("wavelengthBottomTabs")
 
-const val MAX_BOTTOM_TABS = 5
+const val MAX_BOTTOM_TABS = 6
 
 /** What the bar showed before it could be changed. */
 val DEFAULT_BOTTOM_TABS = listOf("home", "search_input", "podcasts", "news", "library")

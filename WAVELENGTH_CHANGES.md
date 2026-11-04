@@ -107,11 +107,11 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   `SettingsScreen.kt`, `NavigationBuilder.kt`
 
 ### 0c-2. Bottom bar setting
-- Features page → **Bottom bar**: switch any top-level screen on or off the bar (max 5, at least 1) and move it
+- Features page → **Bottom bar**: switch any top-level screen on or off the bar (max 6, at least 1) and move it
   with the arrows. Choices (`constants/BottomTabs.kt`, `bottomTabChoices`): Home, the second home (named
   YouTube/Spotify), Search, Library, Podcasts, News, Audiobooks, Radio, Navidrome, Local files. Saved as
   `BottomTabsKey` (comma-separated routes), default `home,search_input,podcasts,news,library`.
-- `MainActivity.navigationItems` is built from that list (switched-off features removed, max 5, falls back to Home).
+- `MainActivity.navigationItems` is built from that list (switched-off features removed, max 6, falls back to Home).
   New `Screens` objects: `AltHomeSpotify`, `AltHomeYouTube` (route `home_alt`), `Radio`, `Subsonic`, `LocalFiles`.
 - The side menu always lists every screen. `WavelengthDrawer.drawerOnlyRoutes` now holds all top-level routes so
   the bar stays visible on any of them; `backToMain()` treats them all as main screens.
@@ -435,3 +435,4 @@ To see the exact diff at any time:
 
 - 2026-11-04: Bottom bar setting: pick up to 5 screens and their order; everything stays in the side menu.
 - 2026-11-04: Podcast OPML backup and import in Backup and restore, skipping podcasts already followed.
+- 2026-11-04: Bottom bar limit raised from 5 to 6 tabs.

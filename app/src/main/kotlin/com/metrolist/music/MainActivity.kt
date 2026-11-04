@@ -753,7 +753,7 @@ class MainActivity : FragmentActivity() {
                 val (listenTogetherInTopBar) = rememberPreference(ListenTogetherInTopBarKey, defaultValue = true)
                 // Tabs for features switched off in Settings → Features are hidden
                 val disabledFeatures = com.metrolist.music.constants.rememberDisabledFeatures()
-                // Bottom bar tabs are chosen and ordered in Settings → Features (up to 5)
+                // Bottom bar tabs are chosen and ordered in Settings → Features (up to 6)
                 val bottomTabRoutes = com.metrolist.music.constants.rememberBottomTabs()
                 val barAlternateIsSpotify = com.metrolist.music.constants.rememberDefaultHomeSource() !=
                     com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
