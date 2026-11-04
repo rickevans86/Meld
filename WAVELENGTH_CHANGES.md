@@ -6,7 +6,7 @@ the update in or to rebuild these features on top of the new code.
 
 - **Fork:** `rickevans86/Meld`, branch `feat/local-folders`
 - **Upstream:** `FrancescoGrazioso/Meld`, branch `main`
-- **Last upstream commit this is based on:** `371ffc90968bae1abd92a344bd30586ddabae16d`
+- **Last upstream commit this is based on:** `fa6e079568f370a8ee72b61d458a15553746b057`
 
 > Keep this file up to date: every change to Wavelength should update the matching section below
 > and add a line to the change log at the end.
@@ -452,3 +452,4 @@ To see the exact diff at any time:
 - 2026-11-04: Bottom bar limit raised from 5 to 6 tabs.
 - 2026-11-05: ⋮ menu (Unfollow, Share) on followed feed podcasts; Unfollow button when a feed won't load.
 - 2026-11-05: Podcasts Discover chip with top charts by country and category.
+- 2026-11-04: Merged Meld update fa6e0795 (automated Spotify GQL hash refresh).
