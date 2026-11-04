@@ -192,6 +192,11 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   with categories. A `search:` source is checked for a public feed when it's ticked; Google-only feeds are
   reported as unavailable.
 - **News sources** screen (`news_sources`) has search, category chips and reordering.
+- The News sources screen checks **every source in the background** when it opens (`NewsBriefing.checkSources`,
+  6 at a time, each re-checked after 6 hours; results in `filesDir/news_status.json`, `SourceStatus` =
+  PLAYABLE / QUIET / NO_FEED). Sources with no public podcast are **struck through** and dimmed with
+  "Not a public podcast"; feeds with nothing in 2 days say "Nothing new in the last 2 days". A "Can't play (N)"
+  chip filters to them, and "Check again" re-checks everything. A connection failure leaves a source unmarked.
 - New files: `podcasts/NewsBriefing.kt`, `viewmodels/NewsViewModel.kt`,
   `ui/screens/podcast/NewsBriefingCard.kt`, `NewsSourcesScreen.kt`
 - **News tab** (`news`, `NewsScreen.kt`): play-all card, then each source's newest bulletin (loaded in parallel,
@@ -407,3 +412,4 @@ To see the exact diff at any time:
 - 2026-11-04: Navidrome Folders tab as an expandable tree.
 - 2026-11-04: Navidrome Folders rebuilt as a file-manager view of the real server folders (path bar, item counts), app and Android Auto.
 - 2026-11-04: News bulletins labelled with their source name instead of the feed's publisher.
+- 2026-11-04: News sources screen checks every source and strikes through the ones that can't be played.

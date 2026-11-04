@@ -56,6 +56,16 @@ enum class NewsSort { YOUR_ORDER, LATEST, NAME, REGION }
 val NewsSortKey = androidx.datastore.preferences.core.stringPreferencesKey("newsSort")
 val NewsSortReversedKey = androidx.datastore.preferences.core.booleanPreferencesKey("newsSortReversed")
 
+/** Whether a source can be played right now. */
+enum class SourceStatus {
+    /** Has a bulletin from the last two days. */
+    PLAYABLE,
+    /** Has a public feed, but nothing new in the last two days, so the briefing skips it for now. */
+    QUIET,
+    /** No public podcast feed (made only for Google News, or not found). */
+    NO_FEED,
+}
+
 /** A source's newest bulletin, ready to play. */
 data class Bulletin(val song: Song, val publishedAt: Long?, val artworkUrl: String?)
 
@@ -109,6 +119,81 @@ constructor(
     private val latestPublished = ConcurrentHashMap<String, Long>(
         runCatching { json.decodeFromString(latestSerializer, latestFile.readText()) }.getOrDefault(emptyMap()),
     )
+
+    /** Last check of every source, so the News sources screen can mark ones that can't be played. */
+    private val statusFile = java.io.File(context.filesDir, "news_status.json")
+    private val statusSerializer = kotlinx.serialization.builtins.MapSerializer(
+        kotlinx.serialization.serializer<String>(),
+        kotlinx.serialization.serializer<String>(),
+    )
+    private val statusChecked = ConcurrentHashMap<String, Long>()
+    private val _statuses = kotlinx.coroutines.flow.MutableStateFlow<Map<String, SourceStatus>>(
+        runCatching { json.decodeFromString(statusSerializer, statusFile.readText()) }.getOrDefault(emptyMap())
+            .mapNotNull { (key, value) ->
+                val (name, at) = value.split('|').let { it[0] to it.getOrNull(1)?.toLongOrNull() }
+                val status = SourceStatus.entries.firstOrNull { it.name == name } ?: return@mapNotNull null
+                statusChecked[key] = at ?: 0L
+                key to status
+            }.toMap(),
+    )
+    val statuses: kotlinx.coroutines.flow.StateFlow<Map<String, SourceStatus>> = _statuses
+
+    private fun saveStatus(key: String, status: SourceStatus) {
+        statusChecked[key] = System.currentTimeMillis()
+        _statuses.value = _statuses.value + (key to status)
+        runCatching {
+            statusFile.writeText(
+                json.encodeToString(statusSerializer, _statuses.value.mapValues { (k, v) -> "${v.name}|${statusChecked[k] ?: 0L}" }),
+            )
+        }
+    }
+
+    /**
+     * Checks one source the way the briefing plays it: finds its feed and looks for a bulletin from the
+     * last two days. Returns null when it couldn't be checked (no connection), so it isn't marked wrongly.
+     */
+    suspend fun checkSource(source: NewsSource): SourceStatus? = withContext(Dispatchers.IO) {
+        withTimeoutOrNull(SOURCE_TIMEOUT_MS) {
+            val feedUrl = try {
+                feedUrlFor(source)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                return@withTimeoutOrNull null
+            }
+            if (feedUrl == null) {
+                // An Apple id that won't look up means the directory couldn't be reached, not a missing feed
+                return@withTimeoutOrNull if (source.key.startsWith("search:")) SourceStatus.NO_FEED else null
+            }
+            val newest = runCatching { directory.feed(PodcastShow(feedUrl, source.name)).episodes.firstOrNull() }
+                .getOrElse { return@withTimeoutOrNull null }
+            rememberPublished(source.key, newest?.publishedAt)
+            val recent = newest != null && (newest.publishedAt ?: System.currentTimeMillis()) >= System.currentTimeMillis() - MAX_AGE_MS
+            if (recent) SourceStatus.PLAYABLE else SourceStatus.QUIET
+        }?.also { saveStatus(source.key, it) }
+    }
+
+    /** Checks every source that hasn't been checked recently, a few at a time; [onProgress] gets (done, total). */
+    suspend fun checkSources(sources: List<NewsSource>, force: Boolean = false, onProgress: (Int, Int) -> Unit = { _, _ -> }) {
+        val now = System.currentTimeMillis()
+        val due = sources.filter { force || now - (statusChecked[it.key] ?: 0L) > STATUS_MAX_AGE_MS }
+        if (due.isEmpty()) return
+        val gate = kotlinx.coroutines.sync.Semaphore(6)
+        val done = java.util.concurrent.atomic.AtomicInteger(0)
+        onProgress(0, due.size)
+        coroutineScope {
+            due.map { source ->
+                async {
+                    gate.acquire()
+                    try {
+                        checkSource(source)
+                    } finally {
+                        gate.release()
+                        onProgress(done.incrementAndGet(), due.size)
+                    }
+                }
+            }.awaitAll()
+        }
+    }
 
     private fun rememberPublished(key: String, at: Long?) {
         if (at == null || latestPublished[key] == at) return
@@ -211,6 +296,7 @@ constructor(
         private const val SEPARATOR = "\n"
         private const val MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000L
         private const val SOURCE_TIMEOUT_MS = 20_000L
+        private const val STATUS_MAX_AGE_MS = 6 * 60 * 60 * 1000L
 
         val BUILT_IN = listOf(
             NewsSource("apple:1303342739", "7NEWS", "Australia"),

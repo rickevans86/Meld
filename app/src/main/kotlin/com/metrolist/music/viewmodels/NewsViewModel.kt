@@ -121,10 +121,32 @@ constructor(
     /** Names of sources that turned out to have no public feed. */
     val unavailable = _unavailable.asSharedFlow()
 
+    /** Last known status of each source, by key. */
+    val statuses = briefing.statuses
+
+    /** (checked, total) while the sources are being checked, otherwise null. */
+    private val _checkProgress = MutableStateFlow<Pair<Int, Int>?>(null)
+    val checkProgress = _checkProgress.asStateFlow()
+    private var checkJob: Job? = null
+
+    /** Checks every source in the background so the screen can mark the ones that can't be played. */
+    fun checkAllSources(force: Boolean = false) {
+        if (checkJob?.isActive == true) return
+        checkJob = viewModelScope.launch {
+            val sources = briefing.choices.first().map { it.source }
+            briefing.checkSources(sources, force) { done, total -> _checkProgress.value = done to total }
+            _checkProgress.value = null
+        }
+    }
+
     fun toggle(choice: NewsSourceChoice) {
         val key = choice.source.key
         if (choice.enabled) {
             save(enabledKeys() - key)
+            return
+        }
+        if (statuses.value[key] == com.metrolist.music.podcasts.SourceStatus.NO_FEED) {
+            _unavailable.tryEmit(choice.source.name)
             return
         }
         if (!key.startsWith("search:")) {
@@ -134,7 +156,9 @@ constructor(
         if (_checking.value != null) return
         viewModelScope.launch {
             _checking.value = key
-            val ok = briefing.isAvailable(choice.source)
+            // Same check as the background one, so a failed source is struck through straight away
+            val status = briefing.checkSource(choice.source)
+            val ok = status != null && status != com.metrolist.music.podcasts.SourceStatus.NO_FEED
             _checking.value = null
             if (ok) briefing.setEnabled(enabledKeys() + key) else _unavailable.tryEmit(choice.source.name)
         }

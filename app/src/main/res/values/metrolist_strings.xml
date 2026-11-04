@@ -1420,4 +1420,10 @@
     <string name="new_episodes_followed_empty">No new episodes in the last 30 days. Follow shows from podcast search to see them here.</string>
     <string name="new_episodes_youtube">From YouTube subscriptions</string>
     <string name="new_episodes_youtube_empty">No new YouTube episodes.</string>
+    <string name="news_category_unplayable">Can\'t play (%d)</string>
+    <string name="news_checking_sources">Checking which sources can be played… %1$d of %2$d</string>
+    <string name="news_unplayable_summary">%d sources can\'t be played (struck through)</string>
+    <string name="news_check_again">Check again</string>
+    <string name="news_status_no_feed">%s · Not a public podcast</string>
+    <string name="news_status_quiet">%s · Nothing new in the last 2 days</string>
 </resources>

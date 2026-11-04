@@ -32,6 +32,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.metrolist.music.podcasts.NewsBriefing
+import com.metrolist.music.podcasts.SourceStatus
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -57,6 +60,7 @@ import com.metrolist.music.viewmodels.NewsViewModel
 import androidx.compose.material3.IconButton as PlainIconButton
 
 private const val SELECTED = "__selected__"
+private const val UNPLAYABLE = "__unplayable__"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +70,9 @@ fun NewsSourcesScreen(
 ) {
     val choices by viewModel.choices.collectAsState()
     val checking by viewModel.checking.collectAsState()
+    val statuses by viewModel.statuses.collectAsState()
+    val checkProgress by viewModel.checkProgress.collectAsState()
+    val unplayableCount = choices.count { statuses[it.source.key] == SourceStatus.NO_FEED }
     val enabledKeys = choices.filter { it.enabled }.map { it.source.key }
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
@@ -76,8 +83,14 @@ fun NewsSourcesScreen(
     }
     val shown = choices.filter { choice ->
         (query.isBlank() || choice.source.name.contains(query.trim(), ignoreCase = true)) &&
-            (category == null || choice.source.region == category || (category == SELECTED && choice.enabled))
+            (
+                category == null || choice.source.region == category || (category == SELECTED && choice.enabled) ||
+                    (category == UNPLAYABLE && statuses[choice.source.key] == SourceStatus.NO_FEED)
+                )
     }
+
+    // Check every source in the background so ones that can't be played are struck through
+    LaunchedEffect(Unit) { viewModel.checkAllSources() }
 
     LaunchedEffect(Unit) {
         viewModel.unavailable.collect { name ->
@@ -126,6 +139,15 @@ fun NewsSourcesScreen(
                         label = { Text(stringResource(R.string.news_category_selected, enabledKeys.size)) },
                     )
                 }
+                if (unplayableCount > 0) {
+                    item {
+                        FilterChip(
+                            selected = category == UNPLAYABLE,
+                            onClick = { category = if (category == UNPLAYABLE) null else UNPLAYABLE },
+                            label = { Text(stringResource(R.string.news_category_unplayable, unplayableCount)) },
+                        )
+                    }
+                }
                 items(categories) { name ->
                     FilterChip(
                         selected = category == name,
@@ -135,8 +157,37 @@ fun NewsSourcesScreen(
                 }
             }
         }
+        item(key = "check_status") {
+            val progress = checkProgress
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+            ) {
+                if (progress != null) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text(
+                        stringResource(R.string.news_checking_sources, progress.first, progress.second),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 10.dp).weight(1f),
+                    )
+                } else {
+                    Text(
+                        stringResource(R.string.news_unplayable_summary, unplayableCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { viewModel.checkAllSources(force = true) }) {
+                        Text(stringResource(R.string.news_check_again))
+                    }
+                }
+            }
+        }
         items(shown, key = { choice -> choice.source.key }) { choice ->
             val position = enabledKeys.indexOf(choice.source.key)
+            val status = statuses[choice.source.key]
+            val unplayable = status == SourceStatus.NO_FEED
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -152,11 +203,23 @@ fun NewsSourcesScreen(
                     Checkbox(checked = choice.enabled, onCheckedChange = { viewModel.toggle(choice) })
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(choice.source.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        choice.source.region,
+                        choice.source.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        // Sources with no public podcast are struck through and dimmed
+                        textDecoration = if (unplayable) TextDecoration.LineThrough else null,
+                        color = if (unplayable) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        when (status) {
+                            SourceStatus.NO_FEED -> stringResource(R.string.news_status_no_feed, choice.source.region)
+                            SourceStatus.QUIET -> stringResource(R.string.news_status_quiet, choice.source.region)
+                            else -> choice.source.region
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (unplayable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 if (choice.enabled) {
