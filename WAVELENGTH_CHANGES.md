@@ -499,3 +499,4 @@ To see the exact diff at any time:
 - 2026-11-05: Official-style YouTube/Spotify homes without podcasts; Library Pins; Android Auto YouTube and Spotify pages with Liked songs and pins first.
 - 2026-11-05: YouTube/Spotify logos on playlists (labels in Android Auto); Local files chip removed from Library; Pins on Playlists page; ⋮ on Spotify playlists.
 - 2026-11-05: Radio (M3U/PLS) and News (OPML) backup and import sections in Backup and restore.
+- 2026-11-05: Fixed a crash when the music service stopped (episode/audiobook position was read from a background thread in `MusicService.onDestroy`).

@@ -5367,9 +5367,11 @@ class MusicService :
         }
 
         val currentMetadata = player.currentMediaItem?.metadata
-        if (currentMetadata != null && currentMetadata.remembersPosition() && player.currentPosition > 0) {
+        // Read the position here on the main thread; the player can't be touched from the IO thread
+        val stopPosition = player.currentPosition
+        if (currentMetadata != null && currentMetadata.remembersPosition() && stopPosition > 0) {
             runBlocking(Dispatchers.IO) {
-                database.updatePlaybackPosition(currentMetadata.id, player.currentPosition)
+                database.updatePlaybackPosition(currentMetadata.id, stopPosition)
             }
         }
 
