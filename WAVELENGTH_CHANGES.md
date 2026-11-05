@@ -139,6 +139,28 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - New files: `podcasts/PodcastDiscover.kt`, `viewmodels/PodcastDiscoverViewModel.kt`,
   `ui/screens/podcast/PodcastDiscoverList.kt`. Edited: `PreferenceKeys.kt`, `LibraryPodcastsScreen.kt`.
 
+### 0c-5. Official-style homes, combined Library pins, Android Auto YouTube/Spotify pages
+- **Home without podcasts**: `HomeScreen.kt` filters the YouTube home (`withoutPodcasts()`): no Podcasts chip, no
+  podcast/episode cards or podcast rows, local rows skip episodes, and a previously picked Podcasts chip is cleared.
+- **YouTube home order** like the official app: Speed dial, Quick picks, then YouTube's own rows in the order it
+  sends them, then Wavelength's extra rows (Keep listening, Recently played, your playlists, Daily discover,
+  Community, Forgotten favourites, Similar to), Moods and genres last (non-random order only).
+- **Spotify home** like the official app (`HomeViewModel.loadSpotifyHomeSections`): Your playlists (from
+  `Spotify.myPlaylists`) first, Start listening (top tracks, renamed), Spotify's own rows in its order, New releases
+  last. Podcast/episode/audiobook/book/show rows are dropped. `SpotifyHomeSectionRow.kt`: big 150dp square cards
+  with name + grey subtitle, large round artist photos.
+- **Library Pins** (`constants/LibraryPins.kt`, `ui/component/LibraryPinsRow.kt`): ⋮ menu "Pin to top of Library"
+  on playlists, albums, artists and Spotify playlists (`PlaylistMenu`, `AlbumMenu`, `ArtistMenu`,
+  `SpotifyPlaylistPinMenu`). Pinned items show in a Pins row at the top of the Library mix (list and grid) and are
+  left out of the list below; long-press a pin to unpin. Keys saved in `LibraryPinsKey`. Separate from Speed dial.
+  The Library mix already lists YouTube and Spotify playlists together (Spotify albums/artists aren't loaded by
+  Meld's Spotify integration).
+- **Android Auto**: `AndroidAutoSection` LIKED + PLAYLISTS → `YOUTUBE` ("YouTube", the `playlist` page: Liked songs,
+  pinned playlists, Downloaded, other playlists, no Spotify items); SPOTIFY_LIKED + SPOTIFY_PLAYLISTS → `SPOTIFY`
+  ("Spotify", the `spotify_playlist` page: Liked songs, pinned Spotify playlists, other playlists). Saved section
+  order migrates in `deserializeSections` (merged page takes the first old page's place, on if either was on).
+  `hiddenAutoSections` now hides `spotify`.
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -453,3 +475,4 @@ To see the exact diff at any time:
 - 2026-11-05: ⋮ menu (Unfollow, Share) on followed feed podcasts; Unfollow button when a feed won't load.
 - 2026-11-05: Podcasts Discover chip with top charts by country and category.
 - 2026-11-04: Merged Meld update fa6e0795 (automated Spotify GQL hash refresh).
+- 2026-11-05: Official-style YouTube/Spotify homes without podcasts; Library Pins; Android Auto YouTube and Spotify pages with Liked songs and pins first.

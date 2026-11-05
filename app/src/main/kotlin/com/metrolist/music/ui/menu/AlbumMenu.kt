@@ -5,6 +5,7 @@
 
 package com.metrolist.music.ui.menu
 
+import com.metrolist.music.constants.libraryPinMenuItem
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -471,9 +472,12 @@ fun AlbumMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
+            // Pins this album to the top of the Library
+            val libraryPin = libraryPinMenuItem("album:${album.id}", onDismiss)
             Material3MenuGroup(
                 items =
                     listOf(
+                        libraryPin,
                         when (downloadState) {
                             STATE_COMPLETED -> {
                                 Material3MenuItemData(

@@ -679,12 +679,23 @@ class HomeViewModel @Inject constructor(
             // These three sources are independent — fetch them concurrently and then
             // assemble the sections in a fixed display order. Previously they ran
             // strictly sequentially (~1-2.7s of chained round-trips).
+            val myPlaylistsDeferred = viewModelScope.async(Dispatchers.IO) { Spotify.myPlaylists(limit = 20) }
             val (profileTracks, newReleasesResult, homeResult) = coroutineScope {
                 val topTracksDeferred = async { SpotifyProfileCache.getTopTracks(context, database, limit = 20) }
                 val newReleasesDeferred = async { Spotify.newReleases(limit = 20) }
                 val homeDeferred = async { Spotify.home(sectionItemsLimit = 10) }
                 Triple(topTracksDeferred.await(), newReleasesDeferred.await(), homeDeferred.await())
             }
+            // Official Spotify order: Your playlists, Start listening (your top tracks), then
+            // Spotify's own home rows in its order, with New releases after them.
+            myPlaylistsDeferred.await().onSuccess { page ->
+                val mine = page.items.filter { it.id.isNotEmpty() }
+                if (mine.isNotEmpty()) {
+                    sections.add(SpotifyHomeSection(title = "spotify_your_playlists", type = SectionType.PLAYLISTS, playlists = mine))
+                }
+            }.onFailure { e -> Timber.w(e, "spotifyHome: myPlaylists failed") }
+            val feedSections = mutableListOf<SpotifyHomeSection>()
+            var newReleasesSection: SpotifyHomeSection? = null
 
             Timber.d("spotifyHome: top tracks from profile cache = ${profileTracks.size}")
             val topTracks = if (hideExplicit) profileTracks.filter { !it.explicit } else profileTracks
@@ -702,11 +713,11 @@ class HomeViewModel @Inject constructor(
             newReleasesResult.onSuccess { newReleases ->
                 val albums = newReleases.albums?.items.orEmpty()
                 if (albums.isNotEmpty()) {
-                    sections.add(SpotifyHomeSection(
+                    newReleasesSection = SpotifyHomeSection(
                         title = "spotify_new_releases",
                         type = SectionType.ALBUMS,
                         albums = albums,
-                    ))
+                    )
                     Timber.d("spotifyHome: added pinned section 'New Releases' (${albums.size} albums)")
                 } else {
                     Timber.w("spotifyHome: newReleases returned 0 albums — skipping section")
@@ -722,16 +733,22 @@ class HomeViewModel @Inject constructor(
                 }
                 feed.sections.forEach { raw ->
                     val converted = convertHomeSection(raw)
+                        // Podcasts and audiobooks have their own tabs, so their rows stay off Home
+                        ?.takeUnless { isPodcastOrBookTitle(it.title) }
+                        // "Your playlists" is already first, built from your own playlists
+                        ?.takeUnless { sections.any { s -> s.title == "spotify_your_playlists" } && it.title.equals("Your playlists", ignoreCase = true) }
                     if (converted == null) {
                         Timber.d("spotifyHome: SKIPPED '${raw.title ?: "<no title>"}' (typename=${raw.typename})")
                     } else {
-                        sections.add(converted)
+                        feedSections.add(converted)
                         Timber.d("spotifyHome: ADDED '${converted.title}' type=${converted.type} items=${converted.playlists.size + converted.albums.size + converted.artists.size}")
                     }
                 }
             }.onFailure { e ->
                 Timber.e(e, "spotifyHome: home() FAILED — ${e.javaClass.simpleName}: ${e.message}")
             }
+            sections.addAll(feedSections)
+            newReleasesSection?.let { sections.add(it) }
         } catch (e: Exception) {
             Timber.e(e, "spotifyHome: loadSpotifyHomeSections() threw ${e.javaClass.simpleName}: ${e.message}")
             reportException(e)
@@ -751,6 +768,9 @@ class HomeViewModel @Inject constructor(
      * a section is heterogeneous and filters items to that type — Shorts sections
      * and episode-only sections are skipped (no title / not playable as tracks).
      */
+    private fun isPodcastOrBookTitle(title: String): Boolean =
+        listOf("podcast", "episode", "audiobook", "books", "show").any { title.contains(it, ignoreCase = true) }
+
     private fun convertHomeSection(feedSection: SpotifyHomeFeedSection): SpotifyHomeSection? {
         val title = feedSection.title ?: return null
 

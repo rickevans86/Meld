@@ -109,6 +109,7 @@ import com.metrolist.music.viewmodels.LibraryMixViewModel
 import com.metrolist.music.viewmodels.SpotifyViewModel
 import com.metrolist.spotify.SpotifyMapper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.Collator
 import java.time.LocalDateTime
@@ -289,6 +290,63 @@ fun LibraryMixScreen(
         }.reversed(sortDescending)
 
     val searchableItems = if (normalizedQuery.isBlank()) allItems else allItems + songs.value
+
+    // ── Pins: items pinned to the top of the Library (⋮ → Pin to top of Library) ──
+    val pinnedKeys = com.metrolist.music.constants.rememberLibraryPins()
+    val pinContext = androidx.compose.ui.platform.LocalContext.current
+    val pinUnpinned = stringResource(R.string.library_unpinned)
+    fun pinKey(item: Any): String? = when (item) {
+        is Playlist -> "playlist:${item.id}"
+        is Album -> "album:${item.id}"
+        is Artist -> "artist:${item.id}"
+        else -> null
+    }
+    val spotifyLikedName = stringResource(R.string.spotify_liked_songs)
+    val pinPlaylistLabel = stringResource(R.string.library_pin_playlist)
+    val pinCards = pinnedKeys.mapNotNull { key ->
+        val id = key.substringAfter(':')
+        when (key.substringBefore(':')) {
+            "playlist" -> playlist.value.firstOrNull { it.id == id }?.let { p ->
+                com.metrolist.music.ui.component.LibraryPinCard(key, p.playlist.name, pinPlaylistLabel, p.thumbnails.firstOrNull()) {
+                    if (!p.playlist.isEditable && p.songCount == 0 && p.playlist.browseId != null) {
+                        navController.navigate("online_playlist/${p.playlist.browseId}")
+                    } else {
+                        navController.navigate("local_playlist/${p.id}")
+                    }
+                }
+            }
+            "album" -> albums.value.firstOrNull { it.id == id }?.let { a ->
+                com.metrolist.music.ui.component.LibraryPinCard(key, a.album.title, a.artists.joinToString(", ") { it.name }, a.album.thumbnailUrl) {
+                    navController.navigate("album/${a.id}")
+                }
+            }
+            "artist" -> artist.value.firstOrNull { it.id == id }?.let { ar ->
+                com.metrolist.music.ui.component.LibraryPinCard(key, ar.artist.name, null, ar.artist.thumbnailUrl, round = true) {
+                    navController.navigate("artist/${ar.id}")
+                }
+            }
+            "spotify" -> if (id == "liked_songs") {
+                com.metrolist.music.ui.component.LibraryPinCard(key, spotifyLikedName, "Spotify", null, placeholder = R.drawable.favorite) {
+                    navController.navigate("spotify_liked_songs")
+                }
+            } else {
+                spotifyPlaylists.firstOrNull { it.id == id }?.let { sp ->
+                    com.metrolist.music.ui.component.LibraryPinCard(key, sp.name, "Spotify", SpotifyMapper.getPlaylistThumbnail(sp)) {
+                        navController.navigate("spotify_playlist/${sp.id}")
+                    }
+                }
+            }
+            else -> null
+        }
+    }
+    val unpin: (com.metrolist.music.ui.component.LibraryPinCard) -> Unit = { pin ->
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        val app = pinContext.applicationContext
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { com.metrolist.music.constants.setLibraryPinned(app, pin.key, false) }
+        android.widget.Toast.makeText(pinContext, pinUnpinned, android.widget.Toast.LENGTH_SHORT).show()
+    }
+    // Pinned items show in the Pins row instead of further down (unless searching)
+    val visibleSpotifyPlaylists = spotifyPlaylists.filterNot { "spotify:${it.id}" in pinnedKeys }
 
     val filteredItems = remember(searchableItems, normalizedQuery, collator) {
         val matchedItems =
@@ -480,6 +538,12 @@ fun LibraryMixScreen(
                         headerContent()
                     }
 
+                    if (pinCards.isNotEmpty() && normalizedQuery.isBlank()) {
+                        item(key = "library_pins", contentType = CONTENT_TYPE_HEADER) {
+                            com.metrolist.music.ui.component.LibraryPinsRow(pins = pinCards, onUnpin = unpin)
+                        }
+                    }
+
                     if (showLikedPlaylist && !hideYtmLiked) {
                         item(
                             key = "likedPlaylist",
@@ -613,7 +677,7 @@ fun LibraryMixScreen(
                         }
                     }
 
-                    if (isSpotifyActive && spotifyLikedSongsTotal > 0) {
+                    if (isSpotifyActive && spotifyLikedSongsTotal > 0 && "spotify:liked_songs" !in pinnedKeys) {
                         item(key = "spotify_liked_songs") {
                             val likedSongsName = stringResource(R.string.spotify_liked_songs)
                             PlaylistListItem(
@@ -652,7 +716,7 @@ fun LibraryMixScreen(
 
                     if (isSpotifyActive && spotifyPlaylists.isNotEmpty()) {
                         items(
-                            items = spotifyPlaylists,
+                            items = visibleSpotifyPlaylists,
                             key = { "spotify_${it.id}" },
                             contentType = { CONTENT_TYPE_PLAYLIST },
                         ) { spotifyPlaylist ->
@@ -691,7 +755,7 @@ fun LibraryMixScreen(
                     }
 
                     items(
-                        items = filteredItems,
+                        items = if (normalizedQuery.isBlank()) filteredItems.filterNot { pinKey(it) in pinnedKeys } else filteredItems,
                         key = { it.id },
                         contentType = { CONTENT_TYPE_PLAYLIST },
                     ) { item ->
@@ -928,6 +992,12 @@ fun LibraryMixScreen(
                         headerContent()
                     }
 
+                    if (pinCards.isNotEmpty() && normalizedQuery.isBlank()) {
+                        item(key = "library_pins", span = { GridItemSpan(maxLineSpan) }, contentType = CONTENT_TYPE_HEADER) {
+                            com.metrolist.music.ui.component.LibraryPinsRow(pins = pinCards, onUnpin = unpin)
+                        }
+                    }
+
                     if (showLikedPlaylist && !hideYtmLiked) {
                         item(
                             key = "likedPlaylist",
@@ -1077,7 +1147,7 @@ fun LibraryMixScreen(
                         }
                     }
 
-                    if (isSpotifyActive && spotifyLikedSongsTotal > 0) {
+                    if (isSpotifyActive && spotifyLikedSongsTotal > 0 && "spotify:liked_songs" !in pinnedKeys) {
                         item(key = "spotify_liked_songs") {
                             val likedSongsName = stringResource(R.string.spotify_liked_songs)
                             PlaylistGridItem(
@@ -1117,7 +1187,7 @@ fun LibraryMixScreen(
 
                     if (isSpotifyActive && spotifyPlaylists.isNotEmpty()) {
                         items(
-                            items = spotifyPlaylists,
+                            items = visibleSpotifyPlaylists,
                             key = { "spotify_${it.id}" },
                             contentType = { CONTENT_TYPE_PLAYLIST },
                         ) { spotifyPlaylist ->
@@ -1157,7 +1227,7 @@ fun LibraryMixScreen(
                     }
 
                     items(
-                        items = filteredItems,
+                        items = if (normalizedQuery.isBlank()) filteredItems.filterNot { pinKey(it) in pinnedKeys } else filteredItems,
                         key = { it.id },
                         contentType = { CONTENT_TYPE_PLAYLIST },
                     ) { item ->

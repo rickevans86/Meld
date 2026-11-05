@@ -263,20 +263,20 @@ constructor(
                         sections
                             .filter { (section, enabled) ->
                                 enabled && section.id !in hiddenByFeatures && when (section) {
-                                    AndroidAutoSection.SPOTIFY_LIKED,
-                                    AndroidAutoSection.SPOTIFY_PLAYLISTS -> spotifyLoggedIn
+                                    AndroidAutoSection.SPOTIFY -> spotifyLoggedIn
                                     else -> true
                                 }
                             }
-                            .ifEmpty { listOf(AndroidAutoSection.LIKED to true) }
+                            .ifEmpty { listOf(AndroidAutoSection.YOUTUBE to true) }
                             .map { (section, _) ->
                                 when (section) {
-                                    AndroidAutoSection.LIKED -> browsableMediaItem(
-                                        "${MusicService.PLAYLIST}/${PlaylistEntity.LIKED_PLAYLIST_ID}",
-                                        context.getString(R.string.liked_songs),
+                                    // One YouTube page: liked songs pinned first, then playlists
+                                    AndroidAutoSection.YOUTUBE -> browsableMediaItem(
+                                        MusicService.PLAYLIST,
+                                        context.getString(R.string.auto_youtube),
                                         null,
-                                        drawableUri(R.drawable.favorite),
-                                        MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                                        drawableUri(R.drawable.library_music_outlined),
+                                        MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS,
                                     )
                                    AndroidAutoSection.SONGS -> browsableMediaItem(
                                         MusicService.SONG,
@@ -299,23 +299,10 @@ constructor(
                                         drawableUri(R.drawable.album),
                                         MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS,
                                     )
-                                    AndroidAutoSection.PLAYLISTS -> browsableMediaItem(
-                                        MusicService.PLAYLIST,
-                                        context.getString(R.string.playlists),
-                                        null,
-                                        drawableUri(R.drawable.queue_music),
-                                        MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS,
-                                    )
-                                    AndroidAutoSection.SPOTIFY_LIKED -> browsableMediaItem(
-                                        "${MusicService.SPOTIFY_PLAYLIST}/liked_songs",
-                                        context.getString(R.string.spotify_liked_songs),
-                                        null,
-                                        drawableUri(R.drawable.favorite),
-                                        MediaMetadata.MEDIA_TYPE_PLAYLIST,
-                                    )
-                                    AndroidAutoSection.SPOTIFY_PLAYLISTS -> browsableMediaItem(
+                                    // One Spotify page: liked songs pinned first, then Spotify playlists
+                                    AndroidAutoSection.SPOTIFY -> browsableMediaItem(
                                         MusicService.SPOTIFY_PLAYLIST,
-                                        context.getString(R.string.spotify_playlists),
+                                        context.getString(R.string.auto_spotify),
                                         null,
                                         drawableUri(R.drawable.spotify),
                                         MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS,
@@ -344,6 +331,13 @@ constructor(
                         val downloadedSongCount = downloadUtil.downloads.value.size
                         val showYoutubePlaylists = context.dataStore.get(AndroidAutoYouTubePlaylistsKey, false)
 
+                        // Playlists pinned in the Library come right after Liked songs
+                        val pins = libraryPins()
+                        val allPlaylists = database.playlistsByCreateDateAsc().first()
+                        val pinnedPlaylists = pins.mapNotNull { key ->
+                            key.removePrefix("playlist:").takeIf { key.startsWith("playlist:") }
+                                ?.let { id -> allPlaylists.firstOrNull { it.id == id } }
+                        }
                         // Build local playlists immediately
                         val localItems = listOf(
                             browsableMediaItem(
@@ -353,6 +347,15 @@ constructor(
                                 drawableUri(R.drawable.favorite),
                                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
                             ),
+                        ) + pinnedPlaylists.map { playlist ->
+                            browsableMediaItem(
+                                "${MusicService.PLAYLIST}/${playlist.id}",
+                                playlist.playlist.name,
+                                context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
+                                playlist.thumbnails.firstOrNull()?.toUri(),
+                                MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                            )
+                        } + listOf(
                             browsableMediaItem(
                                 "${MusicService.PLAYLIST}/${PlaylistEntity.DOWNLOADED_PLAYLIST_ID}",
                                 context.getString(R.string.downloaded_songs),
@@ -360,7 +363,7 @@ constructor(
                                 drawableUri(R.drawable.download),
                                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
                             ),
-                        ) + database.playlistsByCreateDateAsc().first().map { playlist ->
+                        ) + allPlaylists.filterNot { it in pinnedPlaylists }.map { playlist ->
                             browsableMediaItem(
                                 "${MusicService.PLAYLIST}/${playlist.id}",
                                 playlist.playlist.name,
@@ -371,10 +374,30 @@ constructor(
                         }
 
                         val youtubeItems = if (showYoutubePlaylists) fetchYouTubePlaylistItems() else emptyList()
-                        localItems + youtubeItems + fetchSpotifyPlaylistItems()
+                        // Spotify playlists have their own Spotify page now
+                        localItems + youtubeItems
                     }
 
-                    MusicService.SPOTIFY_PLAYLIST -> fetchSpotifyPlaylistItems()
+                    MusicService.SPOTIFY_PLAYLIST -> {
+                        // Liked songs pinned to the top of the Spotify page
+                        val liked = browsableMediaItem(
+                            "${MusicService.SPOTIFY_PLAYLIST}/liked_songs",
+                            context.getString(R.string.spotify_liked_songs),
+                            null,
+                            drawableUri(R.drawable.favorite),
+                            MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                        )
+                        if (SpotifyTokenManager.ensureAuthenticated()) {
+                            // Spotify playlists pinned in the Library come right after Liked songs
+                            val pinnedIds = libraryPins().filter { it.startsWith("spotify:") }
+                                .map { "${MusicService.SPOTIFY_PLAYLIST}/${it.removePrefix("spotify:")}" }
+                            val playlists = fetchSpotifyPlaylistItems()
+                            val pinned = pinnedIds.mapNotNull { id -> playlists.firstOrNull { it.mediaId == id } }
+                            listOf(liked) + pinned + playlists.filterNot { it in pinned }
+                        } else {
+                            emptyList()
+                        }
+                    }
 
                     else ->
                         when {
@@ -1091,6 +1114,11 @@ constructor(
     }
 
     // ── Spotify playlist helpers ─────────────────────────────────────────
+
+    /** Library pins (keys like "playlist:<id>" and "spotify:<id>"), newest first. */
+    private suspend fun libraryPins(): List<String> =
+        context.dataStore.data.first()[com.metrolist.music.constants.LibraryPinsKey]
+            ?.split("\n")?.filter { it.isNotBlank() }.orEmpty()
 
     private suspend fun fetchSpotifyPlaylistItems(): List<MediaItem> {
         if (!SpotifyTokenManager.ensureAuthenticated()) return emptyList()

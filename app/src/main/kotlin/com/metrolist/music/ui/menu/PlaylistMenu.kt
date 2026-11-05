@@ -5,6 +5,7 @@
 
 package com.metrolist.music.ui.menu
 
+import com.metrolist.music.constants.libraryPinMenuItem
 import android.content.Intent
 import android.content.res.Configuration
 import android.widget.Toast
@@ -472,9 +473,12 @@ fun PlaylistMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
+            // Pins this playlist to the top of the Library
+            val libraryPin = libraryPinMenuItem("playlist:${playlist.id}", onDismiss)
             Material3MenuGroup(
                 items =
                     buildList {
+                        add(libraryPin)
                         if (editable && autoPlaylist != true && !isGuest) {
                             add(
                                 Material3MenuItemData(

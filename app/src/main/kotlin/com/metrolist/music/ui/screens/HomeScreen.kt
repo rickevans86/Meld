@@ -679,13 +679,20 @@ fun HomeScreen(
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val quickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
-    val recentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
-    val forgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
-    val keepListening by viewModel.keepListening.collectAsStateWithLifecycle()
+    // Podcast episodes played locally are left out of Home too (they're in the Podcasts tab)
+    val rawQuickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
+    val rawRecentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
+    val rawForgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
+    val rawKeepListening by viewModel.keepListening.collectAsStateWithLifecycle()
+    val quickPicks = remember(rawQuickPicks) { rawQuickPicks?.filterNot { it.song.isEpisode } }
+    val recentlyPlayed = remember(rawRecentlyPlayed) { rawRecentlyPlayed?.filterNot { it.song.isEpisode } }
+    val forgottenFavorites = remember(rawForgottenFavorites) { rawForgottenFavorites?.filterNot { it.song.isEpisode } }
+    val keepListening = remember(rawKeepListening) { rawKeepListening?.filterNot { it is Song && it.song.isEpisode } }
     val similarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
     val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
-    val homePage by viewModel.homePage.collectAsStateWithLifecycle()
+    val rawHomePage by viewModel.homePage.collectAsStateWithLifecycle()
+    // Podcasts have their own tab, so Home leaves out the Podcasts chip, podcast rows and episodes
+    val homePage = remember(rawHomePage) { rawHomePage?.withoutPodcasts() }
     val explorePage by viewModel.explorePage.collectAsStateWithLifecycle()
     val dailyDiscover by viewModel.dailyDiscover.collectAsStateWithLifecycle()
     val communityPlaylists by viewModel.communityPlaylists.collectAsStateWithLifecycle()
@@ -695,6 +702,13 @@ fun HomeScreen(
     val speedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
     val pinnedSpeedDialItems by viewModel.pinnedSpeedDialItems.collectAsStateWithLifecycle()
     val selectedChip by viewModel.selectedChip.collectAsStateWithLifecycle()
+    // A Podcasts chip picked before podcasts left Home can't be seen any more, so switch it off
+    LaunchedEffect(selectedChip) {
+        val chip = selectedChip
+        if (chip != null && (chip.title.contains("podcast", ignoreCase = true) || chip.title.contains("episode", ignoreCase = true))) {
+            viewModel.toggleChip(null)
+        }
+    }
 
     // Official podcast API data
     val savedPodcastShows by viewModel.savedPodcastShows.collectAsStateWithLifecycle()
@@ -1164,23 +1178,26 @@ fun HomeScreen(
                     base + modifier
                 }
             } else {
+                // Same order as the official YouTube Music app: Speed dial, Quick picks, then
+                // YouTube's own rows (Listen again, Mixed for you, New releases…) in the order it sends
+                // them, then Wavelength's extra rows, with Moods and genres last.
                 val defaultOrder =
                     mapOf(
-                        HomeSection.SpeedDial to 100,
-                        HomeSection.QuickPicks to 90,
-                        HomeSection.RecentlyPlayed to 85,
-                        HomeSection.FromTheCommunity to 80,
-                        HomeSection.DailyDiscover to 70,
-                        HomeSection.KeepListening to 60,
-                        HomeSection.AccountPlaylists to 50,
-                        HomeSection.ForgottenFavorites to 40,
-                        HomeSection.MoodAndGenres to 10,
+                        HomeSection.SpeedDial to 10_000,
+                        HomeSection.QuickPicks to 9_000,
+                        HomeSection.KeepListening to 400,
+                        HomeSection.RecentlyPlayed to 390,
+                        HomeSection.AccountPlaylists to 380,
+                        HomeSection.DailyDiscover to 370,
+                        HomeSection.FromTheCommunity to 360,
+                        HomeSection.ForgottenFavorites to 350,
+                        HomeSection.MoodAndGenres to 1,
                     )
 
                 list.sortedByDescending { section ->
                     when (section) {
-                        is HomeSection.SimilarRecommendation -> 30 - section.index
-                        is HomeSection.HomePageSection -> 20 - section.index
+                        is HomeSection.HomePageSection -> 8_000 - section.index
+                        is HomeSection.SimilarRecommendation -> 300 - section.index
                         else -> defaultOrder[section] ?: 0
                     }
                 }
@@ -2882,3 +2899,15 @@ fun HomeScreen(
     }
 }
 
+/** Home without podcasts: drops the Podcasts chip, podcast and episode cards, and rows left empty or about podcasts. */
+private fun com.metrolist.innertube.pages.HomePage.withoutPodcasts(): com.metrolist.innertube.pages.HomePage {
+    fun isPodcastTitle(title: String) = title.contains("podcast", ignoreCase = true) || title.contains("episode", ignoreCase = true)
+    return copy(
+        chips = chips?.filterNot { isPodcastTitle(it.title) },
+        sections = sections.mapNotNull { section ->
+            if (isPodcastTitle(section.title)) return@mapNotNull null
+            val items = section.items.filterNot { it is PodcastItem || it is EpisodeItem }
+            if (items.isEmpty()) null else section.copy(items = items)
+        },
+    )
+}

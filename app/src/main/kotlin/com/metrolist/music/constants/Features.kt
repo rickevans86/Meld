@@ -49,7 +49,7 @@ fun Preferences.hiddenAutoSections(): Set<String> {
     val disabled = disabledFeatures()
     val hidden = disabled.flatMapTo(HashSet()) { it.autoSections }
     if (WavelengthFeature.SECOND_SOURCE in disabled && defaultHomeSource() != HOME_SOURCE_SPOTIFY) {
-        hidden += setOf("spotify_liked", "spotify_playlists")
+        hidden += "spotify"
     }
     return hidden
 }

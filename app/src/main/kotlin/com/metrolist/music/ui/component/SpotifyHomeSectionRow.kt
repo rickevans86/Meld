@@ -6,6 +6,7 @@
 package com.metrolist.music.ui.component
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
@@ -71,7 +72,8 @@ fun resolveSpotifySectionTitle(section: SpotifyHomeSection): String {
             val artistName = title.removePrefix("spotify_because_you_like:")
             stringResource(R.string.spotify_because_you_like, artistName)
         }
-        title == "spotify_top_tracks" -> stringResource(R.string.spotify_top_tracks)
+        // Shown as "Start listening", like the official Spotify home
+        title == "spotify_top_tracks" -> stringResource(R.string.spotify_start_listening)
         title == "spotify_top_artists" -> stringResource(R.string.spotify_top_artists)
         title == "spotify_made_for_you" -> stringResource(R.string.spotify_made_for_you)
         title == "spotify_discover" -> stringResource(R.string.spotify_discover)
@@ -152,18 +154,19 @@ fun SpotifyArtistSectionRow(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .width(GridThumbnailHeight + 24.dp)
+                    .width(SpotifyCardSize + 12.dp)
                     .padding(horizontal = 6.dp)
                     .combinedClickable(
                         onClick = { onArtistClick(artist) },
                     ),
             ) {
+                // Large round artist photos, like the official Spotify home
                 AsyncImage(
                     model = thumbnail,
                     contentDescription = artist.name,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(GridThumbnailHeight)
+                        .size(SpotifyCardSize)
                         .clip(CircleShape),
                 )
                 Text(
@@ -198,18 +201,12 @@ fun SpotifyAlbumSectionRow(
             items = albums,
             key = { "spotify_album_${it.id}" }
         ) { album ->
-            val albumItem = remember(album.id) { album.toAlbumItem() }
-            YouTubeGridItem(
-                item = albumItem,
-                isActive = false,
-                isPlaying = false,
-                onPlayClick = onAlbumPlay?.let { cb -> { cb(album) } },
-                modifier = Modifier
-                    .width(GridThumbnailHeight + 24.dp)
-                    .padding(horizontal = 6.dp)
-                    .combinedClickable(
-                        onClick = { onAlbumClick(album) },
-                    ),
+            val image = remember(album.id) { album.images.maxByOrNull { it.width ?: 0 }?.url ?: album.images.firstOrNull()?.url }
+            SpotifyCard(
+                imageUrl = image,
+                title = album.name,
+                subtitle = album.artists.joinToString(", ") { it.name },
+                modifier = Modifier.combinedClickable(onClick = { onAlbumClick(album) }),
             )
         }
     }
@@ -235,11 +232,12 @@ fun SpotifyPlaylistSectionRow(
             items = playlists,
             key = { "spotify_playlist_${it.id}" }
         ) { playlist ->
-            val playlistItem = remember(playlist.id) { playlist.toPlaylistItem() }
-            YouTubeGridItem(
-                item = playlistItem,
-                isActive = false,
-                isPlaying = false,
+            val image = remember(playlist.id) { playlist.images.maxByOrNull { it.width ?: 0 }?.url ?: playlist.images.firstOrNull()?.url }
+            SpotifyCard(
+                imageUrl = image,
+                title = playlist.name,
+                subtitle = playlist.description?.takeIf { it.isNotBlank() }?.let { android.text.Html.fromHtml(it, 0).toString() }
+                    ?: playlist.owner?.displayName,
                 modifier = Modifier
                     .pointerInput(playlist.id) {
                         detectTapGestures(
@@ -247,6 +245,51 @@ fun SpotifyPlaylistSectionRow(
                             onLongPress = { onPlaylistLongClick?.invoke(playlist) },
                         )
                     },
+            )
+        }
+    }
+}
+
+/** Card size on the Spotify home, close to the official app's large squares. */
+private val SpotifyCardSize = 150.dp
+
+/** Official-style Spotify card: big square artwork, name, then a grey line (artists or description). */
+@Composable
+private fun SpotifyCard(
+    imageUrl: String?,
+    title: String,
+    subtitle: String?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = Modifier
+            .width(SpotifyCardSize + 12.dp)
+            .padding(horizontal = 6.dp)
+            .then(modifier),
+    ) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(SpotifyCardSize)
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        if (!subtitle.isNullOrBlank()) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
