@@ -343,7 +343,8 @@ constructor(
                             browsableMediaItem(
                                 "${MusicService.PLAYLIST}/${PlaylistEntity.LIKED_PLAYLIST_ID}",
                                 context.getString(R.string.liked_songs),
-                                context.resources.getQuantityString(R.plurals.n_song, likedSongCount, likedSongCount),
+                                // Android Auto can't show a logo beside the name, so the source leads the second line
+                                "YouTube · " + context.resources.getQuantityString(R.plurals.n_song, likedSongCount, likedSongCount),
                                 drawableUri(R.drawable.favorite),
                                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
                             ),
@@ -351,7 +352,8 @@ constructor(
                             browsableMediaItem(
                                 "${MusicService.PLAYLIST}/${playlist.id}",
                                 playlist.playlist.name,
-                                context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
+                                (if (playlist.playlist.browseId != null) "YouTube · " else "") +
+                                    context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
                                 playlist.thumbnails.firstOrNull()?.toUri(),
                                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
                             )
@@ -367,7 +369,8 @@ constructor(
                             browsableMediaItem(
                                 "${MusicService.PLAYLIST}/${playlist.id}",
                                 playlist.playlist.name,
-                                context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
+                                (if (playlist.playlist.browseId != null) "YouTube · " else "") +
+                                    context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
                                 playlist.thumbnails.firstOrNull()?.toUri(),
                                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
                             )
@@ -383,7 +386,7 @@ constructor(
                         val liked = browsableMediaItem(
                             "${MusicService.SPOTIFY_PLAYLIST}/liked_songs",
                             context.getString(R.string.spotify_liked_songs),
-                            null,
+                            "Spotify",
                             drawableUri(R.drawable.favorite),
                             MediaMetadata.MEDIA_TYPE_PLAYLIST,
                         )
@@ -1101,7 +1104,7 @@ constructor(
                     browsableMediaItem(
                         "${MusicService.YOUTUBE_PLAYLIST}/${playlist.id}",
                         playlist.title,
-                        playlist.author?.name ?: playlist.songCountText,
+                        "YouTube · " + (playlist.author?.name ?: playlist.songCountText ?: ""),
                         playlist.thumbnail?.toUri(),
                         MediaMetadata.MEDIA_TYPE_PLAYLIST,
                     )
@@ -1128,7 +1131,7 @@ constructor(
                 browsableMediaItem(
                     "${MusicService.SPOTIFY_PLAYLIST}/${playlist.id}",
                     playlist.name,
-                    playlist.owner?.displayName ?: "Spotify",
+                    "Spotify" + (playlist.owner?.displayName?.let { " · $it" } ?: ""),
                     SpotifyMapper.getPlaylistThumbnail(playlist)?.toUri(),
                     MediaMetadata.MEDIA_TYPE_PLAYLIST,
                 )

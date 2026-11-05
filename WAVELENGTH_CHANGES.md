@@ -161,6 +161,16 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   order migrates in `deserializeSections` (merged page takes the first old page's place, on if either was on).
   `hiddenAutoSections` now hides `spotify`.
 
+- **Source logos**: `ui/component/PlaylistSource.kt` + `res/drawable-nodpi/logo_youtube.png`, `logo_spotify.png`
+  (from the user's images, background made transparent). `PlaylistListItem` shows the logo between the artwork and
+  the name; `PlaylistGridItem` shows it before the name. `playlistSourceOf()`: ids starting "spotify" and Spotify
+  liked songs → Spotify; playlists with a YouTube browse id and Liked → YouTube; app-only playlists get none.
+  Android Auto can't show icons beside names, so its second line starts "YouTube ·" / "Spotify ·".
+- Library chips: **Local files removed** (it has its own tab); a saved Local files chip falls back to Library.
+- **Pins on the Playlists page** too (same Pins row and keys; pinned playlists leave the list below), and Spotify
+  playlist rows (and Spotify liked songs) now have a ⋮ button opening the Spotify menu with "Pin to top of Library"
+  (list view in `LibraryMixScreen` and `LibraryPlaylistsScreen`).
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -476,3 +486,4 @@ To see the exact diff at any time:
 - 2026-11-05: Podcasts Discover chip with top charts by country and category.
 - 2026-11-04: Merged Meld update fa6e0795 (automated Spotify GQL hash refresh).
 - 2026-11-05: Official-style YouTube/Spotify homes without podcasts; Library Pins; Android Auto YouTube and Spotify pages with Liked songs and pins first.
+- 2026-11-05: YouTube/Spotify logos on playlists (labels in Android Auto); Local files chip removed from Library; Pins on Playlists page; ⋮ on Spotify playlists.

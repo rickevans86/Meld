@@ -691,6 +691,20 @@ fun LibraryMixScreen(
                                     songThumbnails = emptyList(),
                                 ),
                                 autoPlaylist = true,
+                                trailingContent = {
+                                    IconButton(onClick = {
+                                        menuState.show {
+                                            SpotifyPlaylistMenu(
+                                                spotifyId = "spotify:liked_songs",
+                                                title = likedSongsName,
+                                                onNavigate = { navController.navigate("spotify_liked_songs") },
+                                                onDismiss = menuState::dismiss,
+                                            )
+                                        }
+                                    }) {
+                                        Icon(painter = painterResource(R.drawable.more_vert), contentDescription = null)
+                                    }
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .combinedClickable(
@@ -732,6 +746,19 @@ fun LibraryMixScreen(
                                     songThumbnails = listOfNotNull(thumbnailUrl),
                                 ),
                                 autoPlaylist = true,
+                                trailingContent = {
+                                    IconButton(onClick = {
+                                        menuState.show {
+                                            SpotifyPlaylistMenu(
+                                                playlist = spotifyPlaylist,
+                                                onNavigate = { navController.navigate("spotify_playlist/${spotifyPlaylist.id}") },
+                                                onDismiss = menuState::dismiss,
+                                            )
+                                        }
+                                    }) {
+                                        Icon(painter = painterResource(R.drawable.more_vert), contentDescription = null)
+                                    }
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .combinedClickable(
