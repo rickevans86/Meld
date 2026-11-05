@@ -171,6 +171,17 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   playlist rows (and Spotify liked songs) now have a ⋮ button opening the Spotify menu with "Pin to top of Library"
   (list view in `LibraryMixScreen` and `LibraryPlaylistsScreen`).
 
+- **Radio and News backups**, each its own section in Backup and restore after Podcasts:
+  - Radio: "Back up radio stations (M3U)" / "Import radio stations (M3U or PLS)" (`RadioDirectory.exportM3u`,
+    `importPlaylist`). Export writes `#EXTINF` with `tvg-logo` / `group-title` plus a `#EXTWAVELENGTH:<json>` line
+    per station (ignored by other apps) so a Wavelength re-import keeps every detail. Import reads M3U (with or
+    without those tags) and PLS; skips stations already in favourites (same id or stream address) and repeats.
+  - News: "Back up news sources (OPML)" / "Import news sources (OPML)" (`NewsBriefing.exportOpml`, `importOpml`).
+    Export lists switched-on sources in order with their feed address (looked up, 10 s each), `wavelengthKey`
+    and `category`. Import switches sources on after the current ones, skipping ones already on; a feed with no
+    Wavelength key is followed as a podcast and switched on as "Podcasts you follow".
+  - Both use `PodcastOpmlViewModel` (now also `exportRadio`, `importRadio`, `exportNews`, `importNews`).
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -487,3 +498,4 @@ To see the exact diff at any time:
 - 2026-11-04: Merged Meld update fa6e0795 (automated Spotify GQL hash refresh).
 - 2026-11-05: Official-style YouTube/Spotify homes without podcasts; Library Pins; Android Auto YouTube and Spotify pages with Liked songs and pins first.
 - 2026-11-05: YouTube/Spotify logos on playlists (labels in Android Auto); Local files chip removed from Library; Pins on Playlists page; ⋮ on Spotify playlists.
+- 2026-11-05: Radio (M3U/PLS) and News (OPML) backup and import sections in Backup and restore.

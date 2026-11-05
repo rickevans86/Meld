@@ -229,6 +229,80 @@ constructor(
         return sortSources(choices.first().filter { it.enabled }.map { it.source }, sort, reversed)
     }
 
+    /**
+     * Your chosen news sources, in order, as OPML (the podcast list format), so other podcast apps can
+     * open it too. Each outline also carries Wavelength's own key and category for restoring here.
+     */
+    suspend fun exportOpml(): String {
+        fun esc(text: String) = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+        val sources = choices.first().filter { it.enabled }.map { it.source }
+        val feeds = coroutineScope {
+            sources.map { source ->
+                async { withTimeoutOrNull(10_000) { runCatching { feedUrlFor(source) }.getOrNull() } }
+            }.awaitAll()
+        }
+        return buildString {
+            append("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n")
+            append("<opml version=\"1.0\">\n  <head>\n    <title>Wavelength News Sources</title>\n  </head>\n  <body>\n")
+            append("    <outline text=\"news\">\n")
+            sources.zip(feeds).forEach { (source, feed) ->
+                append("      <outline type=\"rss\" text=\"").append(esc(source.name)).append('"')
+                feed?.let { append(" xmlUrl=\"").append(esc(it)).append('"') }
+                append(" wavelengthKey=\"").append(esc(source.key)).append('"')
+                append(" category=\"").append(esc(source.region)).append("\" />\n")
+            }
+            append("    </outline>\n  </body>\n</opml>\n")
+        }
+    }
+
+    /** Result of a news import: sources switched on, and ones skipped because they were already on. */
+    data class NewsImport(val added: Int, val skipped: Int)
+
+    /**
+     * Switches on the sources in a news OPML file, added after your current ones in the file's order.
+     * Sources already on are skipped. A feed Wavelength doesn't list (e.g. from another app) is followed
+     * as a podcast and switched on under "Podcasts you follow".
+     */
+    suspend fun importOpml(input: java.io.InputStream): NewsImport {
+        val parser = android.util.Xml.newPullParser().apply {
+            setFeature(org.xmlpull.v1.XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+            setInput(input, null)
+        }
+        data class Entry(val key: String?, val url: String?, val name: String?)
+        val entries = mutableListOf<Entry>()
+        while (parser.next() != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+            if (parser.eventType != org.xmlpull.v1.XmlPullParser.START_TAG || !parser.name.equals("outline", ignoreCase = true)) continue
+            val attrs = (0 until parser.attributeCount).associate { parser.getAttributeName(it).lowercase(java.util.Locale.ROOT) to parser.getAttributeValue(it) }
+            val key = attrs["wavelengthkey"]?.trim()?.takeIf { it.isNotEmpty() }
+            val url = attrs["xmlurl"]?.trim()?.takeIf { it.startsWith("http", ignoreCase = true) }
+            if (key == null && url == null) continue
+            entries += Entry(key, url, (attrs["text"] ?: attrs["title"])?.trim())
+        }
+        val available = choices.first().map { it.source.key }.toSet()
+        val enabled = choices.first().filter { it.enabled }.map { it.source.key }.toMutableList()
+        var added = 0
+        var skipped = 0
+        entries.forEach { entry ->
+            val key = when {
+                entry.key != null && (entry.key in available || entry.key.startsWith("feed:")) -> entry.key
+                entry.url != null -> "feed:${entry.url}"
+                else -> null
+            } ?: return@forEach
+            if (key in enabled) {
+                skipped++
+                return@forEach
+            }
+            if (key.startsWith("feed:")) {
+                val url = key.removePrefix("feed:")
+                if (!directory.isFollowed(url)) directory.setFollowed(PodcastShow(url, entry.name ?: url), true)
+            }
+            enabled += key
+            added++
+        }
+        if (added > 0) setEnabled(enabled)
+        return NewsImport(added, skipped)
+    }
+
     suspend fun setEnabled(keysInOrder: List<String>) {
         context.dataStore.edit { it[NewsSourcesKey] = keysInOrder.joinToString(SEPARATOR) }
     }

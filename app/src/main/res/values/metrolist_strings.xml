@@ -1457,4 +1457,28 @@
     <string name="library_unpin">Unpin from Library</string>
     <string name="library_unpinned">Unpinned</string>
     <string name="library_pin_playlist">Playlist</string>
+    <string name="radio_backup_section">Radio</string>
+    <string name="radio_backup_export">Back up radio stations (M3U)</string>
+    <string name="radio_backup_export_desc">Saves your favourite stations as an M3U playlist that VLC, Kodi and most radio apps can open</string>
+    <string name="radio_backup_import">Import radio stations (M3U or PLS)</string>
+    <string name="radio_backup_import_desc">Adds the stations in an M3U or PLS file to your favourites. Ones you already have are skipped</string>
+    <string name="radio_imported">Added %1$d stations, skipped %2$d you already have</string>
+    <string name="radio_import_failed">Couldn\'t read that file. Choose an M3U or PLS station list.</string>
+    <string name="radio_backup_failed">Couldn\'t save the radio backup</string>
+    <plurals name="radio_backup_saved">
+        <item quantity="one">Saved %d station</item>
+        <item quantity="other">Saved %d stations</item>
+    </plurals>
+    <string name="news_backup_section">News</string>
+    <string name="news_backup_export">Back up news sources (OPML)</string>
+    <string name="news_backup_export_desc">Saves your chosen news sources, in order, as an OPML file</string>
+    <string name="news_backup_import">Import news sources (OPML)</string>
+    <string name="news_backup_import_desc">Switches on the sources in a news OPML file. Ones already on are skipped</string>
+    <string name="news_imported">Switched on %1$d news sources, skipped %2$d already on</string>
+    <string name="news_import_failed">Couldn\'t read that file. Choose a news sources OPML file.</string>
+    <string name="news_backup_failed">Couldn\'t save the news backup</string>
+    <plurals name="news_backup_saved">
+        <item quantity="one">Saved %d news source</item>
+        <item quantity="other">Saved %d news sources</item>
+    </plurals>
 </resources>

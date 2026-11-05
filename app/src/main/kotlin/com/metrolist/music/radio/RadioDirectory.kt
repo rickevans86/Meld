@@ -352,6 +352,112 @@ constructor(
 
     private fun JsonObject.string(key: String): String? = (get(key) as? JsonPrimitive)?.contentOrNull
 
+    /**
+     * Favourite stations as an M3U playlist, which most radio and media apps (VLC, Kodi, RadioDroid…)
+     * can open. Each station also gets a "#EXTWAVELENGTH" line holding all its details, which other apps
+     * ignore, so importing back into Wavelength keeps logos, country and tags.
+     */
+    fun exportM3u(): String = buildString {
+        append("#EXTM3U\n")
+        _favourites.value.forEach { station ->
+            val name = station.name.replace(",", " ").replace("\n", " ")
+            append("#EXTWAVELENGTH:").append(json.encodeToString(RadioStation.serializer(), station)).append('\n')
+            append("#EXTINF:-1")
+            station.favicon?.takeIf { it.isNotBlank() }?.let { append(" tvg-logo=\"").append(it.replace("\"", "")).append('"') }
+            station.country?.takeIf { it.isNotBlank() }?.let { append(" group-title=\"").append(it.replace("\"", "")).append('"') }
+            append(',').append(name).append('\n')
+            append(station.streamUrl).append('\n')
+        }
+    }
+
+    /** Result of a radio import: stations added to favourites, and ones skipped as already there. */
+    data class StationImport(val added: Int, val skipped: Int)
+
+    /**
+     * Adds the stations in an M3U or PLS file to favourites. A station already in favourites (same id
+     * or same stream address, ignoring http/https and a trailing slash) is skipped, as are repeats.
+     */
+    fun importPlaylist(text: String): StationImport {
+        val found = mutableListOf<RadioStation>()
+        val lines = text.lines().map { it.trim() }
+        if (lines.any { it.equals("[playlist]", ignoreCase = true) }) {
+            // PLS: File1=…, Title1=…
+            val files = mutableMapOf<String, String>()
+            val titles = mutableMapOf<String, String>()
+            lines.forEach { line ->
+                val key = line.substringBefore('=').trim()
+                val value = line.substringAfter('=', "").trim()
+                when {
+                    key.startsWith("File", ignoreCase = true) -> files[key.drop(4)] = value
+                    key.startsWith("Title", ignoreCase = true) -> titles[key.drop(5)] = value
+                }
+            }
+            files.toSortedMap(compareBy { it.toIntOrNull() ?: 0 }).forEach { (n, url) -> stationFor(titles[n], url, null, null)?.let(found::add) }
+        } else {
+            var saved: RadioStation? = null
+            var name: String? = null
+            var logo: String? = null
+            var group: String? = null
+            lines.forEach { line ->
+                when {
+                    line.startsWith("#EXTWAVELENGTH:") ->
+                        saved = runCatching { json.decodeFromString(RadioStation.serializer(), line.removePrefix("#EXTWAVELENGTH:")) }.getOrNull()
+                    line.startsWith("#EXTINF", ignoreCase = true) -> {
+                        name = line.substringAfterLast(',').trim().takeIf { it.isNotEmpty() }
+                        logo = Regex("tvg-logo=\"([^\"]*)\"").find(line)?.groupValues?.get(1)
+                        group = Regex("group-title=\"([^\"]*)\"").find(line)?.groupValues?.get(1)
+                    }
+                    line.isEmpty() || line.startsWith("#") -> Unit
+                    else -> {
+                        val station = saved?.takeIf { it.streamUrl == line } ?: stationFor(name, line, logo, group)
+                        station?.let(found::add)
+                        saved = null
+                        name = null
+                        logo = null
+                        group = null
+                    }
+                }
+            }
+        }
+        fun urlKey(url: String) = url.lowercase(Locale.ROOT).substringAfter("://").trimEnd('/')
+        val ids = _favourites.value.map { it.id }.toMutableSet()
+        val urls = _favourites.value.map { urlKey(it.streamUrl) }.toMutableSet()
+        val added = mutableListOf<RadioStation>()
+        var skipped = 0
+        found.forEach { station ->
+            if (station.id in ids || urlKey(station.streamUrl) in urls) {
+                skipped++
+            } else {
+                ids += station.id
+                urls += urlKey(station.streamUrl)
+                added += station
+                known[station.songId] = station
+            }
+        }
+        if (added.isNotEmpty()) {
+            _favourites.value = _favourites.value + added
+            runCatching {
+                favouritesFile.writeText(json.encodeToString(ListSerializer(RadioStation.serializer()), _favourites.value))
+            }.onFailure { Timber.w(it, "Could not save radio favourites") }
+        }
+        return StationImport(added.size, skipped)
+    }
+
+    /** A station from another app's playlist entry, with the same id addCustom would give it. */
+    private fun stationFor(name: String?, url: String, logo: String?, country: String?): RadioStation? {
+        if (url.toHttpUrlOrNull() == null) return null
+        return RadioStation(
+            id = "custom-" + java.security.MessageDigest.getInstance("SHA-1").digest(url.toByteArray())
+                .joinToString("") { "%02x".format(it) }.take(16),
+            name = name?.takeIf { it.isNotBlank() } ?: url.toHttpUrlOrNull()?.host ?: "Radio stream",
+            streamUrl = url,
+            favicon = logo?.takeIf { it.isNotBlank() },
+            country = country?.takeIf { it.isNotBlank() },
+            hls = url.contains(".m3u8", ignoreCase = true),
+            source = "Imported",
+        )
+    }
+
     private fun loadFavourites(): List<RadioStation> = runCatching {
         if (favouritesFile.exists()) {
             json.decodeFromString(ListSerializer(RadioStation.serializer()), favouritesFile.readText())

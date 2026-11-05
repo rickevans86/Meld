@@ -19,13 +19,64 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 
-/** Backs up followed podcasts to an OPML file and follows the podcasts in one, skipping ones already followed. */
+/**
+ * Backup and import for Wavelength's own lists, each in its own section of Backup and restore:
+ * podcasts (OPML), radio stations (M3U / PLS) and news sources (OPML). Imports skip what you already have.
+ */
 @HiltViewModel
 class PodcastOpmlViewModel
 @Inject
 constructor(
     private val directory: PodcastDirectory,
+    private val radio: com.metrolist.music.radio.RadioDirectory,
+    private val news: com.metrolist.music.podcasts.NewsBriefing,
 ) : ViewModel() {
+    fun exportRadio(context: Context, uri: Uri) = write(context, uri, R.string.radio_backup_failed) {
+        val count = radio.favourites.value.size
+        radio.exportM3u() to it.resources.getQuantityString(R.plurals.radio_backup_saved, count, count)
+    }
+
+    fun importRadio(context: Context, uri: Uri) = read(context, uri, R.string.radio_import_failed) { app, stream ->
+        val result = radio.importPlaylist(stream.bufferedReader().readText())
+        app.getString(R.string.radio_imported, result.added, result.skipped)
+    }
+
+    fun exportNews(context: Context, uri: Uri) = write(context, uri, R.string.news_backup_failed) { app ->
+        val text = news.exportOpml()
+        val count = Regex("wavelengthKey=").findAll(text).count()
+        text to app.resources.getQuantityString(R.plurals.news_backup_saved, count, count)
+    }
+
+    fun importNews(context: Context, uri: Uri) = read(context, uri, R.string.news_import_failed) { app, stream ->
+        val result = news.importOpml(stream)
+        app.getString(R.string.news_imported, result.added, result.skipped)
+    }
+
+    private fun write(context: Context, uri: Uri, failed: Int, build: suspend (Context) -> Pair<String, String>) {
+        val app = context.applicationContext
+        viewModelScope.launch {
+            val message = withContext(Dispatchers.IO) {
+                runCatching {
+                    val (text, done) = build(app)
+                    app.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } ?: error("no file")
+                    done
+                }.onFailure { Timber.w(it, "Backup failed") }.getOrNull()
+            } ?: app.getString(failed)
+            Toast.makeText(app, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun read(context: Context, uri: Uri, failed: Int, import: suspend (Context, java.io.InputStream) -> String) {
+        val app = context.applicationContext
+        viewModelScope.launch {
+            val message = withContext(Dispatchers.IO) {
+                runCatching { app.contentResolver.openInputStream(uri)?.use { import(app, it) } }
+                    .onFailure { Timber.w(it, "Import failed") }.getOrNull()
+            } ?: app.getString(failed)
+            Toast.makeText(app, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
     val followedCount get() = directory.followed.value.size
 
     fun export(context: Context, uri: Uri) {
