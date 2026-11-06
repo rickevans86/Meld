@@ -459,7 +459,7 @@ private fun ContinueListeningManager() {
     val extras = remember(context) {
         dagger.hilt.android.EntryPointAccessors.fromApplication(
             context.applicationContext,
-            com.metrolist.music.playback.AutoLibraryExtras.Access::class.java,
+            com.metrolist.music.playback.AutoLibraryExtras.Companion.Access::class.java,
         ).autoLibraryExtras()
     }
     fun reload() {
