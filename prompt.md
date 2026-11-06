@@ -44,6 +44,8 @@ Rules for the whole job:
 - Keep a file `WAVELENGTH_CHANGES.md` in the repo root that records every feature: what it does, new files,
   upstream files edited and why, how to merge a new Meld update, the rules above, and a dated change log. Update
   it with every change.
+- Rewrite `README.md` to describe Wavelength (what it is, download link to my fork's releases, every feature in
+  plain words, what's inherited from Meld, credits, license), and update it in the same commit as every change.
 - Commit as `Claude <noreply@anthropic.com>`. Only push when I say "push" (every push publishes a release).
   After pushing, watch the GitHub Actions build; if it fails, read the log, fix it, push again, then tell me the
   new version number.
@@ -78,9 +80,19 @@ Add a GitHub Actions workflow "Build and Release" that runs on every push to `fe
 - Settings → **Features** page:
   - Default home.
   - **Bottom bar**: switch any top-level screen on/off the bar (up to 6, at least 1) and reorder with arrows.
-    The side menu always shows everything.
+    The side menu always shows everything. Search is not a bar choice (remove it from bars saved earlier); the
+    combined Search screen stays in the side menu.
   - Switches to turn off whole features: the second music source, News, Navidrome, Jellyfin/Plex, Audiobooks,
     Podcasts, Local files, Radio. A switched-off feature disappears from the bottom bar, side menu and Android Auto.
+- **Search button in the top bar** (left of History) on every tab, searching only that tab, with one shared
+  search-bar look (back arrow, text field, clear ✕) everywhere:
+  - YouTube home → YouTube Music search; Spotify home → Spotify search (whatever the "Use Spotify for search"
+    setting says); Library → library search. Reuse the Search screen with a fixed source and pass the source on
+    to the results page.
+  - Podcasts → the podcast search screen, whose search box becomes the shared top bar (paste-link button in it).
+  - Radio, Navidrome, Media server, News, Audiobooks, Local files → the top bar itself turns into the search
+    field and the page shows results as you type (server searches) or filters what's on screen (News,
+    audiobooks, local files). Remove the old search boxes inside these pages. Back or changing tab closes it.
 - Remove Discord, Last.fm and Listen Together by switching them off and hiding them (one flag each), not by
   deleting code, so upstream merges stay clean. Clear their saved sign-ins on start.
 
@@ -89,7 +101,8 @@ Add a GitHub Actions workflow "Build and Release" that runs on every push to `fe
 - YouTube home in the official app's order: Speed dial, Quick picks, then YouTube's own rows in the order YouTube
   sends them, then the app's extra rows, Moods & genres last.
 - Spotify home in the official app's order: Your playlists, Start listening (top tracks), Spotify's own rows, New
-  releases. Large square cards and big round artist photos.
+  releases. Large square cards and big round artist photos. Its Recently played row lists only songs played from
+  Spotify (ones with a Spotify match), not YouTube videos or episodes.
 - Podcasts live in their own tab, so remove them from both homes: no Podcasts chip, no podcast/episode cards or
   rows, none in Speed dial, Quick picks, Similar to or Start listening.
 
@@ -97,12 +110,15 @@ Add a GitHub Actions workflow "Build and Release" that runs on every push to `fe
 
 - One Library page that lists YouTube and Spotify playlists together, each with a small YouTube or Spotify logo
   between the artwork and the name (Android Auto: start the second line with "YouTube ·" / "Spotify ·" instead).
-- **Pins**: "Pin to top of Library" in the ⋮ menu of playlists, albums, artists and Spotify playlists. Pinned items
-  show in a Pins row of square cards at the top (Library and Playlists pages); long-press to unpin. Give Spotify
-  playlist rows a ⋮ button.
+- **Pins**: "Pin to top of Library" in the ⋮ menu of playlists, albums, artists, Spotify playlists and Liked songs.
+  Pinned items show in a Pins row of square cards at the top (Library and Playlists pages) and leave the list
+  below. Long-pressing a pin opens that item's own ⋮ menu (which has Unpin). Give Spotify playlist rows a ⋮ button.
+- The ⋮ inside an open playlist and inside Liked songs starts with Play next, Pin to top and Auto-download new
+  songs, so it matches the playlist's menu in the Library.
 - Remove the Podcasts, Audiobooks and Local files chips from Library (they have their own tabs).
-- Playlist ⋮ → **Auto-download new songs**: a background job every 6 hours refreshes the playlist from YouTube
-  and downloads anything not yet downloaded; turning it on downloads what's there now.
+- Playlist (or Liked songs) ⋮ → **Auto-download new songs**: a background job every 6 hours refreshes the
+  playlist (or liked songs) from YouTube and downloads anything not yet downloaded; turning it on downloads
+  what's there now.
 
 ## Part 6: Downloads as real files
 
@@ -243,7 +259,7 @@ where to find each feature in the app.
 | 0 | Sets the context and the rules for the whole job | Any project where an AI works on a fork for you |
 | 1 | Builds, signs and publishes a release on every push | Any Android app you want auto-built on GitHub |
 | 2 | Updates from inside the app, and a new icon | Any app you install from GitHub rather than the Play Store |
-| 3 | Side menu, two homes, Features switches, bottom bar editor | Any app with many sections you want to tidy or hide |
+| 3 | Side menu, two homes, Features switches, bottom bar editor, per-tab search | Any app with many sections you want to tidy or hide |
 | 4 | Makes the homes look like the official apps and removes podcasts | Restyling a home feed or filtering content out of it |
 | 5 | Combined library, source logos, pins, auto-download playlists | Any app that mixes content from several services |
 | 6 | Saves downloads as real M4A files in named folders | Getting downloads out of an app into normal files |
@@ -278,19 +294,22 @@ where to find each feature in the app.
 
 ### Part 3: Navigation, homes and features switches
 - **Does:** adds a side menu with everything in it, splits the home into one per music service named after it, and
-  adds a Features page to turn whole sections off and choose what's on the bottom bar. Unwanted integrations are
-  hidden with a flag rather than deleted, so upstream updates still merge.
-- **Reuse:** the "hide with a flag, don't delete" idea and the bottom-bar editor work in any Compose app.
+  adds a Features page to turn whole sections off and choose what's on the bottom bar. A search button in the top
+  bar searches whichever tab you're on, so there's no separate Search tab. Unwanted integrations are hidden with
+  a flag rather than deleted, so upstream updates still merge.
+- **Reuse:** the "hide with a flag, don't delete" idea, the bottom-bar editor and the "search the current tab
+  from the top bar" pattern work in any Compose app.
 
 ### Part 4: Official-looking homes, no podcasts
 - **Does:** orders home rows like the official YouTube Music and Spotify apps, uses larger Spotify-style cards,
-  and filters podcasts out everywhere on the homes.
+  filters podcasts out everywhere on the homes, and keeps the Spotify home's Recently played to Spotify songs.
 - **Reuse:** the "filter a content type out of every feed" instruction is useful anywhere a feed mixes things you
   don't want.
 
 ### Part 5: Library
 - **Does:** one library across YouTube and Spotify with a source logo on each playlist, Spotify-style Pins at the
-  top, and automatic downloading of new songs added to chosen playlists.
+  top (long-press for the item's menu), the same menu items inside playlists and Liked songs, and automatic
+  downloading of new songs added to chosen playlists or liked.
 - **Reuse:** "pin to top" and "auto-download new items every N hours" fit any list-based app.
 
 ### Part 6: Downloads as real files

@@ -49,7 +49,8 @@ where `<n>` is the build number.
 - **Search on every tab.** The search button in the top bar searches the tab you're on: YouTube Music
   from the YouTube home, Spotify from the Spotify home, your library from Library, and podcasts, radio
   stations, Navidrome, your media server, news sources, audiobooks or files on the phone from those tabs.
-  Every search uses the same search bar.
+  Every search uses the same search bar, so Search is no longer a bottom-bar tab (the combined Search
+  screen is still in the side menu).
 - **Features settings.** Settings → Features turns whole sections on or off.
 
 ### Library

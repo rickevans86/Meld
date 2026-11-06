@@ -624,3 +624,4 @@ To see the exact diff at any time:
 - 2026-11-06: Top-bar search on every tab that searches that tab; Spotify home Recently played lists only Spotify songs.
 - 2026-11-07: Removed Search from the bottom bar (each tab has its own search button; Search stays in the side menu).
 - 2026-11-07: Long-press a pin opens its menu; Play next, pin and auto-download in the ⋮ inside playlists and Liked; Liked can be pinned and auto-downloaded.
+- 2026-11-07: prompt.md updated with top-bar search, Spotify Recently played, Search off the bottom bar, pin menus and Liked pin/auto-download.
