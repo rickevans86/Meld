@@ -39,6 +39,8 @@ and re-apply the small edits listed for each upstream file.
   New DAO queries are fine.
 - Don't bump the base version in source. CI appends a build number (`0.9.2.<n>`).
 - Strings go only in `metrolist_strings.xml`.
+- README.md describes Wavelength. Update it with every change that adds, removes or changes a feature,
+  in the same commit as the change.
 - The signing key is never committed. It lives in the `DEBUG_KEYSTORE_BASE64` repository secret, and
   the owner holds a backup. Every release must be signed with this same key, or the in-app update fails.
 
@@ -575,3 +577,4 @@ To see the exact diff at any time:
 - 2026-11-06: Keep listening (continuous song recognition), no duplicate recognised songs, playlist auto-download.
 - 2026-11-06: Episode download on play / delete on finish, download buttons, Downloaded folders; remove items from Android Auto Continue listening.
 - 2026-11-06: Added prompt.md: a single prompt to rebuild Wavelength from Meld, split into reusable Parts with explanations.
+- 2026-11-06: Rewrote README.md for Wavelength (features, download link to this fork, credits); README is now updated with every change.
