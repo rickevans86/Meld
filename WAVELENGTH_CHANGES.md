@@ -6,7 +6,7 @@ the update in or to rebuild these features on top of the new code.
 
 - **Fork:** `rickevans86/Meld`, branch `feat/local-folders`
 - **Upstream:** `FrancescoGrazioso/Meld`, branch `main`
-- **Last upstream commit this is based on:** `fa6e079568f370a8ee72b61d458a15553746b057`
+- **Last upstream commit this is based on:** `8541129108fee8ef6aede0fb37340ae6b853cf67`
 
 > Keep this file up to date: every change to Wavelength should update the matching section below
 > and add a line to the change log at the end.
@@ -540,3 +540,4 @@ To see the exact diff at any time:
 - 2026-11-06: Playlists-as-podcasts picker also lists YouTube account playlists and accepts a pasted playlist link.
 - 2026-11-06: Fixed "New playlist: Recognised songs" (the playlist was created without `bookmarkedAt`, so it was hidden and the setting showed Off).
 - 2026-11-06: "New playlist: Recognised songs" now creates a private playlist on the YouTube account (via `SyncUtils.createPlaylist`, synced) and selects it once created.
+- 2026-11-06: Merged Meld upstream 85411291 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
