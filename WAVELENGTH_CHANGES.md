@@ -208,6 +208,11 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   keep-listening and quick-pick episodes are marked/skipped; Home's "Similar to" rows drop podcast items and rows
   based on an episode; Spotify "Start listening" drops episodes, shows and Wavelength podcast/audiobook items.
 
+- **Playlists shown as podcasts**: Settings → Features → Podcasts → "Playlists to show as podcasts" — a searchable
+  tick list of every playlist (podcast or not). Saved in `PodcastPlaylistsKey` (`constants/PodcastPlaylists.kt`).
+  Ticked playlists appear in the Podcasts tab's Episodes view after followed shows (`LibraryPodcastsScreen`,
+  `LibraryPodcastsViewModel.allPlaylists`) and at the end of Android Auto's Podcasts section (`playlist/<id>`).
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -527,3 +532,4 @@ To see the exact diff at any time:
 - 2026-11-05: Radio (M3U/PLS) and News (OPML) backup and import sections in Backup and restore.
 - 2026-11-05: Fixed a crash when the music service stopped (episode/audiobook position was read from a background thread in `MusicService.onDestroy`).
 - 2026-11-06: Jellyfin / Plex tab; recognised songs auto-added to a chosen playlist; home named YouTube/Spotify; podcasts removed from Speed dial, Similar to and Spotify Start listening.
+- 2026-11-06: Pick any playlists to show in the Podcasts tab and Android Auto Podcasts.

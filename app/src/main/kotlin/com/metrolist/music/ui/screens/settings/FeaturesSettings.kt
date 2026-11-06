@@ -241,6 +241,8 @@ fun FeaturesSettings(navController: NavController) {
         )
         Spacer(Modifier.height(16.dp))
         RecognisedSongsSetting()
+        Spacer(Modifier.height(16.dp))
+        PodcastPlaylistsSetting()
     }
 
     TopAppBar(
@@ -333,5 +335,99 @@ private fun RecognisedChoice(label: String, selected: Boolean, onClick: () -> Un
     ) {
         androidx.compose.material3.RadioButton(selected = selected, onClick = onClick)
         Text(label, modifier = Modifier.padding(start = 8.dp))
+    }
+}
+
+/**
+ * Podcasts: pick any of your playlists (podcast or not) to show in the Podcasts tab and in
+ * Android Auto's Podcasts section. Searchable, with a tick box per playlist.
+ */
+@Composable
+private fun PodcastPlaylistsSetting() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val database = com.metrolist.music.LocalDatabase.current
+    val playlists by database.playlistsByCreateDateAsc().collectAsState(initial = emptyList())
+    val chosen = com.metrolist.music.constants.rememberPodcastPlaylistIds()
+    var choosing by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val chosenCount = chosen.count { id -> playlists.any { it.id == id } }
+
+    Material3SettingsGroup(
+        title = stringResource(R.string.filter_podcasts),
+        items = listOf(
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.podcasts),
+                title = { Text(stringResource(R.string.podcast_playlists_setting)) },
+                description = {
+                    Text(
+                        if (chosenCount == 0) {
+                            stringResource(R.string.podcast_playlists_none)
+                        } else {
+                            androidx.compose.ui.res.pluralStringResource(R.plurals.podcast_playlists_count, chosenCount, chosenCount)
+                        },
+                    )
+                },
+                onClick = { choosing = true },
+            ),
+        ),
+    )
+
+    if (choosing) {
+        val shown = playlists.filter { query.isBlank() || it.playlist.name.contains(query.trim(), ignoreCase = true) }
+            // Ticked playlists first, then the rest A–Z
+            .sortedWith(compareBy({ it.id !in chosen }, { it.playlist.name.lowercase() }))
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text(stringResource(R.string.podcast_playlists_setting)) },
+            text = {
+                Column {
+                    Text(
+                        stringResource(R.string.podcast_playlists_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    androidx.compose.material3.OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.podcast_playlists_search)) },
+                        leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    )
+                    androidx.compose.foundation.lazy.LazyColumn(Modifier.height(360.dp)) {
+                        items(shown.size, key = { shown[it].id }) { index ->
+                            val playlist = shown[index]
+                            val ticked = playlist.id in chosen
+                            Row(
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        scope.launch {
+                                            com.metrolist.music.constants.setPodcastPlaylist(context, playlist.id, !ticked)
+                                        }
+                                    }
+                                    .padding(vertical = 4.dp),
+                            ) {
+                                androidx.compose.material3.Checkbox(
+                                    checked = ticked,
+                                    onCheckedChange = { on ->
+                                        scope.launch { com.metrolist.music.constants.setPodcastPlaylist(context, playlist.id, on) }
+                                    },
+                                )
+                                com.metrolist.music.ui.component.playlistSourceOf(playlist)?.let {
+                                    com.metrolist.music.ui.component.PlaylistSourceLogo(it, size = 16.dp, modifier = Modifier.padding(end = 6.dp))
+                                }
+                                Text(playlist.playlist.name, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { choosing = false }) { Text(stringResource(R.string.podcast_playlists_done)) }
+            },
+        )
     }
 }

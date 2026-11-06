@@ -1505,4 +1505,13 @@
     <string name="media_server_refresh">Refresh</string>
     <string name="media_server_favourites">Favourites</string>
     <string name="media_server_songs">%d songs</string>
+    <string name="podcast_playlists_setting">Playlists to show as podcasts</string>
+    <string name="podcast_playlists_none">None. Pick any playlist to list it in the Podcasts tab</string>
+    <string name="podcast_playlists_desc">Ticked playlists show in the Podcasts tab and in Android Auto\'s Podcasts section, whether they\'re podcasts or not.</string>
+    <string name="podcast_playlists_search">Search your playlists</string>
+    <string name="podcast_playlists_done">Done</string>
+    <plurals name="podcast_playlists_count">
+        <item quantity="one">%d playlist shown in Podcasts</item>
+        <item quantity="other">%d playlists shown in Podcasts</item>
+    </plurals>
 </resources>

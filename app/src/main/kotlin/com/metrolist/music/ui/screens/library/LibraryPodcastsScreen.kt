@@ -123,6 +123,12 @@ fun LibraryPodcastsScreen(
 
     val subscribedChannels by viewModel.subscribedChannels.collectAsStateWithLifecycle()
     val followedFeedsUnsorted by viewModel.followedFeeds.collectAsStateWithLifecycle()
+    // Playlists you've marked as podcasts, in the order you chose them
+    val podcastPlaylistIds = com.metrolist.music.constants.rememberPodcastPlaylistIds()
+    val allPlaylists by viewModel.allPlaylists.collectAsStateWithLifecycle()
+    val podcastPlaylists = remember(podcastPlaylistIds, allPlaylists) {
+        podcastPlaylistIds.mapNotNull { id -> allPlaylists.firstOrNull { it.id == id } }
+    }
     // Sort for shows (also used by Android Auto's Podcasts page)
     val (sortName, onSortName) = rememberPreference(
         com.metrolist.music.constants.PodcastShowSortKey,
@@ -348,6 +354,28 @@ fun LibraryPodcastsScreen(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
+                                    .animateItem(),
+                        )
+                    }
+
+                    // Your own playlists marked as podcasts (Settings → Features → Podcasts)
+                    itemsIndexed(
+                        items = podcastPlaylists,
+                        key = { _, playlist -> "podcast_playlist:${playlist.id}" },
+                        contentType = { _, _ -> CONTENT_TYPE_SONG },
+                    ) { _, playlist ->
+                        com.metrolist.music.ui.component.PlaylistListItem(
+                            playlist = playlist,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.browseId != null) {
+                                            navController.navigate("online_playlist/${playlist.playlist.browseId}")
+                                        } else {
+                                            navController.navigate("local_playlist/${playlist.id}")
+                                        }
+                                    }
                                     .animateItem(),
                         )
                     }

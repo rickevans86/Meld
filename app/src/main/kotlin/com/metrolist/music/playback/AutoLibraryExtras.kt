@@ -26,6 +26,7 @@ import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.localfiles.LocalMusicFolders
 import com.metrolist.music.models.toMediaMetadata
 import com.metrolist.music.utils.dataStore
+import com.metrolist.music.constants.podcastPlaylistIds
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -688,7 +689,19 @@ constructor(
         val feeds = followed.map { show ->
             folder("$PODCAST_FEED/${feedKey(show.feedUrl)}", show.title, show.author, show.artworkUrl?.toUri())
         }
-        return listOf(newEpisodes, saved) + com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed)
+        // Your playlists marked as podcasts (Settings → Features → Podcasts) come after your shows
+        val markedIds = context.dataStore.data.first().podcastPlaylistIds()
+        val allPlaylists = database.playlistsByCreateDateAsc().first()
+        val marked = markedIds.mapNotNull { id -> allPlaylists.firstOrNull { it.id == id } }.map { playlist ->
+            folder(
+                "${MusicService.PLAYLIST}/${playlist.id}",
+                playlist.playlist.name,
+                context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
+                playlist.thumbnails.firstOrNull()?.toUri(),
+                MediaMetadata.MEDIA_TYPE_PLAYLIST,
+            )
+        }
+        return listOf(newEpisodes, saved) + com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed) + marked
     }
 
     private fun followedFeed(key: String) =
