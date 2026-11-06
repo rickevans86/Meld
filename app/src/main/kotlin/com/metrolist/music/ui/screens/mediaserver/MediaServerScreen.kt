@@ -252,13 +252,13 @@ private fun Browser(viewModel: MediaServerViewModel) {
     val busy by viewModel.signingIn.collectAsState()
     val current by playerConnection.mediaMetadata.collectAsState()
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState(initial = false)
-    var query by rememberSaveable { mutableStateOf("") }
+    // Typed in the top-bar search (search button on this tab); Back closes it from the top bar
+    val query = com.metrolist.music.ui.component.rememberPageSearchQuery("media_server")
+    com.metrolist.music.ui.component.PageSearchEffect(query) {
+        if (it.isBlank()) viewModel.clearSearch() else viewModel.search(it)
+    }
 
     BackHandler(enabled = pages.isNotEmpty()) { viewModel.back() }
-    BackHandler(enabled = pages.isEmpty() && search != null) {
-        query = ""
-        viewModel.clearSearch()
-    }
 
     fun LazyListScope.songs(songs: List<Song>, queueTitle: String) {
         itemsIndexed(songs, key = { _, song -> "song:${song.id}" }) { index, song ->
@@ -330,19 +330,6 @@ private fun Browser(viewModel: MediaServerViewModel) {
                     IconButton(onClick = viewModel::refresh) { Icon(painterResource(R.drawable.sync), contentDescription = stringResource(R.string.media_server_refresh)) }
                     TextButton(onClick = viewModel::signOut) { Text(stringResource(R.string.subsonic_sign_out)) }
                 }
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = {
-                        query = it
-                        if (it.isBlank()) viewModel.clearSearch()
-                    },
-                    singleLine = true,
-                    placeholder = { Text(stringResource(R.string.media_server_search)) },
-                    leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { viewModel.search(query) }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MediaServerTab.entries
                         .filter { it != MediaServerTab.FAVOURITES || viewModel.hasFavourites }
@@ -350,7 +337,7 @@ private fun Browser(viewModel: MediaServerViewModel) {
                             FilterChip(
                                 selected = tab == option && search == null,
                                 onClick = {
-                                    query = ""
+                                    com.metrolist.music.ui.component.PageSearch.close()
                                     viewModel.clearSearch()
                                     viewModel.selectTab(option)
                                 },

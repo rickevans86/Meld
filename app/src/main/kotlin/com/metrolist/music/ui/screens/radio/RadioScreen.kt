@@ -78,7 +78,12 @@ fun RadioScreen(
     val error by viewModel.error.collectAsState()
     val nowPlaying by viewModel.nowPlaying.collectAsState()
     val current by playerConnection.mediaMetadata.collectAsState()
-    var query by rememberSaveable { mutableStateOf("") }
+    // Typed in the top-bar search (search button on this tab)
+    val query = com.metrolist.music.ui.component.rememberPageSearchQuery("radio")
+    com.metrolist.music.ui.component.PageSearchEffect(query) {
+        // Clearing the search goes back to Popular, unless a chip was picked meanwhile
+        if (it.isNotBlank() || viewModel.list.value is RadioList.Search) viewModel.search(it)
+    }
     var addDialogLink by rememberSaveable { mutableStateOf<String?>(null) }
     val shown = if (list is RadioList.Favourites) favourites else stations
     val pastedLink = com.metrolist.music.podcasts.PodcastDirectory.linkIn(query)
@@ -91,7 +96,7 @@ fun RadioScreen(
                 viewModel.addCustom(name, link) { error ->
                     if (error == null) {
                         addDialogLink = null
-                        query = ""
+                        com.metrolist.music.ui.component.PageSearch.close()
                     } else {
                         onError(error)
                     }
@@ -105,48 +110,36 @@ fun RadioScreen(
         contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         modifier = Modifier.fillMaxSize(),
     ) {
-        item(key = "search") {
-            OutlinedTextField(
-                value = query,
-                onValueChange = {
-                    query = it
-                    viewModel.search(it)
-                },
-                singleLine = true,
-                placeholder = { Text(stringResource(R.string.radio_search_hint)) },
-                leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
-                trailingIcon = {
-                    IconButton(onClick = { addDialogLink = "" }) {
-                        Icon(painterResource(R.drawable.add), contentDescription = stringResource(R.string.radio_add_station))
-                    }
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
         item(key = "chips") {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp),
             ) {
+                item {
+                    androidx.compose.material3.AssistChip(
+                        onClick = { addDialogLink = "" },
+                        label = { Text(stringResource(R.string.radio_add_station)) },
+                        leadingIcon = { Icon(painterResource(R.drawable.add), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    )
+                }
                 item {
                     FilterChip(
                         selected = list is RadioList.Favourites,
-                        onClick = { query = ""; viewModel.show(RadioList.Favourites) },
+                        onClick = { com.metrolist.music.ui.component.PageSearch.close(); viewModel.show(RadioList.Favourites) },
                         label = { Text(stringResource(R.string.radio_favourites)) },
                     )
                 }
                 item {
                     FilterChip(
                         selected = list is RadioList.Popular,
-                        onClick = { query = ""; viewModel.show(RadioList.Popular) },
+                        onClick = { com.metrolist.music.ui.component.PageSearch.close(); viewModel.show(RadioList.Popular) },
                         label = { Text(stringResource(R.string.radio_popular)) },
                     )
                 }
                 items(RadioViewModel.GENRES) { (tag, label) ->
                     FilterChip(
                         selected = (list as? RadioList.Genre)?.tag == tag,
-                        onClick = { query = ""; viewModel.show(RadioList.Genre(tag, label)) },
+                        onClick = { com.metrolist.music.ui.component.PageSearch.close(); viewModel.show(RadioList.Genre(tag, label)) },
                         label = { Text(label) },
                     )
                 }

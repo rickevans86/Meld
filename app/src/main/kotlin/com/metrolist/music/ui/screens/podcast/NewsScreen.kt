@@ -65,6 +65,8 @@ fun NewsScreen(
     val enabledKeys = enabled.map { it.source.key }
     val sortedSources by viewModel.sortedEnabled.collectAsState()
     val sortSetting by viewModel.sort.collectAsState()
+    // Typed in the top-bar search: shows only sources or bulletins that match
+    val query = com.metrolist.music.ui.component.rememberPageSearchQuery("news")
 
     LaunchedEffect(enabledKeys) { if (enabledKeys.isNotEmpty()) viewModel.refresh() }
 
@@ -118,7 +120,20 @@ fun NewsScreen(
                 )
             }
         }
-        items(sortedSources.mapNotNull { s -> enabled.firstOrNull { it.source.key == s.key } }, key = { it.source.key }) { choice ->
+        val shownChoices = sortedSources.mapNotNull { s -> enabled.firstOrNull { it.source.key == s.key } }.filter { choice ->
+            com.metrolist.music.ui.component.matchesSearch(query, choice.source.name, bulletins[choice.source.key]?.song?.song?.title)
+        }
+        if (query.isNotBlank() && shownChoices.isEmpty() && enabled.isNotEmpty()) {
+            item(key = "no_match") {
+                Text(
+                    stringResource(R.string.page_search_no_match),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                )
+            }
+        }
+        items(shownChoices, key = { it.source.key }) { choice ->
             val loaded = choice.source.key in bulletins
             val bulletin = bulletins[choice.source.key]
             val isCurrent = bulletin != null && currentId?.id == bulletin.song.id

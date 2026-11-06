@@ -1553,4 +1553,10 @@
     <string name="episode_delete_on_finish">Delete episodes after finishing</string>
     <string name="episode_delete_on_finish_desc">Removes an episode\'s download once it has played to the end</string>
     <string name="auto_downloaded_episodes">Downloaded</string>
+    <!-- Wavelength: top-bar search on each tab -->
+    <string name="search_spotify_hint">Search Spotify…</string>
+    <string name="page_search_news">Search news sources…</string>
+    <string name="page_search_audiobooks">Search audiobooks…</string>
+    <string name="page_search_local_files">Search files on this phone…</string>
+    <string name="page_search_no_match">Nothing matches your search.</string>
 </resources>

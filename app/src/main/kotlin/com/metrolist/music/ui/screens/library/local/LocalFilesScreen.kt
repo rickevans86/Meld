@@ -127,8 +127,22 @@ fun LocalFilesScreen(
     var folderView by rememberPreference(LocalFilesFolderViewKey, false)
     var openFolderPath by rememberSaveable { mutableStateOf<String?>(null) }
     val openFolder = if (folderView) folders.find { it.path == openFolderPath } else null
-    val showFolderList = folderView && openFolder == null
-    val visibleSongs = openFolder?.songs ?: songs
+    // Typed in the top-bar search on the Local files tab: shows matching songs from every folder
+    val query = com.metrolist.music.ui.component.rememberPageSearchQuery("local_files")
+    val searching = query.isNotBlank()
+    val showFolderList = folderView && openFolder == null && !searching
+    val visibleSongs = if (searching) {
+        songs.filter { song ->
+            com.metrolist.music.ui.component.matchesSearch(
+                query,
+                song.song.title,
+                song.artists.joinToString { it.name },
+                song.album?.title,
+            )
+        }
+    } else {
+        openFolder?.songs ?: songs
+    }
     val queueTitle = openFolder?.let { folderDisplayName(it) } ?: stringResource(R.string.local_files)
 
     Box(modifier = Modifier.fillMaxSize()) {

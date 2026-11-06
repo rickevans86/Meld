@@ -39,12 +39,17 @@ where `<n>` is the build number.
 - **Official-style home pages.** The YouTube Music and Spotify homes are laid out like the official apps
   (speed dial, quick picks, "Start listening", your playlists, new releases). The home tab is named after
   its source, so it reads "YouTube" or "Spotify" instead of "Home".
+- **Spotify Recently played** on the Spotify home only lists songs you played from Spotify.
 - **No podcasts on the music homes.** Podcasts and audiobooks are filtered out of the home rows, speed
   dial, "Similar to" and Spotify's "Start listening", because they have their own tab.
 - **Editable bottom bar.** Choose up to 6 tabs and their order in Settings → Features → Bottom bar.
   Choices: YouTube or Spotify home, Search, Library, Podcasts, News, Audiobooks, Radio, Navidrome, Media
   server and Local files.
 - **Side drawer.** Every section is always reachable from the side menu, even if it isn't on the bottom bar.
+- **Search on every tab.** The search button in the top bar searches the tab you're on: YouTube Music
+  from the YouTube home, Spotify from the Spotify home, your library from Library, and podcasts, radio
+  stations, Navidrome, your media server, news sources, audiobooks or files on the phone from those tabs.
+  Every search uses the same search bar.
 - **Features settings.** Settings → Features turns whole sections on or off.
 
 ### Library

@@ -183,11 +183,13 @@ private fun Browser(viewModel: SubsonicViewModel) {
     val pages by viewModel.pages.collectAsState()
     val current by playerConnection.mediaMetadata.collectAsState()
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState(initial = false)
-    var query by rememberSaveable { mutableStateOf("") }
+    // Typed in the top-bar search (search button on this tab)
+    val query = com.metrolist.music.ui.component.rememberPageSearchQuery("subsonic")
+    com.metrolist.music.ui.component.PageSearchEffect(query) { viewModel.search(it) }
 
     BackHandler(enabled = pages.isNotEmpty()) { viewModel.back() }
-    // In the Folders tab, Back goes up one folder before leaving the screen
-    BackHandler(enabled = pages.isEmpty() && tab == SubsonicTab.FOLDERS && folderPath.isNotEmpty()) { viewModel.folderUp() }
+    // In the Folders tab, Back goes up one folder before leaving the screen (Back closes a search first)
+    BackHandler(enabled = pages.isEmpty() && query.isBlank() && tab == SubsonicTab.FOLDERS && folderPath.isNotEmpty()) { viewModel.folderUp() }
 
     fun LazyListScope.songs(songs: List<Song>, queueTitle: String) {
         itemsIndexed(songs, key = { _, song -> "song:${song.id}" }) { index, song ->
@@ -268,20 +270,6 @@ private fun Browser(viewModel: SubsonicViewModel) {
                 TextButton(onClick = viewModel::signOut) { Text(stringResource(R.string.subsonic_sign_out)) }
             }
         }
-        item(key = "search") {
-            OutlinedTextField(
-                value = query,
-                onValueChange = {
-                    query = it
-                    viewModel.search(it)
-                },
-                singleLine = true,
-                placeholder = { Text(stringResource(R.string.subsonic_search_hint)) },
-                leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
-
         val results = search
         if (query.isNotBlank() && results != null) {
             if (results.artists.isEmpty() && results.albums.isEmpty() && results.songs.isEmpty()) {

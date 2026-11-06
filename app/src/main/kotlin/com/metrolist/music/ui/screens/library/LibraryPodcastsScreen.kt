@@ -266,7 +266,8 @@ fun LibraryPodcastsScreen(
                     onSelect = { onSortName(it.name) },
                     onReversedChange = onSortReversed,
                 )
-                IconButton(onClick = { navController.navigate("podcast_directory") }) {
+                // On the Podcasts tab, search is the top-bar search button; inside Library it stays here
+                if (onDeselect != null) IconButton(onClick = { navController.navigate("podcast_directory") }) {
                     Icon(
                         painter = painterResource(R.drawable.search),
                         contentDescription = stringResource(R.string.podcast_directory),

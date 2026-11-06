@@ -101,7 +101,13 @@ fun AudiobookshelfContent(
     val openBook by viewModel.openBook.collectAsState()
     val downloads by viewModel.downloads.collectAsState()
     val downloadedBooks by viewModel.downloadedBooks.collectAsState()
-    var query by rememberSaveable { mutableStateOf("") }
+    var inlineQuery by rememberSaveable { mutableStateOf("") }
+    // On the Audiobooks tab the search is the top-bar search button; elsewhere (Library) it stays in the page
+    val navRoute = com.metrolist.music.LocalNavController.current.currentBackStackEntry?.destination?.route
+    val onAudiobooksTab = navRoute == "audiobooks"
+    val pageQuery = com.metrolist.music.ui.component.rememberPageSearchQuery("audiobooks")
+    com.metrolist.music.ui.component.PageSearchEffect(pageQuery) { if (onAudiobooksTab) viewModel.search(it) }
+    val query = if (onAudiobooksTab) pageQuery else inlineQuery
     val listState = rememberLazyListState()
 
     val playingItemId = mediaMetadata?.id?.takeIf(::isAbsTrackId)?.removePrefix("audiobook:abs:")?.substringBeforeLast(':')
@@ -249,11 +255,11 @@ fun AudiobookshelfContent(
             }
         }
 
-        item(key = "search") {
+        if (!onAudiobooksTab) item(key = "search") {
             OutlinedTextField(
-                value = query,
+                value = inlineQuery,
                 onValueChange = {
-                    query = it
+                    inlineQuery = it
                     viewModel.search(it)
                 },
                 singleLine = true,

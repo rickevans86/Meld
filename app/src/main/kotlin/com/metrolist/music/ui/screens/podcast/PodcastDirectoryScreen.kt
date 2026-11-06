@@ -128,51 +128,59 @@ fun PodcastDirectoryScreen(
         }
     }
 
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+    // Same search top bar as every other tab's search
+    if (page == null) {
+        com.metrolist.music.ui.component.SearchTopBar(
+            query = query,
+            onQueryChange = {
+                query = it
+                viewModel.search(it)
+            },
+            placeholder = stringResource(R.string.podcast_search_hint),
+            onBack = { navController.navigateUp() },
+            onSearch = { viewModel.search(it) },
+            colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            ),
+            actions = {
+                if (searching) {
+                    CircularProgressIndicator(modifier = Modifier.padding(horizontal = 12.dp).size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    PlainIconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val pasted = clipboard.primaryClip?.takeIf { it.itemCount > 0 }
+                                ?.getItemAt(0)?.coerceToText(context)?.toString()?.trim()
+                            if (pasted.isNullOrEmpty()) {
+                                Toast.makeText(context, R.string.podcast_clipboard_empty, Toast.LENGTH_SHORT).show()
+                            } else {
+                                query = pasted
+                                viewModel.search(pasted)
+                            }
+                        },
+                    ) {
+                        Icon(painterResource(R.drawable.content_paste), contentDescription = stringResource(R.string.podcast_paste))
+                    }
+                }
+            },
+        )
+    }
     LazyColumn(
         state = listState,
         contentPadding = LocalPlayerAwareWindowInsets.current
-            .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom + WindowInsetsSides.Top)
+            .only(
+                if (page == null) {
+                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+                } else {
+                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom + WindowInsetsSides.Top
+                },
+            )
             .asPaddingValues(),
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.weight(1f).fillMaxWidth(),
     ) {
         when (val current = page) {
             null -> {
-                item(key = "search") {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = {
-                            query = it
-                            viewModel.search(it)
-                        },
-                        singleLine = true,
-                        placeholder = { Text(stringResource(R.string.podcast_search_hint)) },
-                        trailingIcon = {
-                            if (searching) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            } else {
-                                PlainIconButton(
-                                    onClick = {
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val pasted = clipboard.primaryClip?.takeIf { it.itemCount > 0 }
-                                            ?.getItemAt(0)?.coerceToText(context)?.toString()?.trim()
-                                        if (pasted.isNullOrEmpty()) {
-                                            Toast.makeText(context, R.string.podcast_clipboard_empty, Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            query = pasted
-                                            viewModel.search(pasted)
-                                        }
-                                    },
-                                ) {
-                                    Icon(painterResource(R.drawable.content_paste), contentDescription = stringResource(R.string.podcast_paste))
-                                }
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
                 val found = results
                 if (query.isNotBlank() && found != null) {
                     if (found.isEmpty()) item(key = "no_results") { Hint(stringResource(R.string.podcast_no_results)) }
@@ -308,8 +316,10 @@ fun PodcastDirectoryScreen(
             }
         }
     }
+    }
 
-    TopAppBar(
+    // A show's page keeps its title bar; the search list uses the search top bar above
+    if (page != null) TopAppBar(
         title = {
             Text(
                 page?.title?.ifBlank { null } ?: stringResource(R.string.podcast_directory),

@@ -62,6 +62,9 @@ constructor(
 
     val spotifyYouTubeMapper = SpotifyYouTubeMapper(database)
     val query = SearchRoutes.decodeQuery(savedStateHandle.get<String>("query").orEmpty())
+
+    /** "youtube" or "spotify" when searching from that home tab's top bar; null follows the setting. */
+    val forcedSource: String? = savedStateHandle.get<String>("source")
     val filter = MutableStateFlow<YouTube.SearchFilter?>(null)
     var summaryPage by mutableStateOf<SearchSummaryPage?>(null)
     val viewStateMap = mutableStateMapOf<String, ItemsPage?>()
@@ -162,7 +165,11 @@ constructor(
         val enabled = prefs[EnableSpotifyKey] ?: false
         val useForSearch = prefs[UseSpotifySearchKey] ?: false
         val hasToken = (prefs[SpotifyAccessTokenKey] ?: "").isNotEmpty()
-        return enabled && useForSearch && hasToken
+        return when (forcedSource) {
+            "youtube" -> false
+            "spotify" -> enabled && hasToken
+            else -> enabled && useForSearch && hasToken
+        }
     }
 
     private fun initYouTubeSearch() {

@@ -188,7 +188,7 @@ fun OnlineSearchResult(
                     isSearchFocused = false
                     focusManager.clearFocus()
 
-                    navController.navigate(SearchRoutes.resultRoute(searchQuery)) {
+                    navController.navigate(SearchRoutes.resultRoute(searchQuery, viewModel.forcedSource)) {
                         popUpTo(SearchRoutes.ROUTE) {
                             inclusive = true
                         }

@@ -124,6 +124,8 @@ private fun DeviceAudiobooks(
     val openBookId by viewModel.openBookId.collectAsState()
     val detail by viewModel.detail.collectAsState()
     val lazyListState = rememberLazyListState()
+    // Typed in the top-bar search on the Audiobooks tab: shows only matching books
+    val query = com.metrolist.music.ui.component.rememberPageSearchQuery("audiobooks")
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -241,7 +243,10 @@ private fun DeviceAudiobooks(
             }
         }
 
-        items(summaries, key = { it.book.id }) { summary ->
+        items(
+            summaries.filter { com.metrolist.music.ui.component.matchesSearch(query, it.book.title, it.book.author) },
+            key = { it.book.id },
+        ) { summary ->
             BookRow(
                 summary = summary,
                 onClick = { viewModel.openBookId.value = summary.book.id },

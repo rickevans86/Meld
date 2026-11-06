@@ -106,6 +106,23 @@ fun NavGraphBuilder.navigationBuilder(
         LibraryScreen()
     }
 
+    // Top-bar search on the home and library tabs: searches only that tab's source
+    // (youtube, spotify or library), in the same layout as the Search tab
+    composable(
+        route = "page_search/{scope}",
+        arguments = listOf(navArgument("scope") { type = NavType.StringType }),
+    ) { backStackEntry ->
+        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
+        val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
+        val isSystemInDarkTheme = isSystemInDarkTheme()
+        val useDarkTheme = if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
+        SearchScreen(
+            pureBlack = pureBlackEnabled && useDarkTheme,
+            savedStateHandle = backStackEntry.savedStateHandle,
+            scope = backStackEntry.arguments?.getString("scope"),
+        )
+    }
+
     // The home that isn't the default one (YouTube or Spotify), opened from the side menu
     composable(
         route = "home_alt",
@@ -212,11 +229,16 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable(
-        route = "search/{query}",
+        route = com.metrolist.music.utils.SearchRoutes.ROUTE,
         arguments =
             listOf(
                 navArgument("query") {
                     type = NavType.StringType
+                },
+                navArgument("source") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 },
             ),
         enterTransition = {

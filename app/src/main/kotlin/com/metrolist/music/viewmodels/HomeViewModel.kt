@@ -542,11 +542,21 @@ class HomeViewModel @Inject constructor(
         val isSpotifyOnly = spotifyPage
 
         // Local play history — always loaded regardless of Spotify mode
-        recentlyPlayed.value = database.events().first()
+        val history = database.events().first()
             .distinctBy { it.song.id }
-            .take(40)
             .map { it.song }
-            .filterVideoSongs(hideVideoSongs)
+        recentlyPlayed.value = if (spotifyPage) {
+            // Spotify page: only songs that were played from Spotify (they have a Spotify match),
+            // not YouTube videos, podcasts or other sources
+            val fromSpotify = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                history.take(300).map { it.id }.chunked(500).flatMap { ids ->
+                    runCatching { database.getSpotifyMatchesByYouTubeIds(ids) }.getOrDefault(emptyList())
+                }.map { it.youtubeId }.toSet()
+            }
+            history.filter { it.id in fromSpotify && !it.song.isEpisode }.take(40)
+        } else {
+            history.take(40)
+        }.filterVideoSongs(hideVideoSongs)
 
         // When Spotify-only mode is active, skip all YouTube-based content
         if (!isSpotifyOnly) {

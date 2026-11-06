@@ -8,15 +8,16 @@ package com.metrolist.music.utils
 import android.net.Uri
 
 object SearchRoutes {
-    const val ROUTE = "search/{query}"
+    // Wavelength: optional ?source=youtube|spotify forces where the search goes (top-bar search on a home tab)
+    const val ROUTE = "search/{query}?source={source}"
 
     // Prefix query payloads so a literal "null" search is not confused with
     // an absent or undefined Navigation argument.
     private const val QUERY_ROUTE_PREFIX = "__metrolist_search_query__"
 
     // Encode the prefixed query as a route path segment before navigating.
-    fun resultRoute(query: String): String =
-        "search/${Uri.encode(QUERY_ROUTE_PREFIX + query)}"
+    fun resultRoute(query: String, source: String? = null): String =
+        "search/${Uri.encode(QUERY_ROUTE_PREFIX + query)}" + (source?.let { "?source=$it" } ?: "")
 
     // Navigation already decodes path segments once, so only strip the prefix.
     // Decoding again would turn literal input like "%2F" into "/".

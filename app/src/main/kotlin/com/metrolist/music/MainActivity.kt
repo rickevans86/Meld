@@ -1069,6 +1069,31 @@ class MainActivity : FragmentActivity() {
                         !(pauseListenHistory && eventCount == 0)
                     }
 
+                // Top-bar search: searches whichever tab it's opened on
+                val pageSearchRoute by com.metrolist.music.ui.component.PageSearch.route.collectAsStateWithLifecycle()
+                val pageSearchQuery by com.metrolist.music.ui.component.PageSearch.query.collectAsStateWithLifecycle()
+                val pageSearchOpen = pageSearchRoute != null && pageSearchRoute == currentRoute
+                LaunchedEffect(currentRoute) {
+                    if (com.metrolist.music.ui.component.PageSearch.route.value.let { it != null && it != currentRoute }) {
+                        com.metrolist.music.ui.component.PageSearch.close()
+                    }
+                }
+                val searchableRoutes = remember {
+                    setOf(Screens.Home.route, "home_alt", Screens.Library.route, Screens.Podcasts.route) +
+                        com.metrolist.music.ui.component.PageSearch.inPageRoutes
+                }
+                fun openTabSearch() {
+                    val route = currentRoute ?: return
+                    val spotifyIsDefault = defaultHomeSource == com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
+                    when (route) {
+                        Screens.Home.route -> navController.navigate("page_search/" + if (spotifyIsDefault) "spotify" else "youtube")
+                        "home_alt" -> navController.navigate("page_search/" + if (spotifyIsDefault) "youtube" else "spotify")
+                        Screens.Library.route -> navController.navigate("page_search/library")
+                        Screens.Podcasts.route -> navController.navigate("podcast_directory")
+                        else -> com.metrolist.music.ui.component.PageSearch.open(route)
+                    }
+                }
+
                 val baseBg = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
                 val artistNameAliases by ArtistNameAliases.aliases.collectAsStateWithLifecycle()
 
@@ -1092,6 +1117,7 @@ class MainActivity : FragmentActivity() {
                     val drawerState = rememberDrawerState(DrawerValue.Closed)
                     val drawerScope = rememberCoroutineScope()
                     BackHandler(enabled = drawerState.isOpen) { drawerScope.launch { drawerState.close() } }
+                    BackHandler(enabled = pageSearchOpen && !drawerState.isOpen) { com.metrolist.music.ui.component.PageSearch.close() }
                     ModalNavigationDrawer(
                         drawerState = drawerState,
                         // Swiping only closes it, so the left-edge back gesture keeps working
@@ -1123,20 +1149,51 @@ class MainActivity : FragmentActivity() {
                                     Row {
                                         TopAppBar(
                                             navigationIcon = {
-                                                IconButton(onClick = { drawerScope.launch { drawerState.open() } }) {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.menu),
-                                                        contentDescription = stringResource(R.string.open_menu),
-                                                    )
+                                                if (pageSearchOpen) {
+                                                    IconButton(onClick = { com.metrolist.music.ui.component.PageSearch.close() }) {
+                                                        Icon(
+                                                            painter = painterResource(R.drawable.arrow_back),
+                                                            contentDescription = stringResource(R.string.dismiss),
+                                                        )
+                                                    }
+                                                } else {
+                                                    IconButton(onClick = { drawerScope.launch { drawerState.open() } }) {
+                                                        Icon(
+                                                            painter = painterResource(R.drawable.menu),
+                                                            contentDescription = stringResource(R.string.open_menu),
+                                                        )
+                                                    }
                                                 }
                                             },
                                             title = {
-                                                Text(
-                                                    text = currentTitleRes?.let { stringResource(it) } ?: "",
-                                                    style = MaterialTheme.typography.titleLarge,
-                                                )
+                                                if (pageSearchOpen) {
+                                                    com.metrolist.music.ui.component.SearchBarField(
+                                                        query = pageSearchQuery,
+                                                        onQueryChange = com.metrolist.music.ui.component.PageSearch::setQuery,
+                                                        placeholder = stringResource(com.metrolist.music.ui.component.PageSearch.hintFor(pageSearchRoute)),
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        text = currentTitleRes?.let { stringResource(it) } ?: "",
+                                                        style = MaterialTheme.typography.titleLarge,
+                                                    )
+                                                }
                                             },
-                                            actions = {
+                                            actions = actions@{
+                                                if (pageSearchOpen) {
+                                                    com.metrolist.music.ui.component.SearchBarClearButton(pageSearchQuery) {
+                                                        com.metrolist.music.ui.component.PageSearch.setQuery("")
+                                                    }
+                                                    return@actions
+                                                }
+                                                if (currentRoute in searchableRoutes) {
+                                                    IconButton(onClick = { openTabSearch() }) {
+                                                        Icon(
+                                                            painter = painterResource(R.drawable.search),
+                                                            contentDescription = stringResource(R.string.search),
+                                                        )
+                                                    }
+                                                }
                                                 if (showHistoryButton) {
                                                     IconButton(onClick = { navController.navigate("history") }) {
                                                         Icon(

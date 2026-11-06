@@ -250,6 +250,31 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   `AutoLibraryExtras.ContinueHiddenKey` holds keys ("ep:<song>", "book:<id>@<progress time>", "abs:<id>");
   an episode is un-hidden when played again, an on-phone audiobook when its progress changes.
 
+### 0c-7. Top-bar search for each tab, Spotify-only Recently played
+- **Recently played on the Spotify home** only lists songs played from Spotify: `HomeViewModel.load()` keeps
+  history songs that have a row in `spotify_match` (`getSpotifyMatchesByYouTubeIds`, on IO) and drops
+  episodes. The YouTube home is unchanged.
+- **Search button in the top bar** (before History) on Home, the other home, Library, Podcasts, Radio,
+  Navidrome, Media server, News, Audiobooks and Local files. It searches the tab it's pressed on:
+  - YouTube home / Spotify home / Library → route `page_search/{scope}` (`scope` = `youtube`, `spotify`,
+    `library`), which is the normal `SearchScreen` with a `scope` parameter: the source is fixed (the
+    Search tab's online/library choice isn't changed and its toggle is hidden), and the hint says which.
+    Results go to `search/{query}?source=youtube|spotify` (`SearchRoutes.ROUTE` and `resultRoute(query,
+    source)`); `OnlineSearchViewModel.forcedSource` makes `shouldUseSpotifySearch()` use Spotify (when
+    signed in) or YouTube regardless of the "Use Spotify for search" setting. Searches made from the result
+    screen keep the same source.
+  - Podcasts → `podcast_directory`, whose search field is now a `SearchTopBar` (paste button and progress
+    in its actions). The in-page search icon stays only when podcasts are shown inside Library.
+  - Radio, Navidrome, Media server, News, Audiobooks, Local files → the top bar itself turns into the search
+    field (`ui/component/PageSearch.kt`: `PageSearch.open/close/setQuery`, `rememberPageSearchQuery(route)`,
+    `PageSearchEffect` for search-as-you-type with a 400 ms pause, `matchesSearch`). Back or the arrow
+    closes it; changing tab closes it. Radio, Navidrome, Media server and Audiobookshelf send the text to
+    their existing `search()`; News, device audiobooks and Local files filter what's on screen. Their old
+    in-page search boxes were removed (Radio's "Add station" moved to a chip; Audiobookshelf keeps its box
+    when shown inside Library).
+- All search bars share `SearchBarField` / `SearchBarClearButton` / `SearchTopBar` so they look like the
+  Search tab's bar (back arrow, text, clear ✕).
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -507,6 +532,8 @@ These are the files that can conflict during a merge, and what to re-apply in ea
 | `ui/screens/settings/AppearanceSettings.kt` | Audiobooks filter label |
 | `ui/screens/settings/StorageSettings.kt` | Download folder, playlist folders and music folders settings |
 | `utils/Updater.kt` | Fork repo URL |
+| `utils/SearchRoutes.kt` | Optional `?source=` on the result route (`ROUTE`, `resultRoute(query, source)`) |
+| `ui/screens/search/SearchScreen.kt`, `OnlineSearchResult.kt`, `viewmodels/OnlineSearchViewModel.kt` | `scope` / `forcedSource` for top-bar search (see 0c-7) |
 | `viewmodels/LibraryViewModels.kt` | `followedFeeds` in `LibraryPodcastsViewModel` |
 | `viewmodels/LocalFilesViewModel.kt` | Folder filter, de-duplication, picked folders (large change) |
 | `spotify/Spotify.kt` | `myShows()` |
@@ -578,3 +605,4 @@ To see the exact diff at any time:
 - 2026-11-06: Episode download on play / delete on finish, download buttons, Downloaded folders; remove items from Android Auto Continue listening.
 - 2026-11-06: Added prompt.md: a single prompt to rebuild Wavelength from Meld, split into reusable Parts with explanations.
 - 2026-11-06: Rewrote README.md for Wavelength (features, download link to this fork, credits); README is now updated with every change.
+- 2026-11-06: Top-bar search on every tab that searches that tab; Spotify home Recently played lists only Spotify songs.
