@@ -2817,6 +2817,15 @@ class MusicService :
     }
 
     /** Radio play counts and Subsonic "now playing" / scrobbles when the track changes. */
+    /** Deletes a finished episode's download (Settings → Features → Podcasts → Delete after finishing). */
+    private fun deleteFinishedEpisode(episodeId: String) {
+        scope.launch {
+            if (!com.metrolist.music.podcasts.EpisodeDownloads.deleteOnFinish(this@MusicService)) return@launch
+            if (downloadUtil.downloads.value[episodeId] == null) return@launch
+            downloadUtil.removeInBackground(episodeId)
+        }
+    }
+
     private fun onWavelengthTransition(mediaItem: MediaItem?) {
         val id = mediaItem?.mediaId
         // A podcast's own playback speed, put back to the earlier speed for anything else
@@ -2831,6 +2840,26 @@ class MusicService :
         }
         radioDirectory.setNowPlaying(id.orEmpty(), null)
         if (com.metrolist.music.constants.isRadioId(id)) radioDirectory.reportPlay(id!!)
+        // Podcast episodes download as soon as they start playing (Settings → Features → Podcasts)
+        val episodeMetadata = mediaItem?.metadata
+        // An episode removed from Android Auto's Continue listening comes back once it's played again
+        if (id != null && episodeMetadata?.isEpisode == true) {
+            scope.launch { AutoLibraryExtras.unhideEpisode(this@MusicService, id) }
+        }
+        if (id != null && !isAudiobookId(id) &&
+            (id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) || episodeMetadata?.isEpisode == true)
+        ) {
+            scope.launch {
+                val state = downloadUtil.downloads.value[id]?.state
+                if (episodeMetadata != null && state != androidx.media3.exoplayer.offline.Download.STATE_COMPLETED &&
+                    state != androidx.media3.exoplayer.offline.Download.STATE_QUEUED &&
+                    state != androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING &&
+                    com.metrolist.music.podcasts.EpisodeDownloads.downloadOnPlay(this@MusicService)
+                ) {
+                    downloadUtil.download(episodeMetadata)
+                }
+            }
+        }
         subsonicScrobbleJob?.cancel()
         if (id != null && com.metrolist.music.constants.isSubsonicId(id)) {
             subsonicRepository.scrobble(id, submission = false)
@@ -2881,6 +2910,7 @@ class MusicService :
                 // A podcast episode played to the end: mark it played and start it fresh next time
                 com.metrolist.music.podcasts.PlayedEpisodes.set(this, episodeId, true)
                 scope.launch(Dispatchers.IO) { database.updatePlaybackPosition(episodeId, null) }
+                deleteFinishedEpisode(episodeId)
             } else if (previousEpisodePosition > 0) {
                 saveEpisodePosition(episodeId, previousEpisodePosition)
             }
@@ -2980,7 +3010,10 @@ class MusicService :
             // The last episode in the queue finished: mark it played too
             player.currentMediaItem?.mediaId
                 ?.takeIf { it.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) || player.currentMetadata?.isEpisode == true }
-                ?.let { com.metrolist.music.podcasts.PlayedEpisodes.set(this, it, true) }
+                ?.let {
+                    com.metrolist.music.podcasts.PlayedEpisodes.set(this, it, true)
+                    deleteFinishedEpisode(it)
+                }
             player.currentMediaItem?.mediaId?.let { mediaId ->
                 scope.launch(Dispatchers.IO) { markCachedIfFullyDownloaded(mediaId) }
             }

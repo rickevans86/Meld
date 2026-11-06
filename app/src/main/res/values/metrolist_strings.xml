@@ -1541,4 +1541,16 @@
         <item quantity="one">%d minute</item>
         <item quantity="other">%d minutes</item>
     </plurals>
+    <string name="continue_manage">Remove items from Continue listening</string>
+    <string name="continue_manage_desc">See what Android Auto\'s Continue listening shows and remove ones you don\'t want. A removed episode comes back if you play it again.</string>
+    <string name="continue_empty">Nothing to continue right now.</string>
+    <string name="continue_remove">Remove</string>
+    <string name="continue_restore">Bring back removed</string>
+    <string name="episode_download">Download episode</string>
+    <string name="episode_delete_download">Delete download</string>
+    <string name="episode_download_on_play">Download episodes when played</string>
+    <string name="episode_download_on_play_desc">Saves an episode on the phone as soon as it starts playing (follows the Wi-Fi-only setting)</string>
+    <string name="episode_delete_on_finish">Delete episodes after finishing</string>
+    <string name="episode_delete_on_finish_desc">Removes an episode\'s download once it has played to the end</string>
+    <string name="auto_downloaded_episodes">Downloaded</string>
 </resources>

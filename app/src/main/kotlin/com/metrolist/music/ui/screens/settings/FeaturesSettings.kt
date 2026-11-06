@@ -446,6 +446,15 @@ private fun PodcastPlaylistsSetting() {
     var link by remember { mutableStateOf("") }
     var online by remember { mutableStateOf<List<com.metrolist.music.constants.YouTubePodcastPlaylist>?>(null) }
     val chosenCount = chosenSaved.count { id -> playlists.any { it.id == id } } + chosenOnline.size
+    // Episode downloads: on play, and delete once finished (both on unless switched off)
+    val (downloadOnPlay, onDownloadOnPlay) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.podcasts.EpisodeDownloads.DownloadOnPlayKey,
+        true,
+    )
+    val (deleteOnFinish, onDeleteOnFinish) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.podcasts.EpisodeDownloads.DeleteOnFinishKey,
+        true,
+    )
     val notFound = stringResource(R.string.podcast_playlists_link_bad)
 
     // Your YouTube account's playlists, loaded when the list opens
@@ -476,6 +485,20 @@ private fun PodcastPlaylistsSetting() {
                     )
                 },
                 onClick = { choosing = true },
+            ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.download),
+                title = { Text(stringResource(R.string.episode_download_on_play)) },
+                description = { Text(stringResource(R.string.episode_download_on_play_desc)) },
+                trailingContent = { Switch(checked = downloadOnPlay, onCheckedChange = onDownloadOnPlay) },
+                onClick = { onDownloadOnPlay(!downloadOnPlay) },
+            ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.delete),
+                title = { Text(stringResource(R.string.episode_delete_on_finish)) },
+                description = { Text(stringResource(R.string.episode_delete_on_finish_desc)) },
+                trailingContent = { Switch(checked = deleteOnFinish, onCheckedChange = onDeleteOnFinish) },
+                onClick = { onDeleteOnFinish(!deleteOnFinish) },
             ),
         ),
     )

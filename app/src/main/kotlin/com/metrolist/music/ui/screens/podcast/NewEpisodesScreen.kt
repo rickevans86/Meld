@@ -128,6 +128,7 @@ fun NewEpisodesScreen(
                     isActive = current?.id == song.id,
                     isPlaying = isPlaying,
                     trailingContent = {
+                        com.metrolist.music.podcasts.EpisodeDownloadButton(song)
                         val isPlayed = song.id in played
                         IconButton(onClick = { com.metrolist.music.podcasts.PlayedEpisodes.set(context, song.id, !isPlayed) }) {
                             Icon(

@@ -5,6 +5,8 @@
 
 package com.metrolist.music.ui.screens.settings
 
+import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -423,6 +425,8 @@ fun AndroidAutoSettings(
         )
 
         Spacer(Modifier.height(27.dp))
+        ContinueListeningManager()
+        Spacer(Modifier.height(27.dp))
     }
 
     TopAppBar(
@@ -439,4 +443,113 @@ fun AndroidAutoSettings(
             }
         },
     )
+}
+
+/**
+ * Settings → Android Auto → Continue listening: shows what Android Auto's Continue listening lists, with
+ * a button to remove each one, and a way to bring removed items back. A removed episode also comes back
+ * by itself once it's played again.
+ */
+@Composable
+private fun ContinueListeningManager() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var open by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var items by remember { androidx.compose.runtime.mutableStateOf<List<com.metrolist.music.playback.AutoLibraryExtras.ContinueItem>?>(null) }
+    val extras = remember(context) {
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            com.metrolist.music.playback.AutoLibraryExtras.Access::class.java,
+        ).autoLibraryExtras()
+    }
+    fun reload() {
+        scope.launch {
+            items = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { extras.continueItems() }.getOrDefault(emptyList())
+            }
+        }
+    }
+
+    Material3SettingsGroup(
+        title = stringResource(R.string.auto_continue_listening),
+        items = listOf(
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.history),
+                title = { Text(stringResource(R.string.continue_manage)) },
+                description = { Text(stringResource(R.string.continue_manage_desc)) },
+                onClick = {
+                    open = true
+                    items = null
+                    reload()
+                },
+            ),
+        ),
+    )
+
+    if (open) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.auto_continue_listening)) },
+            text = {
+                val list = items
+                when {
+                    list == null -> androidx.compose.material3.CircularProgressIndicator()
+                    list.isEmpty() -> Text(stringResource(R.string.continue_empty))
+                    else -> androidx.compose.foundation.lazy.LazyColumn(Modifier.height(360.dp)) {
+                        items(list.size, key = { list[it].key }) { index ->
+                            val item = list[index]
+                            Row(
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            ) {
+                                coil3.compose.AsyncImage(
+                                    model = item.artwork,
+                                    contentDescription = null,
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
+                                )
+                                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                    Text(item.title, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                    item.subtitle?.let {
+                                        Text(
+                                            it,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
+                                androidx.compose.material3.IconButton(
+                                    onClick = {
+                                        scope.launch {
+                                            com.metrolist.music.playback.AutoLibraryExtras.hideFromContinue(context, item.key)
+                                            items = items?.filterNot { it.key == item.key }
+                                        }
+                                    },
+                                ) {
+                                    Icon(painterResource(R.drawable.close), contentDescription = stringResource(R.string.continue_remove))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { open = false }) { Text(stringResource(R.string.podcast_playlists_done)) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        scope.launch {
+                            com.metrolist.music.playback.AutoLibraryExtras.restoreContinue(context)
+                            reload()
+                        }
+                    },
+                ) { Text(stringResource(R.string.continue_restore)) }
+            },
+        )
+    }
 }

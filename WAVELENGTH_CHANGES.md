@@ -236,6 +236,18 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   and downloads any song not yet downloaded (follows the Wi-Fi-only download setting). Switching it on runs it
   straight away. Ids saved in `AutoDownloadPlaylistsKey`; scheduled from `MusicService` with the podcast job.
 
+- **Episode downloads** (`podcasts/EpisodeDownloads.kt`): Settings → Features → Podcasts switches "Download
+  episodes when played" and "Delete episodes after finishing" (both on by default; `DownloadOnPlayKey`,
+  `DeleteOnFinishKey`). `MusicService.onWavelengthTransition` downloads an episode (podcast prefix or isEpisode,
+  not audiobooks) when it starts; `deleteFinishedEpisode` removes its download when it plays to the end (auto
+  transition or end of queue). `EpisodeDownloadButton` (download / spinner / tick-to-delete) on episode rows in
+  show pages and New episodes. Show pages have a "Downloaded" chip. Android Auto Podcasts has a "Downloaded"
+  folder (`podcasts/downloaded`, newest download first).
+- **Continue listening removal**: Settings → Android Auto → Continue listening → "Remove items from Continue
+  listening" lists what Android Auto shows, each with a remove button, plus "Bring back removed".
+  `AutoLibraryExtras.ContinueHiddenKey` holds keys ("ep:<song>", "book:<id>@<progress time>", "abs:<id>");
+  an episode is un-hidden when played again, an on-phone audiobook when its progress changes.
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -561,3 +573,4 @@ To see the exact diff at any time:
 - 2026-11-06: "New playlist: Recognised songs" now creates a private playlist on the YouTube account (via `SyncUtils.createPlaylist`, synced) and selects it once created.
 - 2026-11-06: Merged Meld upstream 85411291 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
 - 2026-11-06: Keep listening (continuous song recognition), no duplicate recognised songs, playlist auto-download.
+- 2026-11-06: Episode download on play / delete on finish, download buttons, Downloaded folders; remove items from Android Auto Continue listening.

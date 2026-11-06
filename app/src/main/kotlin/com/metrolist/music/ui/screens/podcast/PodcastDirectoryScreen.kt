@@ -100,6 +100,8 @@ fun PodcastDirectoryScreen(
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState(initial = false)
     val menuState = LocalMenuState.current
     val played = com.metrolist.music.podcasts.rememberPlayedEpisodes()
+    var downloadedOnly by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val downloadStates by com.metrolist.music.LocalDownloadUtil.current.downloads.collectAsState()
     val speeds by viewModel.speeds.collectAsState()
     val (hidePlayed, onHidePlayedChange) = rememberPreference(com.metrolist.music.podcasts.HidePlayedEpisodesKey, false)
 
@@ -249,8 +251,18 @@ fun PodcastDirectoryScreen(
                 }
                 val episodesById = current.feed.episodes.associateBy { PODCAST_EPISODE_ID_PREFIX + it.id }
                 // Played episodes can be hidden; indexes stay those of the full list for playing
+                // "Downloaded" chip: only episodes saved on the phone
+                item(key = "downloaded_filter") {
+                    androidx.compose.material3.FilterChip(
+                        selected = downloadedOnly,
+                        onClick = { downloadedOnly = !downloadedOnly },
+                        label = { Text(stringResource(R.string.filter_downloaded)) },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
                 val visible = current.songs.withIndex().filter { (_, song) ->
-                    !hidePlayed || song.id !in played || song.id == mediaMetadata?.id
+                    (!hidePlayed || song.id !in played || song.id == mediaMetadata?.id) &&
+                        (!downloadedOnly || downloadStates[song.id]?.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED)
                 }
                 items(visible, key = { "episode:${it.value.id}" }) { (index, song) ->
                     val episode = episodesById[song.id]
@@ -262,6 +274,7 @@ fun PodcastDirectoryScreen(
                         isActive = mediaMetadata?.id == song.id,
                         isPlaying = isPlaying,
                         trailingContent = {
+                            com.metrolist.music.podcasts.EpisodeDownloadButton(song)
                             PlainIconButton(onClick = { PlayedEpisodes.set(context, song.id, !isPlayed) }) {
                                 Icon(
                                     painterResource(if (isPlayed) R.drawable.check_circle else R.drawable.radio_button_unchecked),

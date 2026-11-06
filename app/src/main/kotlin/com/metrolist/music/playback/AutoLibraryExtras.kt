@@ -26,6 +26,7 @@ import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.localfiles.LocalMusicFolders
 import com.metrolist.music.models.toMediaMetadata
 import com.metrolist.music.utils.dataStore
+import androidx.datastore.preferences.core.edit
 import com.metrolist.music.constants.podcastPlaylistIds
 import com.metrolist.music.constants.youTubePodcastPlaylists
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -82,6 +83,7 @@ constructor(
             mediaId == ABS_ALL ||
             mediaId == PODCASTS ||
             mediaId == SAVED_EPISODES ||
+            mediaId == DOWNLOADED_EPISODES ||
             (mediaId.startsWith("$PODCAST_CHANNEL/") && mediaId.count { it == '/' } == 2) ||
             (mediaId.startsWith("$PODCAST_FEED/") && mediaId.count { it == '/' } == 2)
 
@@ -180,6 +182,7 @@ constructor(
         parentId == ABS_ALL -> absAllBooks()
         parentId == PODCASTS -> podcastFolders()
         parentId == SAVED_EPISODES -> savedEpisodes().map { it.toAutoItem(SAVED_EPISODES) }
+        parentId == DOWNLOADED_EPISODES -> downloadedEpisodes().map { it.toAutoItem(DOWNLOADED_EPISODES) }
         parentId.startsWith("$PODCAST_CHANNEL/") -> channelEpisodes(parentId)
         parentId.startsWith("$PODCAST_FEED/") -> feedEpisodes(parentId)
         else -> null
@@ -346,6 +349,8 @@ constructor(
 
     /** One thing to resume: a half-played podcast episode or an unfinished audiobook. */
     private class ContinueEntry(
+        /** Used to remove it from Continue listening in the app: "ep:<song>", "book:<id>@<time>", "abs:<id>". */
+        val key: String,
         val title: String,
         val subtitle: String?,
         val artwork: Uri?,
@@ -357,12 +362,17 @@ constructor(
     private var continueCache: List<ContinueEntry> = emptyList()
 
     /** Half-finished podcast episodes and audiobooks, most recent first. */
+    /** Downloaded podcast episodes, newest download first. */
+    private suspend fun downloadedEpisodes(): List<Song> =
+        database.downloadedPodcastEpisodes(com.metrolist.music.constants.SongSortType.CREATE_DATE, true).first()
+
     private suspend fun continueListening(): List<ContinueEntry> {
         com.metrolist.music.podcasts.PlayedEpisodes.init(context)
         val entries = mutableListOf<ContinueEntry>()
         database.inProgressEpisodes().filterNot { com.metrolist.music.podcasts.PlayedEpisodes.isPlayed(it.id) }
             .forEachIndexed { index, song ->
                 entries += ContinueEntry(
+                    key = "ep:${song.id}",
                     title = song.song.title,
                     subtitle = song.song.albumName ?: song.artists.firstOrNull()?.name,
                     artwork = song.song.thumbnailUrl?.toUri(),
@@ -375,6 +385,8 @@ constructor(
             val progress = audiobooks.progress.value[book.id] ?: return@forEach
             if (progress.finished) return@forEach
             entries += ContinueEntry(
+                // Includes the progress time, so a removed book comes back once it's listened to again
+                key = "book:${book.id}@${progress.updatedAt}",
                 title = book.title,
                 subtitle = book.author,
                 artwork = book.coverUri?.toUri(),
@@ -385,6 +397,7 @@ constructor(
         withTimeoutOrNull(NETWORK_TIMEOUT_MS) { runCatching { audiobookshelf.inProgress() }.getOrNull() }.orEmpty()
             .forEach { book ->
                 entries += ContinueEntry(
+                    key = "abs:${book.id}",
                     title = book.title,
                     subtitle = book.author,
                     artwork = audiobookshelf.coverUrl(book.id)?.toUri(),
@@ -392,9 +405,17 @@ constructor(
                     play = { playAudiobook(listOf(AUDIOBOOKS, "abs", book.id)) },
                 )
             }
-        // Episodes are ordered by when they were last played; books by their own progress time
-        return entries.sortedByDescending { it.at }.also { continueCache = it }
+        // Episodes are ordered by when they were last played; books by their own progress time.
+        // Items removed in the app (Settings → Android Auto → Continue listening) are left out.
+        val hidden = context.dataStore.data.first()[ContinueHiddenKey].orEmpty()
+        return entries.filterNot { it.key in hidden }.sortedByDescending { it.at }.also { continueCache = it }
     }
+
+    /** What Android Auto's Continue listening shows, for the list in the app's settings. */
+    data class ContinueItem(val key: String, val title: String, val subtitle: String?, val artwork: String?)
+
+    suspend fun continueItems(): List<ContinueItem> =
+        continueListening().map { ContinueItem(it.key, it.title, it.subtitle, it.artwork?.toString()) }
 
     /**
      * "Hey Google, play … on Wavelength": the news, a favourite or searched radio station, the newest
@@ -682,6 +703,8 @@ constructor(
     private suspend fun podcastFolders(): List<MediaItem> {
         val newEpisodes = folder(NEW_EPISODES, context.getString(R.string.new_episodes), null, icon(R.drawable.podcasts))
         val saved = folder(SAVED_EPISODES, context.getString(R.string.auto_saved_episodes), null, icon(R.drawable.mic))
+        // Episodes downloaded on the phone (play offline)
+        val downloaded = folder(DOWNLOADED_EPISODES, context.getString(R.string.auto_downloaded_episodes), null, icon(R.drawable.offline))
         val subscribed = database.subscribedPodcasts().first()
         val followed = podcastFeeds.followed.value
         val channels = subscribed.map { podcast ->
@@ -706,7 +729,7 @@ constructor(
                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
             )
         }
-        return listOf(newEpisodes, saved) + com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed) + marked + markedOnline
+        return listOf(newEpisodes, saved, downloaded) + com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed) + marked + markedOnline
     }
 
     private fun followedFeed(key: String) =
@@ -744,6 +767,19 @@ constructor(
         "new" -> {
             val items = newEpisodes(refresh = false)
             if (items.isEmpty()) null else MediaItemsWithStartPosition(items, (path.getOrNull(2)?.toIntOrNull() ?: 0).coerceIn(0, items.lastIndex), C.TIME_UNSET)
+        }
+        "downloaded" -> {
+            val episodes = downloadedEpisodes()
+            val id = path.getOrNull(2)
+            if (episodes.isEmpty()) {
+                null
+            } else {
+                MediaItemsWithStartPosition(
+                    episodes.map { it.toMediaItem() },
+                    episodes.indexOfFirst { it.id == id }.coerceAtLeast(0),
+                    C.TIME_UNSET,
+                )
+            }
         }
         "saved" -> {
             val episodes = savedEpisodes()
@@ -865,6 +901,7 @@ constructor(
         private const val SUB_DIR = "$SUBSONIC/dir"
         private const val ABS_ALL = "$AUDIOBOOKS/abs_all"
         private const val SAVED_EPISODES = "$PODCASTS/saved"
+        private const val DOWNLOADED_EPISODES = "$PODCASTS/downloaded"
         private const val PODCAST_CHANNEL = "$PODCASTS/channel"
         private const val PODCAST_FEED = "$PODCASTS/feed"
         private const val SHUFFLE = "__shuffle__"
@@ -873,6 +910,31 @@ constructor(
         const val LIB_ARTIST = "lib_artist"
         private const val NEW_EPISODES = "$PODCASTS/new"
         const val CONTINUE = "continue"
+
+        /** Keys of items removed from Continue listening in the app. */
+        val ContinueHiddenKey = androidx.datastore.preferences.core.stringSetPreferencesKey("wavelengthContinueHidden")
+
+        suspend fun hideFromContinue(context: Context, key: String) {
+            context.dataStore.edit { it[ContinueHiddenKey] = it[ContinueHiddenKey].orEmpty() + key }
+        }
+
+        suspend fun restoreContinue(context: Context) {
+            context.dataStore.edit { it.remove(ContinueHiddenKey) }
+        }
+
+        /** An episode removed from Continue listening comes back once it's played again. */
+        suspend fun unhideEpisode(context: Context, songId: String) {
+            context.dataStore.edit { prefs ->
+                val current = prefs[ContinueHiddenKey].orEmpty()
+                if ("ep:$songId" in current) prefs[ContinueHiddenKey] = current - "ep:$songId"
+            }
+        }
+
+        @dagger.hilt.EntryPoint
+        @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+        interface Access {
+            fun autoLibraryExtras(): AutoLibraryExtras
+        }
         private const val NEW_EPISODES_TTL_MS = 5 * 60 * 1000L
     }
 }
