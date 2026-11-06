@@ -306,14 +306,22 @@ private fun RecognisedSongsSetting() {
                     if (editable.none { it.playlist.name.equals(newName, ignoreCase = true) }) {
                         item {
                             RecognisedChoice(stringResource(R.string.recognised_create, newName), false) {
-                                // New Wavelength playlist named "Recognised songs", then select it
-                                // bookmarkedAt makes it one of your saved playlists (shown in the Library and this list)
-                                val entity = com.metrolist.music.db.entities.PlaylistEntity(
-                                    name = newName,
-                                    bookmarkedAt = java.time.LocalDateTime.now(),
-                                )
-                                database.query { insert(entity) }
-                                choose(entity.id)
+                                // New "Recognised songs" playlist, created on your YouTube account as a private
+                                // (hidden) playlist and linked here, then selected. Without a YouTube sign-in it's
+                                // made in Wavelength only. bookmarkedAt makes it one of your saved playlists.
+                                val syncUtils = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                                    context.applicationContext,
+                                    com.metrolist.music.recognition.RecognisedSongs.Access::class.java,
+                                ).syncUtils()
+                                syncUtils.createPlaylist(
+                                    playlist = com.metrolist.music.db.entities.PlaylistEntity(
+                                        name = newName,
+                                        bookmarkedAt = java.time.LocalDateTime.now(),
+                                        isEditable = true,
+                                    ),
+                                    syncWithYouTube = true,
+                                ) { playlistId, _ -> choose(playlistId) }
+                                choosing = false
                             }
                         }
                     }

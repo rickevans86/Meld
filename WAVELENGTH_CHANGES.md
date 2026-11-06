@@ -539,3 +539,4 @@ To see the exact diff at any time:
 - 2026-11-06: Pick any playlists to show in the Podcasts tab and Android Auto Podcasts.
 - 2026-11-06: Playlists-as-podcasts picker also lists YouTube account playlists and accepts a pasted playlist link.
 - 2026-11-06: Fixed "New playlist: Recognised songs" (the playlist was created without `bookmarkedAt`, so it was hidden and the setting showed Off).
+- 2026-11-06: "New playlist: Recognised songs" now creates a private playlist on the YouTube account (via `SyncUtils.createPlaylist`, synced) and selects it once created.
