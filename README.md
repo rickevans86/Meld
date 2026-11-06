@@ -43,7 +43,7 @@ where `<n>` is the build number.
 - **No podcasts on the music homes.** Podcasts and audiobooks are filtered out of the home rows, speed
   dial, "Similar to" and Spotify's "Start listening", because they have their own tab.
 - **Editable bottom bar.** Choose up to 6 tabs and their order in Settings → Features → Bottom bar.
-  Choices: YouTube or Spotify home, Search, Library, Podcasts, News, Audiobooks, Radio, Navidrome, Media
+  Choices: YouTube or Spotify home, Library, Podcasts, News, Audiobooks, Radio, Navidrome, Media
   server and Local files.
 - **Side drawer.** Every section is always reachable from the side menu, even if it isn't on the bottom bar.
 - **Search on every tab.** The search button in the top bar searches the tab you're on: YouTube Music

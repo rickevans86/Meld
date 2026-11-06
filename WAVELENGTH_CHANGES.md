@@ -274,6 +274,9 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
     when shown inside Library).
 - All search bars share `SearchBarField` / `SearchBarClearButton` / `SearchTopBar` so they look like the
   Search tab's bar (back arrow, text, clear ✕).
+- Search is no longer a bottom-bar choice (`bottomTabChoices`, `DEFAULT_BOTTOM_TABS`), and
+  `parseBottomTabs` drops `search_input` from bars saved before. The combined Search screen is still in the
+  side menu.
 
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
@@ -606,3 +609,4 @@ To see the exact diff at any time:
 - 2026-11-06: Added prompt.md: a single prompt to rebuild Wavelength from Meld, split into reusable Parts with explanations.
 - 2026-11-06: Rewrote README.md for Wavelength (features, download link to this fork, credits); README is now updated with every change.
 - 2026-11-06: Top-bar search on every tab that searches that tab; Spotify home Recently played lists only Spotify songs.
+- 2026-11-07: Removed Search from the bottom bar (each tab has its own search button; Search stays in the side menu).

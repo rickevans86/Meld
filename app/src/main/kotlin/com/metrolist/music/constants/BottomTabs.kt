@@ -23,15 +23,14 @@ val BottomTabsKey = stringPreferencesKey("wavelengthBottomTabs")
 
 const val MAX_BOTTOM_TABS = 6
 
-/** What the bar showed before it could be changed. */
-val DEFAULT_BOTTOM_TABS = listOf("home", "search_input", "podcasts", "news", "library")
+/** The bar's tabs until changed. Search isn't a tab: each tab has its own search button in the top bar. */
+val DEFAULT_BOTTOM_TABS = listOf("home", "podcasts", "news", "library")
 
 /** Every screen that can go on the bar, in side-menu order. The second home is named after its source. */
 fun bottomTabChoices(alternateIsSpotify: Boolean): List<Screens> = listOf(
     // Main home, named after the default source (the second home is the other one)
     if (alternateIsSpotify) Screens.MainHomeYouTube else Screens.MainHomeSpotify,
     if (alternateIsSpotify) Screens.AltHomeSpotify else Screens.AltHomeYouTube,
-    Screens.Search,
     Screens.Library,
     Screens.Podcasts,
     Screens.News,
@@ -43,7 +42,10 @@ fun bottomTabChoices(alternateIsSpotify: Boolean): List<Screens> = listOf(
 )
 
 fun parseBottomTabs(saved: String?): List<String> =
-    saved?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.distinct()?.takeIf { it.isNotEmpty() }
+    saved?.split(',')?.map { it.trim() }
+        // Search was a tab before the top-bar search; it's removed from bars saved back then
+        ?.filter { it.isNotEmpty() && it != Screens.Search.route }
+        ?.distinct()?.takeIf { it.isNotEmpty() }
         ?: DEFAULT_BOTTOM_TABS
 
 /** The bar's routes in order, as saved (features switched off are removed where it's shown). */
