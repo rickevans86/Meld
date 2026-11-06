@@ -226,6 +226,9 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   On the Recognise screen, holding the big button for 5 seconds switches it on (or off); while held the caption
   says "Keep holding for auto listening…". While on, "Auto listening" (plus "Hold the button for 5 seconds to
   stop") shows under the button, and Cancel while listening also switches it off.
+  Tapping the button while it's on switches it off. It keeps going with the screen off (partial wake lock while
+  on). Settings → Features → Song recognition → "Turn Keep listening off after": Never or 30-minute steps up to
+  12 hours (`AutoOffMinutesKey`, default 60); the notification shows "On until <time>".
 - **No duplicate recognised songs**: `RecognisedSongs` skips a song already in the playlist by YouTube id, or by
   the same core title (ignoring "(…)", "[…]" and " - …" extras) with an overlapping artist.
 - **Playlist auto-download** (`playback/PlaylistAutoDownload.kt`): playlist ⋮ → "Auto-download new songs".

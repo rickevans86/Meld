@@ -280,6 +280,14 @@ private fun RecognisedSongsSetting() {
         choosing = false
     }
 
+    var choosingAutoOff by remember { mutableStateOf(false) }
+    val autoOffMinutes by remember(context) {
+        context.dataStore.data.map {
+            it[com.metrolist.music.recognition.AutoRecognitionService.AutoOffMinutesKey]
+                ?: com.metrolist.music.recognition.AutoRecognitionService.DEFAULT_AUTO_OFF_MINUTES
+        }
+    }.collectAsState(initial = com.metrolist.music.recognition.AutoRecognitionService.DEFAULT_AUTO_OFF_MINUTES)
+
     // Keep listening needs the microphone; ask for it the first time
     val keepListening by com.metrolist.music.recognition.AutoRecognitionService.running.collectAsState()
     val micPermission = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -312,8 +320,39 @@ private fun RecognisedSongsSetting() {
                 trailingContent = { Switch(checked = keepListening, onCheckedChange = { setKeepListening(it) }) },
                 onClick = { setKeepListening(!keepListening) },
             ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.timer),
+                title = { Text(stringResource(R.string.auto_recognise_off_after)) },
+                description = { Text(autoOffLabel(autoOffMinutes)) },
+                onClick = { choosingAutoOff = true },
+            ),
         ),
     )
+
+    if (choosingAutoOff) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { choosingAutoOff = false },
+            title = { Text(stringResource(R.string.auto_recognise_off_after)) },
+            text = {
+                androidx.compose.foundation.lazy.LazyColumn(Modifier.height(360.dp)) {
+                    // Never, then every 30 minutes up to 12 hours
+                    val options = listOf(0) + (1..24).map { it * 30 }
+                    items(options.size) { index ->
+                        val minutes = options[index]
+                        RecognisedChoice(autoOffLabel(minutes), minutes == autoOffMinutes) {
+                            scope.launch {
+                                context.dataStore.edit { it[com.metrolist.music.recognition.AutoRecognitionService.AutoOffMinutesKey] = minutes }
+                            }
+                            choosingAutoOff = false
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { choosingAutoOff = false }) { Text(stringResource(android.R.string.cancel)) }
+            },
+        )
+    }
 
     if (choosing) {
         androidx.compose.material3.AlertDialog(
@@ -555,4 +594,17 @@ private fun PodcastPlaylistsSetting() {
             },
         )
     }
+}
+
+/** "Never", "30 minutes", "1 hour", "1 hour 30 minutes"… */
+@Composable
+private fun autoOffLabel(minutes: Int): String {
+    if (minutes <= 0) return stringResource(R.string.auto_recognise_off_never)
+    val hours = minutes / 60
+    val rest = minutes % 60
+    val parts = buildList {
+        if (hours > 0) add(androidx.compose.ui.res.pluralStringResource(R.plurals.auto_recognise_hours, hours, hours))
+        if (rest > 0) add(androidx.compose.ui.res.pluralStringResource(R.plurals.auto_recognise_minutes, rest, rest))
+    }
+    return parts.joinToString(" ")
 }

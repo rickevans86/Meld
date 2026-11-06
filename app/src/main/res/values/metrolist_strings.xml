@@ -1519,7 +1519,7 @@
     <string name="podcast_playlists_link_bad">That doesn\'t look like a YouTube playlist link</string>
     <string name="podcast_playlists_loading">Loading your YouTube playlists…</string>
     <string name="auto_recognise_toggle">Keep listening</string>
-    <string name="auto_recognise_desc">Keeps recognising songs until you switch it off, adding new ones to your playlist above. Uses the microphone and shows a notification while on.</string>
+    <string name="auto_recognise_desc">Keeps recognising songs, even with the screen off, until you switch it off or the time below runs out. New songs go into your playlist above. Uses the microphone and shows a notification while on.</string>
     <string name="auto_recognise_title">Listening for songs</string>
     <string name="auto_recognise_listening">Listening… new songs are added as they\'re recognised</string>
     <string name="auto_recognise_last">Last: %1$s – %2$s (%3$d found)</string>
@@ -1528,6 +1528,17 @@
     <string name="playlist_auto_download_on">Auto-download new songs</string>
     <string name="playlist_auto_download_off">Stop auto-downloading new songs</string>
     <string name="auto_recognise_caption">Auto listening</string>
-    <string name="auto_recognise_caption_hint">Hold the button for 5 seconds to stop</string>
+    <string name="auto_recognise_caption_hint">Tap the button to stop</string>
     <string name="auto_recognise_keep_holding">Keep holding for auto listening…</string>
+    <string name="auto_recognise_off_after">Turn Keep listening off after</string>
+    <string name="auto_recognise_off_never">Never (until switched off)</string>
+    <string name="auto_recognise_until">On until %s</string>
+    <plurals name="auto_recognise_hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    <plurals name="auto_recognise_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
 </resources>

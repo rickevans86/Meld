@@ -19,6 +19,8 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.metrolist.music.MainActivity
 import com.metrolist.music.R
+import com.metrolist.music.utils.dataStore
+import kotlinx.coroutines.flow.first
 import com.metrolist.music.db.entities.RecognitionHistory
 import com.metrolist.shazamkit.models.RecognitionStatus
 import dagger.hilt.android.EntryPointAccessors
@@ -48,6 +50,8 @@ class AutoRecognitionService : Service() {
     private var loop: Job? = null
     private var lastKey: String? = null
     private var found = 0
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+    private var stopAt: Long = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -75,13 +79,28 @@ class AutoRecognitionService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        // Auto-off after the time set in Settings (0 = until switched off)
+        val limit = autoOffMinutes(applicationContext)
+        stopAt = if (limit > 0) System.currentTimeMillis() + limit * 60_000L else 0L
+        // Keep the phone's processor awake so it keeps listening with the screen off
+        wakeLock = getSystemService(android.os.PowerManager::class.java)
+            .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "Wavelength:AutoRecognition")
+            .apply {
+                setReferenceCounted(false)
+                acquire(if (limit > 0) limit * 60_000L + 60_000L else MAX_WAKE_MS)
+            }
         _running.value = true
+        if (stopAt > 0) update(getString(R.string.auto_recognise_until, java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(stopAt))))
         loop = scope.launch { listenLoop() }
         return START_NOT_STICKY
     }
 
     private suspend fun listenLoop() {
         while (scope.isActive) {
+            if (stopAt > 0 && System.currentTimeMillis() >= stopAt) {
+                stopSelf()
+                return
+            }
             // Don't fight the normal Recognise screen for the microphone
             if (MusicRecognitionService.recognitionStatus.value.let {
                     it is RecognitionStatus.Listening || it is RecognitionStatus.Processing
@@ -99,7 +118,12 @@ class AutoRecognitionService : Service() {
                         lastKey = key
                         found++
                         saveHistory(result)
-                        update(getString(R.string.auto_recognise_last, result.title, result.artist, found))
+                        val until = if (stopAt > 0) {
+                            " · " + getString(R.string.auto_recognise_until, java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(stopAt)))
+                        } else {
+                            ""
+                        }
+                        update(getString(R.string.auto_recognise_last, result.title, result.artist, found) + until)
                     }
                     // A song lasts a few minutes, so wait longer after a match
                     delay(MATCH_PAUSE_MS)
@@ -184,6 +208,7 @@ class AutoRecognitionService : Service() {
         loop?.cancel()
         scope.cancel()
         MusicRecognitionService.reset()
+        runCatching { if (wakeLock?.isHeld == true) wakeLock?.release() }
         _running.value = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
@@ -197,6 +222,15 @@ class AutoRecognitionService : Service() {
         private const val MATCH_PAUSE_MS = 45_000L
         private const val NO_MATCH_PAUSE_MS = 10_000L
         private const val ERROR_PAUSE_MS = 30_000L
+        private const val MAX_WAKE_MS = 12 * 60 * 60_000L
+
+        /** Settings → Features → Song recognition → Turn off after: minutes (30-minute steps), 0 = never. */
+        val AutoOffMinutesKey = androidx.datastore.preferences.core.intPreferencesKey("wavelengthAutoRecogniseMinutes")
+        const val DEFAULT_AUTO_OFF_MINUTES = 60
+
+        fun autoOffMinutes(context: Context): Int = kotlinx.coroutines.runBlocking {
+            context.dataStore.data.first()[AutoOffMinutesKey] ?: DEFAULT_AUTO_OFF_MINUTES
+        }
 
         private val _running = MutableStateFlow(false)
 

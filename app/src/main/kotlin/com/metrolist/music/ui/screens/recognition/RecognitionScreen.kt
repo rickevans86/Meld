@@ -263,7 +263,10 @@ fun RecognitionScreen(
                 when (status) {
                     is RecognitionStatus.Ready -> {
                         ReadyState(
-                            onStartRecognition = ::startRecognition,
+                            // While auto listening, a tap on the button switches it off again
+                            onStartRecognition = {
+                                if (AutoRecognitionService.running.value) AutoRecognitionService.stop(context) else startRecognition()
+                            },
                             // Holding the button for 5 seconds switches Keep listening on (or off again)
                             onHoldFiveSeconds = {
                                 if (AutoRecognitionService.running.value) {
