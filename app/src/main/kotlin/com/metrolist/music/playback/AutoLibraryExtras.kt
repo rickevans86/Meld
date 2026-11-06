@@ -495,8 +495,8 @@ constructor(
                 null
             },
             folder(MS_PLAYLISTS, context.getString(R.string.playlists), null, icon(R.drawable.queue_music), MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS),
-            folder(MS_ALBUMS, context.getString(R.string.subsonic_albums), null, icon(R.drawable.album), MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS),
-            folder(MS_ARTISTS, context.getString(R.string.subsonic_artists), null, icon(R.drawable.artist), MediaMetadata.MEDIA_TYPE_FOLDER_ARTISTS),
+            folder(MS_ALBUMS, context.getString(R.string.albums), null, icon(R.drawable.album), MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS),
+            folder(MS_ARTISTS, context.getString(R.string.artists), null, icon(R.drawable.artist), MediaMetadata.MEDIA_TYPE_FOLDER_ARTISTS),
         )
     }
 

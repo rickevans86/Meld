@@ -358,9 +358,9 @@ private fun Browser(viewModel: MediaServerViewModel) {
                                     Text(
                                         stringResource(
                                             when (option) {
-                                                MediaServerTab.ALBUMS -> R.string.subsonic_albums
-                                                MediaServerTab.ARTISTS -> R.string.subsonic_artists
-                                                MediaServerTab.PLAYLISTS -> R.string.subsonic_playlists
+                                                MediaServerTab.ALBUMS -> R.string.albums
+                                                MediaServerTab.ARTISTS -> R.string.artists
+                                                MediaServerTab.PLAYLISTS -> R.string.playlists
                                                 MediaServerTab.FAVOURITES -> R.string.media_server_favourites
                                             },
                                         ),
