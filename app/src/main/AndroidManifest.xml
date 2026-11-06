@@ -379,6 +379,12 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
+        <!-- Wavelength: keep listening and recognising songs until switched off -->
+        <service
+            android:name=".recognition.AutoRecognitionService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
         <!-- Music Recognizer Quick Settings Tile -->
         <service
             android:name=".quicksettings.MusicRecognizerTileService"

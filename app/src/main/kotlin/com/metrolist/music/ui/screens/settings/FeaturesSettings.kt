@@ -280,6 +280,20 @@ private fun RecognisedSongsSetting() {
         choosing = false
     }
 
+    // Keep listening needs the microphone; ask for it the first time
+    val keepListening by com.metrolist.music.recognition.AutoRecognitionService.running.collectAsState()
+    val micPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) com.metrolist.music.recognition.AutoRecognitionService.start(context) }
+    fun setKeepListening(on: Boolean) {
+        when {
+            !on -> com.metrolist.music.recognition.AutoRecognitionService.stop(context)
+            com.metrolist.music.recognition.MusicRecognitionService.hasRecordPermission(context) ->
+                com.metrolist.music.recognition.AutoRecognitionService.start(context)
+            else -> micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     Material3SettingsGroup(
         title = stringResource(R.string.recognised_section),
         items = listOf(
@@ -290,6 +304,13 @@ private fun RecognisedSongsSetting() {
                     Text(selected?.playlist?.name ?: stringResource(R.string.recognised_off))
                 },
                 onClick = { choosing = true },
+            ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.mic),
+                title = { Text(stringResource(R.string.auto_recognise_toggle)) },
+                description = { Text(stringResource(R.string.auto_recognise_desc)) },
+                trailingContent = { Switch(checked = keepListening, onCheckedChange = { setKeepListening(it) }) },
+                onClick = { setKeepListening(!keepListening) },
             ),
         ),
     )

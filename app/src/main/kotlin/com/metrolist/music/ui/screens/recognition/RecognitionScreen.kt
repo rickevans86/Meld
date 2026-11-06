@@ -5,6 +5,9 @@
 
 package com.metrolist.music.ui.screens.recognition
 
+import androidx.compose.runtime.collectAsState
+import com.metrolist.music.recognition.MusicRecognitionService
+import com.metrolist.music.recognition.AutoRecognitionService
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -214,6 +217,21 @@ fun RecognitionScreen(
                     }
                 },
                 actions = {
+                    // Keep listening: recognise song after song until switched off
+                    val keepListening by AutoRecognitionService.running.collectAsState()
+                    val keepContext = androidx.compose.ui.platform.LocalContext.current
+                    val needMic = stringResource(R.string.auto_recognise_need_mic)
+                    androidx.compose.material3.FilterChip(
+                        selected = keepListening,
+                        onClick = {
+                            when {
+                                keepListening -> AutoRecognitionService.stop(keepContext)
+                                MusicRecognitionService.hasRecordPermission(keepContext) -> AutoRecognitionService.start(keepContext)
+                                else -> android.widget.Toast.makeText(keepContext, needMic, android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        label = { Text(stringResource(R.string.auto_recognise_toggle)) },
+                    )
                     IconButton(onClick = { navController.navigate("recognition_history") }) {
                         Icon(
                             painter = painterResource(R.drawable.history),

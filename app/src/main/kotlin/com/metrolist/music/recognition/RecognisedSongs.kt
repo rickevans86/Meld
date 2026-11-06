@@ -70,10 +70,17 @@ object RecognisedSongs {
         val database = access.database()
         val playlist = database.playlist(playlistId).firstOrNull()
             ?: return context.getString(R.string.recognised_playlist_missing)
+        // Already in the playlist under the same name and artist (maybe a different upload)? Then skip it.
+        val existing = database.playlistSongs(playlist.id).first()
+        if (existing.any { sameSong(it.song.title, it.song.artists.map { a -> a.name }, result.title, result.artist) }) {
+            return context.getString(R.string.recognised_already_in, result.title, playlist.playlist.name)
+        }
         val song = findOnYouTube(result)
             ?: return context.getString(R.string.recognised_not_found, result.title)
         database.insert(song.toMediaMetadata())
-        if (database.playlistDuplicates(playlist.id, listOf(song.id)).isNotEmpty()) {
+        if (database.playlistDuplicates(playlist.id, listOf(song.id)).isNotEmpty() ||
+            existing.any { sameSong(it.song.title, it.song.artists.map { a -> a.name }, song.title, song.artists.joinToString(" ") { it.name }) }
+        ) {
             return context.getString(R.string.recognised_already_in, result.title, playlist.playlist.name)
         }
         database.addSongsToPlaylist(playlist, listOf(song.id to null))
@@ -81,6 +88,21 @@ object RecognisedSongs {
             access.syncUtils().scheduleAddToPlaylist(browseId, playlist.id, listOf(song.id))
         }
         return context.getString(R.string.recognised_added, result.title, playlist.playlist.name)
+    }
+
+    /**
+     * Same song by name and artist, ignoring case, punctuation and extras like "(Official Video)" or
+     * "- Remastered": the core titles must match and at least one artist must overlap.
+     */
+    private fun sameSong(titleA: String, artistsA: List<String>, titleB: String, artistB: String): Boolean {
+        fun core(title: String) = title.lowercase(Locale.ROOT)
+            .replace(Regex("\\(.*?\\)|\\[.*?\\]"), " ")
+            .substringBefore(" - ")
+            .filter { it.isLetterOrDigit() }
+        fun norm(text: String) = text.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }
+        if (core(titleA).isEmpty() || core(titleA) != core(titleB)) return false
+        val b = norm(artistB)
+        return artistsA.isEmpty() || b.isEmpty() || artistsA.any { a -> norm(a).isNotEmpty() && (b.contains(norm(a)) || norm(a).contains(b)) }
     }
 
     /** The recognised song on YouTube Music: Shazam's own video if it gave one, else the best song match. */

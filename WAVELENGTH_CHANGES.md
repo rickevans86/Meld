@@ -217,6 +217,19 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   saved as `yt:<id>\t<title>\t<thumbnail>` lines (`YouTubePodcastPlaylist`) and open as online playlists
   (`online_playlist/<id>`, Android Auto `youtube_playlist/<id>`).
 
+- **Keep listening** (`recognition/AutoRecognitionService.kt`, microphone foreground service in the manifest):
+  recognises song after song until switched off — "Keep listening" chip on the Recognise screen, switch in
+  Settings → Features → Song recognition (asks for the microphone), or Stop in its notification. Each new song
+  (not the same as the last one) is saved to recognition history and added to the recognised-songs playlist.
+  Waits 45 s after a match, 10 s after no match, 30 s after an error; pauses while the normal Recognise screen
+  is listening. `AutoRecognitionService.running` is the on/off state.
+- **No duplicate recognised songs**: `RecognisedSongs` skips a song already in the playlist by YouTube id, or by
+  the same core title (ignoring "(…)", "[…]" and " - …" extras) with an overlapping artist.
+- **Playlist auto-download** (`playback/PlaylistAutoDownload.kt`): playlist ⋮ → "Auto-download new songs".
+  A WorkManager job every 6 hours (online) refreshes YouTube-synced playlists (`SyncUtils.syncPlaylistSuspend`)
+  and downloads any song not yet downloaded (follows the Wi-Fi-only download setting). Switching it on runs it
+  straight away. Ids saved in `AutoDownloadPlaylistsKey`; scheduled from `MusicService` with the podcast job.
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -541,3 +554,4 @@ To see the exact diff at any time:
 - 2026-11-06: Fixed "New playlist: Recognised songs" (the playlist was created without `bookmarkedAt`, so it was hidden and the setting showed Off).
 - 2026-11-06: "New playlist: Recognised songs" now creates a private playlist on the YouTube account (via `SyncUtils.createPlaylist`, synced) and selects it once created.
 - 2026-11-06: Merged Meld upstream 85411291 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
+- 2026-11-06: Keep listening (continuous song recognition), no duplicate recognised songs, playlist auto-download.

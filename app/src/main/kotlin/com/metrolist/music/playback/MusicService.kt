@@ -1182,6 +1182,7 @@ class MusicService :
         com.metrolist.music.podcasts.PlayedEpisodes.init(this@MusicService)
         if (podcastDirectory.followed.value.any { it.autoDownload }) {
             com.metrolist.music.podcasts.PodcastAutoDownload.schedule(this@MusicService)
+            com.metrolist.music.playback.PlaylistAutoDownload.schedule(this@MusicService)
         }
 
         // Wavelength: Discord, Last.fm and Listen Together are switched off; clear any saved sign-ins
