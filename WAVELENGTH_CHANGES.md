@@ -538,3 +538,4 @@ To see the exact diff at any time:
 - 2026-11-06: Jellyfin / Plex tab; recognised songs auto-added to a chosen playlist; home named YouTube/Spotify; podcasts removed from Speed dial, Similar to and Spotify Start listening.
 - 2026-11-06: Pick any playlists to show in the Podcasts tab and Android Auto Podcasts.
 - 2026-11-06: Playlists-as-podcasts picker also lists YouTube account playlists and accepts a pasted playlist link.
+- 2026-11-06: Fixed "New playlist: Recognised songs" (the playlist was created without `bookmarkedAt`, so it was hidden and the setting showed Off).

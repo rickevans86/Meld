@@ -307,7 +307,11 @@ private fun RecognisedSongsSetting() {
                         item {
                             RecognisedChoice(stringResource(R.string.recognised_create, newName), false) {
                                 // New Wavelength playlist named "Recognised songs", then select it
-                                val entity = com.metrolist.music.db.entities.PlaylistEntity(name = newName)
+                                // bookmarkedAt makes it one of your saved playlists (shown in the Library and this list)
+                                val entity = com.metrolist.music.db.entities.PlaylistEntity(
+                                    name = newName,
+                                    bookmarkedAt = java.time.LocalDateTime.now(),
+                                )
                                 database.query { insert(entity) }
                                 choose(entity.id)
                             }
