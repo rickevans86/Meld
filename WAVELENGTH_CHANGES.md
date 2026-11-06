@@ -212,6 +212,10 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   tick list of every playlist (podcast or not). Saved in `PodcastPlaylistsKey` (`constants/PodcastPlaylists.kt`).
   Ticked playlists appear in the Podcasts tab's Episodes view after followed shows (`LibraryPodcastsScreen`,
   `LibraryPodcastsViewModel.allPlaylists`) and at the end of Android Auto's Podcasts section (`playlist/<id>`).
+  The picker also loads your YouTube account playlists (`YouTube.library("FEmusic_liked_playlists")`, including
+  unlisted ones from the YouTube app that Wavelength hasn't saved) and takes a pasted playlist link. Those are
+  saved as `yt:<id>\t<title>\t<thumbnail>` lines (`YouTubePodcastPlaylist`) and open as online playlists
+  (`online_playlist/<id>`, Android Auto `youtube_playlist/<id>`).
 
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
@@ -533,3 +537,4 @@ To see the exact diff at any time:
 - 2026-11-05: Fixed a crash when the music service stopped (episode/audiobook position was read from a background thread in `MusicService.onDestroy`).
 - 2026-11-06: Jellyfin / Plex tab; recognised songs auto-added to a chosen playlist; home named YouTube/Spotify; podcasts removed from Speed dial, Similar to and Spotify Start listening.
 - 2026-11-06: Pick any playlists to show in the Podcasts tab and Android Auto Podcasts.
+- 2026-11-06: Playlists-as-podcasts picker also lists YouTube account playlists and accepts a pasted playlist link.

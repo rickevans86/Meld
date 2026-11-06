@@ -41,3 +41,40 @@ suspend fun setPodcastPlaylist(context: Context, playlistId: String, isPodcast: 
         prefs[PodcastPlaylistsKey] = (if (isPodcast) current + playlistId else current).joinToString("\n")
     }
 }
+
+/**
+ * A YouTube account playlist that isn't saved in Wavelength (e.g. an unlisted one made in the YouTube app),
+ * marked as a podcast. Saved as "yt:<playlist id>\t<title>\t<thumbnail>" so it can be listed offline.
+ */
+data class YouTubePodcastPlaylist(val id: String, val title: String, val thumbnail: String?)
+
+private const val YT_PREFIX = "yt:"
+
+fun Preferences.youTubePodcastPlaylists(): List<YouTubePodcastPlaylist> =
+    podcastPlaylistIds().filter { it.startsWith(YT_PREFIX) }.map { line ->
+        val parts = line.removePrefix(YT_PREFIX).split('\t')
+        YouTubePodcastPlaylist(parts[0], parts.getOrNull(1)?.takeIf { it.isNotBlank() } ?: parts[0], parts.getOrNull(2)?.takeIf { it.isNotBlank() })
+    }
+
+@Composable
+fun rememberYouTubePodcastPlaylists(): List<YouTubePodcastPlaylist> {
+    val context = LocalContext.current
+    val flow = remember(context) { context.dataStore.data.map { it.youTubePodcastPlaylists() } }
+    val items by flow.collectAsState(initial = emptyList())
+    return items
+}
+
+suspend fun setYouTubePodcastPlaylist(context: Context, playlist: YouTubePodcastPlaylist, isPodcast: Boolean) {
+    context.dataStore.edit { prefs ->
+        val current = prefs.podcastPlaylistIds().filterNot { it == YT_PREFIX + playlist.id || it.startsWith(YT_PREFIX + playlist.id + "\t") }
+        val line = YT_PREFIX + listOf(playlist.id, playlist.title.replace('\t', ' ').replace('\n', ' '), playlist.thumbnail.orEmpty()).joinToString("\t")
+        prefs[PodcastPlaylistsKey] = (if (isPodcast) current + line else current).joinToString("\n")
+    }
+}
+
+/** The playlist id in a YouTube / YouTube Music link ("…list=PL…"), or the text itself if it already looks like one. */
+fun youTubePlaylistIdFrom(text: String): String? {
+    val trimmed = text.trim()
+    Regex("[?&]list=([A-Za-z0-9_-]+)").find(trimmed)?.let { return it.groupValues[1] }
+    return trimmed.takeIf { Regex("^(PL|OL|VL|RD|UU|FL|LL)[A-Za-z0-9_-]{8,}$").matches(it) }?.removePrefix("VL")
+}

@@ -1514,4 +1514,8 @@
         <item quantity="one">%d playlist shown in Podcasts</item>
         <item quantity="other">%d playlists shown in Podcasts</item>
     </plurals>
+    <string name="podcast_playlists_link">Or paste a YouTube playlist link</string>
+    <string name="podcast_playlists_add">Add</string>
+    <string name="podcast_playlists_link_bad">That doesn\'t look like a YouTube playlist link</string>
+    <string name="podcast_playlists_loading">Loading your YouTube playlists…</string>
 </resources>

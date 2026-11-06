@@ -34,6 +34,8 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import com.metrolist.innertube.utils.completed
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -338,9 +340,26 @@ private fun RecognisedChoice(label: String, selected: Boolean, onClick: () -> Un
     }
 }
 
+/** One row in the "Playlists to show as podcasts" list. */
+private sealed interface PodcastPlaylistChoice {
+    val key: String
+    val name: String
+
+    data class Saved(val playlist: com.metrolist.music.db.entities.Playlist) : PodcastPlaylistChoice {
+        override val key get() = playlist.id
+        override val name get() = playlist.playlist.name
+    }
+
+    data class Online(val item: com.metrolist.music.constants.YouTubePodcastPlaylist) : PodcastPlaylistChoice {
+        override val key get() = "yt:" + item.id
+        override val name get() = item.title
+    }
+}
+
 /**
- * Podcasts: pick any of your playlists (podcast or not) to show in the Podcasts tab and in
- * Android Auto's Podcasts section. Searchable, with a tick box per playlist.
+ * Podcasts: pick any of your playlists (podcast or not) to show in the Podcasts tab and in Android Auto's
+ * Podcasts section. Lists playlists saved in Wavelength plus your YouTube account's playlists (including
+ * unlisted ones made in the YouTube app), and a YouTube playlist link can be pasted in.
  */
 @Composable
 private fun PodcastPlaylistsSetting() {
@@ -348,10 +367,26 @@ private fun PodcastPlaylistsSetting() {
     val scope = rememberCoroutineScope()
     val database = com.metrolist.music.LocalDatabase.current
     val playlists by database.playlistsByCreateDateAsc().collectAsState(initial = emptyList())
-    val chosen = com.metrolist.music.constants.rememberPodcastPlaylistIds()
+    val chosenSaved = com.metrolist.music.constants.rememberPodcastPlaylistIds()
+    val chosenOnline = com.metrolist.music.constants.rememberYouTubePodcastPlaylists()
     var choosing by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val chosenCount = chosen.count { id -> playlists.any { it.id == id } }
+    var link by remember { mutableStateOf("") }
+    var online by remember { mutableStateOf<List<com.metrolist.music.constants.YouTubePodcastPlaylist>?>(null) }
+    val chosenCount = chosenSaved.count { id -> playlists.any { it.id == id } } + chosenOnline.size
+    val notFound = stringResource(R.string.podcast_playlists_link_bad)
+
+    // Your YouTube account's playlists, loaded when the list opens
+    LaunchedEffect(choosing) {
+        if (!choosing || online != null) return@LaunchedEffect
+        online = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.metrolist.innertube.YouTube.library("FEmusic_liked_playlists").completed()
+                .getOrNull()?.items.orEmpty()
+                .filterIsInstance<com.metrolist.innertube.models.PlaylistItem>()
+                .filterNot { it.id == "SE" || it.id == "LM" }
+                .map { com.metrolist.music.constants.YouTubePodcastPlaylist(it.id, it.title, it.thumbnail) }
+        }
+    }
 
     Material3SettingsGroup(
         title = stringResource(R.string.filter_podcasts),
@@ -374,9 +409,25 @@ private fun PodcastPlaylistsSetting() {
     )
 
     if (choosing) {
-        val shown = playlists.filter { query.isBlank() || it.playlist.name.contains(query.trim(), ignoreCase = true) }
+        val savedBrowseIds = playlists.mapNotNull { it.playlist.browseId }.toSet()
+        val chosenOnlineIds = chosenOnline.map { it.id }.toSet()
+        // Saved playlists, then account playlists Wavelength hasn't saved, then ticked links not in either
+        val onlineItems = (online.orEmpty() + chosenOnline).distinctBy { it.id }.filter { it.id !in savedBrowseIds }
+        val all: List<PodcastPlaylistChoice> =
+            playlists.map { PodcastPlaylistChoice.Saved(it) } + onlineItems.map { PodcastPlaylistChoice.Online(it) }
+        fun isTicked(choice: PodcastPlaylistChoice) = when (choice) {
+            is PodcastPlaylistChoice.Saved -> choice.playlist.id in chosenSaved
+            is PodcastPlaylistChoice.Online -> choice.item.id in chosenOnlineIds
+        }
+        fun toggle(choice: PodcastPlaylistChoice, on: Boolean) = scope.launch {
+            when (choice) {
+                is PodcastPlaylistChoice.Saved -> com.metrolist.music.constants.setPodcastPlaylist(context, choice.playlist.id, on)
+                is PodcastPlaylistChoice.Online -> com.metrolist.music.constants.setYouTubePodcastPlaylist(context, choice.item, on)
+            }
+        }
+        val shown = all.filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
             // Ticked playlists first, then the rest A–Z
-            .sortedWith(compareBy({ it.id !in chosen }, { it.playlist.name.lowercase() }))
+            .sortedWith(compareBy({ !isTicked(it) }, { it.name.lowercase() }))
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { choosing = false },
             title = { Text(stringResource(R.string.podcast_playlists_setting)) },
@@ -393,33 +444,74 @@ private fun PodcastPlaylistsSetting() {
                         singleLine = true,
                         placeholder = { Text(stringResource(R.string.podcast_playlists_search)) },
                         leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
-                    androidx.compose.foundation.lazy.LazyColumn(Modifier.height(360.dp)) {
-                        items(shown.size, key = { shown[it].id }) { index ->
-                            val playlist = shown[index]
-                            val ticked = playlist.id in chosen
+                    // Paste a YouTube playlist link for one that isn't listed
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        androidx.compose.material3.OutlinedTextField(
+                            value = link,
+                            onValueChange = { link = it },
+                            singleLine = true,
+                            placeholder = { Text(stringResource(R.string.podcast_playlists_link)) },
+                            leadingIcon = { Icon(painterResource(R.drawable.link), contentDescription = null) },
+                            modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+                        )
+                        androidx.compose.material3.TextButton(
+                            enabled = link.isNotBlank(),
+                            onClick = {
+                                val id = com.metrolist.music.constants.youTubePlaylistIdFrom(link)
+                                if (id == null) {
+                                    android.widget.Toast.makeText(context, notFound, android.widget.Toast.LENGTH_SHORT).show()
+                                } else {
+                                    scope.launch {
+                                        val page = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                            com.metrolist.innertube.YouTube.playlist(id).getOrNull()
+                                        }
+                                        com.metrolist.music.constants.setYouTubePodcastPlaylist(
+                                            context,
+                                            com.metrolist.music.constants.YouTubePodcastPlaylist(
+                                                id,
+                                                page?.playlist?.title ?: id,
+                                                page?.playlist?.thumbnail,
+                                            ),
+                                            true,
+                                        )
+                                        link = ""
+                                    }
+                                }
+                            },
+                        ) { Text(stringResource(R.string.podcast_playlists_add)) }
+                    }
+                    if (online == null) {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+                            androidx.compose.material3.CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                            Text(
+                                stringResource(R.string.podcast_playlists_loading),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    }
+                    androidx.compose.foundation.lazy.LazyColumn(Modifier.height(320.dp)) {
+                        items(shown.size, key = { shown[it].key }) { index ->
+                            val choice = shown[index]
+                            val ticked = isTicked(choice)
                             Row(
                                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable {
-                                        scope.launch {
-                                            com.metrolist.music.constants.setPodcastPlaylist(context, playlist.id, !ticked)
-                                        }
-                                    }
+                                    .clickable { toggle(choice, !ticked) }
                                     .padding(vertical = 4.dp),
                             ) {
-                                androidx.compose.material3.Checkbox(
-                                    checked = ticked,
-                                    onCheckedChange = { on ->
-                                        scope.launch { com.metrolist.music.constants.setPodcastPlaylist(context, playlist.id, on) }
-                                    },
-                                )
-                                com.metrolist.music.ui.component.playlistSourceOf(playlist)?.let {
+                                androidx.compose.material3.Checkbox(checked = ticked, onCheckedChange = { toggle(choice, it) })
+                                val source = when (choice) {
+                                    is PodcastPlaylistChoice.Saved -> com.metrolist.music.ui.component.playlistSourceOf(choice.playlist)
+                                    is PodcastPlaylistChoice.Online -> com.metrolist.music.ui.component.PlaylistSource.YOUTUBE
+                                }
+                                source?.let {
                                     com.metrolist.music.ui.component.PlaylistSourceLogo(it, size = 16.dp, modifier = Modifier.padding(end = 6.dp))
                                 }
-                                Text(playlist.playlist.name, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                Text(choice.name, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             }
                         }
                     }

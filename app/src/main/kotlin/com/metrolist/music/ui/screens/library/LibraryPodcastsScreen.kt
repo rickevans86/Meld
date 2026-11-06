@@ -126,8 +126,23 @@ fun LibraryPodcastsScreen(
     // Playlists you've marked as podcasts, in the order you chose them
     val podcastPlaylistIds = com.metrolist.music.constants.rememberPodcastPlaylistIds()
     val allPlaylists by viewModel.allPlaylists.collectAsStateWithLifecycle()
-    val podcastPlaylists = remember(podcastPlaylistIds, allPlaylists) {
-        podcastPlaylistIds.mapNotNull { id -> allPlaylists.firstOrNull { it.id == id } }
+    val youTubePodcastPlaylists = com.metrolist.music.constants.rememberYouTubePodcastPlaylists()
+    val podcastPlaylists = remember(podcastPlaylistIds, allPlaylists, youTubePodcastPlaylists) {
+        podcastPlaylistIds.mapNotNull { id -> allPlaylists.firstOrNull { it.id == id } } +
+            // YouTube account playlists not saved in Wavelength open as online playlists
+            youTubePodcastPlaylists.map { yt ->
+                com.metrolist.music.db.entities.Playlist(
+                    playlist = com.metrolist.music.db.entities.PlaylistEntity(
+                        id = "yt_${yt.id}",
+                        name = yt.title,
+                        browseId = yt.id,
+                        isEditable = false,
+                        thumbnailUrl = yt.thumbnail,
+                    ),
+                    songCount = 0,
+                    songThumbnails = emptyList(),
+                )
+            }
     }
     // Sort for shows (also used by Android Auto's Podcasts page)
     val (sortName, onSortName) = rememberPreference(
