@@ -574,3 +574,4 @@ To see the exact diff at any time:
 - 2026-11-06: Merged Meld upstream 85411291 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
 - 2026-11-06: Keep listening (continuous song recognition), no duplicate recognised songs, playlist auto-download.
 - 2026-11-06: Episode download on play / delete on finish, download buttons, Downloaded folders; remove items from Android Auto Continue listening.
+- 2026-11-06: Added prompt.md: a single prompt to rebuild Wavelength from Meld, split into reusable Parts with explanations.
