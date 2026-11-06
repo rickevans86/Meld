@@ -230,7 +230,9 @@ fun LibraryMixScreen(
     val (showCached) = rememberPreference(ShowCachedPlaylistKey, true)
     val (showUploaded) = rememberPreference(ShowUploadedPlaylistKey, true)
     
-    val showLikedPlaylist = showLiked && matchesNormalizedQuery(normalizedQuery, likedPlaylist.playlist.name)
+    // A pinned Liked songs shows in the Pins row instead
+    val likedPinned = "auto:liked" in com.metrolist.music.constants.rememberLibraryPins()
+    val showLikedPlaylist = showLiked && !likedPinned && matchesNormalizedQuery(normalizedQuery, likedPlaylist.playlist.name)
     val showDownloadedPlaylist =
         showDownloaded && matchesNormalizedQuery(normalizedQuery, downloadPlaylist.playlist.name)
     val showTopPlaylists = showTop && matchesNormalizedQuery(normalizedQuery, topPlaylist.playlist.name)
@@ -302,12 +304,21 @@ fun LibraryMixScreen(
         else -> null
     }
     val spotifyLikedName = stringResource(R.string.spotify_liked_songs)
+    val likedPinName = stringResource(R.string.liked)
     val pinPlaylistLabel = stringResource(R.string.library_pin_playlist)
+    // Long-pressing a pin opens the same ⋮ menu as the item has in the list
+    val pinMenuScope = rememberCoroutineScope()
+    fun pinMenu(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        menuState.show(content)
+    }
     val pinCards = pinnedKeys.mapNotNull { key ->
         val id = key.substringAfter(':')
         when (key.substringBefore(':')) {
             "playlist" -> playlist.value.firstOrNull { it.id == id }?.let { p ->
-                com.metrolist.music.ui.component.LibraryPinCard(key, p.playlist.name, pinPlaylistLabel, p.thumbnails.firstOrNull()) {
+                com.metrolist.music.ui.component.LibraryPinCard(key, p.playlist.name, pinPlaylistLabel, p.thumbnails.firstOrNull(), onLongClick = {
+                    pinMenu { com.metrolist.music.ui.menu.PlaylistMenu(playlist = p, coroutineScope = pinMenuScope, onDismiss = menuState::dismiss) }
+                }) {
                     if (!p.playlist.isEditable && p.songCount == 0 && p.playlist.browseId != null) {
                         navController.navigate("online_playlist/${p.playlist.browseId}")
                     } else {
@@ -316,22 +327,51 @@ fun LibraryMixScreen(
                 }
             }
             "album" -> albums.value.firstOrNull { it.id == id }?.let { a ->
-                com.metrolist.music.ui.component.LibraryPinCard(key, a.album.title, a.artists.joinToString(", ") { it.name }, a.album.thumbnailUrl) {
+                com.metrolist.music.ui.component.LibraryPinCard(key, a.album.title, a.artists.joinToString(", ") { it.name }, a.album.thumbnailUrl, onLongClick = {
+                    pinMenu { com.metrolist.music.ui.menu.AlbumMenu(originalAlbum = a, onDismiss = menuState::dismiss) }
+                }) {
                     navController.navigate("album/${a.id}")
                 }
             }
             "artist" -> artist.value.firstOrNull { it.id == id }?.let { ar ->
-                com.metrolist.music.ui.component.LibraryPinCard(key, ar.artist.name, null, ar.artist.thumbnailUrl, round = true) {
+                com.metrolist.music.ui.component.LibraryPinCard(key, ar.artist.name, null, ar.artist.thumbnailUrl, round = true, onLongClick = {
+                    pinMenu { com.metrolist.music.ui.menu.ArtistMenu(originalArtist = ar, coroutineScope = pinMenuScope, onDismiss = menuState::dismiss) }
+                }) {
                     navController.navigate("artist/${ar.id}")
                 }
             }
+            // YouTube Liked songs (pinned from its ⋮ menu)
+            "auto" -> if (id == "liked") {
+                com.metrolist.music.ui.component.LibraryPinCard(key, likedPinName, "YouTube", null, placeholder = R.drawable.favorite) {
+                    navController.navigate("auto_playlist/liked")
+                }
+            } else {
+                null
+            }
             "spotify" -> if (id == "liked_songs") {
-                com.metrolist.music.ui.component.LibraryPinCard(key, spotifyLikedName, "Spotify", null, placeholder = R.drawable.favorite) {
+                com.metrolist.music.ui.component.LibraryPinCard(key, spotifyLikedName, "Spotify", null, placeholder = R.drawable.favorite, onLongClick = {
+                    pinMenu {
+                        com.metrolist.music.ui.menu.SpotifyPlaylistMenu(
+                            spotifyId = "spotify:liked_songs",
+                            title = spotifyLikedName,
+                            onNavigate = { navController.navigate("spotify_liked_songs") },
+                            onDismiss = menuState::dismiss,
+                        )
+                    }
+                }) {
                     navController.navigate("spotify_liked_songs")
                 }
             } else {
                 spotifyPlaylists.firstOrNull { it.id == id }?.let { sp ->
-                    com.metrolist.music.ui.component.LibraryPinCard(key, sp.name, "Spotify", SpotifyMapper.getPlaylistThumbnail(sp)) {
+                    com.metrolist.music.ui.component.LibraryPinCard(key, sp.name, "Spotify", SpotifyMapper.getPlaylistThumbnail(sp), onLongClick = {
+                        pinMenu {
+                            com.metrolist.music.ui.menu.SpotifyPlaylistMenu(
+                                playlist = sp,
+                                onNavigate = { navController.navigate("spotify_playlist/${sp.id}") },
+                                onDismiss = menuState::dismiss,
+                            )
+                        }
+                    }) {
                         navController.navigate("spotify_playlist/${sp.id}")
                     }
                 }

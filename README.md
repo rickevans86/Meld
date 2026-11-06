@@ -55,9 +55,11 @@ where `<n>` is the build number.
 ### Library
 - **YouTube and Spotify together.** Both libraries show on the same page.
 - **Source logos.** Each playlist shows a small YouTube or Spotify logo between its picture and its name.
-- **Pins.** Pin any playlist, album or artist (⋮ → Pin to top) and it appears in a Pins row at the top of
-  the library and at the top of the playlist list.
-- **Auto-download new songs.** On a playlist, ⋮ → Auto-download new songs. Every few hours the playlist is
+- **Pins.** Pin any playlist, album or artist, or Liked songs (⋮ → Pin to top) and it appears in a Pins row
+  at the top of the library and at the top of the playlist list. Long-press a pin to open its menu.
+- **Same menu everywhere.** The ⋮ inside a playlist or Liked songs has Play next, Pin to top and
+  Auto-download new songs, like the playlist's menu in the Library.
+- **Auto-download new songs.** On a playlist or Liked songs, ⋮ → Auto-download new songs. Every few hours the playlist is
   refreshed from YouTube and any new song is downloaded. Switching it on also downloads what's already there.
 - **Downloads as files.** Downloaded songs can be saved as ordinary audio files on the phone.
 

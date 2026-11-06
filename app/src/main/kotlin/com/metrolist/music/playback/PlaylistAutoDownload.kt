@@ -62,6 +62,21 @@ class PlaylistAutoDownload(context: Context, params: WorkerParameters) : Corouti
 
         val started = mutableListOf<String>()
         for (id in ids) {
+            if (id == LIKED_ID) {
+                // Liked songs: pull in new likes from YouTube, then download any not downloaded yet
+                runCatching {
+                    runCatching { access.syncUtils().syncLikedSongsSuspend() }
+                        .onFailure { Timber.tag(TAG).w(it, "Couldn't refresh liked songs") }
+                    database.likedSongs(com.metrolist.music.constants.SongSortType.CREATE_DATE, true).first().forEach { song ->
+                        val state = downloads.downloads.value[song.id]?.state
+                        if (state != Download.STATE_COMPLETED && state != Download.STATE_QUEUED && state != Download.STATE_DOWNLOADING) {
+                            downloads.downloadInBackground(song)
+                            started += song.id
+                        }
+                    }
+                }.onFailure { Timber.tag(TAG).w(it, "Auto-download failed for liked songs") }
+                continue
+            }
             runCatching {
                 val playlist = database.playlist(id).firstOrNull() ?: return@runCatching
                 // Pull in new songs added on YouTube first
@@ -98,7 +113,10 @@ class PlaylistAutoDownload(context: Context, params: WorkerParameters) : Corouti
         private const val PERIODIC = "playlist_auto_download"
         private const val NOW = "playlist_auto_download_now"
 
-        /** Ids of playlists whose new songs download automatically. */
+        /** Id used for Liked songs (not a playlist in the database). */
+        const val LIKED_ID = "liked"
+
+        /** Ids of playlists whose new songs download automatically ([LIKED_ID] for Liked songs). */
         val AutoDownloadPlaylistsKey = stringSetPreferencesKey("wavelengthAutoDownloadPlaylists")
 
         private val online = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()

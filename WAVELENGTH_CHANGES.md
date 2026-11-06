@@ -278,6 +278,19 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   `parseBottomTabs` drops `search_input` from bars saved before. The combined Search screen is still in the
   side menu.
 
+### 0c-8. Playlist menus everywhere, Liked songs pin and auto-download
+- **Long-press a pin** (Library Pins row) opens that item's own ⋮ menu (`LibraryPinCard.onLongClick`):
+  `PlaylistMenu`, `AlbumMenu`, `ArtistMenu` or `SpotifyPlaylistMenu`. That menu has Unpin and Auto-download
+  new songs; before, long-press unpinned straight away, so a pinned playlist's menu couldn't be reached.
+- **⋮ inside a playlist** (`LocalPlaylistMenu`) and **⋮ inside Liked** (`AutoPlaylistMenu`, new
+  `autoPlaylistId` param passed from `AutoPlaylistHeader`) start with the shared `wavelengthPlaylistItems`:
+  Play next, Pin to top of Library and Auto-download new songs (the last two for Liked songs only among the
+  auto playlists).
+- **Liked songs pin:** key `auto:liked` in `LibraryPinsKey`; shown as a Pins card in `LibraryMixScreen` and
+  `LibraryPlaylistsScreen`, and hidden from the list below while pinned.
+- **Liked songs auto-download:** `PlaylistAutoDownload.LIKED_ID` ("liked") in `AutoDownloadPlaylistsKey`; the
+  worker runs `SyncUtils.syncLikedSongsSuspend()` and downloads liked songs not downloaded yet.
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -610,3 +623,4 @@ To see the exact diff at any time:
 - 2026-11-06: Rewrote README.md for Wavelength (features, download link to this fork, credits); README is now updated with every change.
 - 2026-11-06: Top-bar search on every tab that searches that tab; Spotify home Recently played lists only Spotify songs.
 - 2026-11-07: Removed Search from the bottom bar (each tab has its own search button; Search stays in the side menu).
+- 2026-11-07: Long-press a pin opens its menu; Play next, pin and auto-download in the ⋮ inside playlists and Liked; Liked can be pinned and auto-downloaded.

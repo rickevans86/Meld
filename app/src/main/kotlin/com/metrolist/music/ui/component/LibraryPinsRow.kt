@@ -46,12 +46,14 @@ data class LibraryPinCard(
     val round: Boolean = false,
     /** Shown when there's no artwork, e.g. the heart for liked songs. */
     val placeholder: Int = R.drawable.queue_music,
+    /** Long-press: opens the item's ⋮ menu (which has Unpin). Null unpins straight away. */
+    val onLongClick: (() -> Unit)? = null,
     val onClick: () -> Unit,
 )
 
 /**
  * Spotify-style Pins row at the top of the Library: square artwork with the name underneath.
- * Long-press a pin to unpin it.
+ * Long-press a pin to open its menu (auto-download, unpin and the rest).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -81,7 +83,7 @@ fun LibraryPinsRow(
                     Modifier
                         .width(PinSize)
                         .clip(RoundedCornerShape(8.dp))
-                        .combinedClickable(onClick = pin.onClick, onLongClick = { onUnpin(pin) }),
+                        .combinedClickable(onClick = pin.onClick, onLongClick = pin.onLongClick ?: { onUnpin(pin) }),
                 ) {
                     Box(
                         Modifier
