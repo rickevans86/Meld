@@ -1527,4 +1527,7 @@
     <string name="auto_recognise_need_mic">Allow the microphone first: tap the big button once to recognise a song.</string>
     <string name="playlist_auto_download_on">Auto-download new songs</string>
     <string name="playlist_auto_download_off">Stop auto-downloading new songs</string>
+    <string name="auto_recognise_caption">Auto listening</string>
+    <string name="auto_recognise_caption_hint">Hold the button for 5 seconds to stop</string>
+    <string name="auto_recognise_keep_holding">Keep holding for auto listening…</string>
 </resources>

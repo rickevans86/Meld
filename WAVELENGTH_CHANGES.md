@@ -223,6 +223,9 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   (not the same as the last one) is saved to recognition history and added to the recognised-songs playlist.
   Waits 45 s after a match, 10 s after no match, 30 s after an error; pauses while the normal Recognise screen
   is listening. `AutoRecognitionService.running` is the on/off state.
+  On the Recognise screen, holding the big button for 5 seconds switches it on (or off); while held the caption
+  says "Keep holding for auto listening…". While on, "Auto listening" (plus "Hold the button for 5 seconds to
+  stop") shows under the button, and Cancel while listening also switches it off.
 - **No duplicate recognised songs**: `RecognisedSongs` skips a song already in the playlist by YouTube id, or by
   the same core title (ignoring "(…)", "[…]" and " - …" extras) with an overlapping artist.
 - **Playlist auto-download** (`playback/PlaylistAutoDownload.kt`): playlist ⋮ → "Auto-download new songs".

@@ -5,6 +5,8 @@
 
 package com.metrolist.music.ui.screens.recognition
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.collectAsState
 import com.metrolist.music.recognition.MusicRecognitionService
 import com.metrolist.music.recognition.AutoRecognitionService
@@ -260,12 +262,26 @@ fun RecognitionScreen(
             ) { status ->
                 when (status) {
                     is RecognitionStatus.Ready -> {
-                        ReadyState(onStartRecognition = ::startRecognition)
+                        ReadyState(
+                            onStartRecognition = ::startRecognition,
+                            // Holding the button for 5 seconds switches Keep listening on (or off again)
+                            onHoldFiveSeconds = {
+                                if (AutoRecognitionService.running.value) {
+                                    AutoRecognitionService.stop(context)
+                                } else if (MusicRecognitionService.hasRecordPermission(context)) {
+                                    AutoRecognitionService.start(context)
+                                } else {
+                                    startRecognition()
+                                }
+                            },
+                        )
                     }
 
                     is RecognitionStatus.Listening -> {
                         ListeningState(
                             onCancel = {
+                                // Cancel also switches Keep listening off
+                                if (AutoRecognitionService.running.value) AutoRecognitionService.stop(context)
                                 com.metrolist.music.recognition.MusicRecognitionService
                                     .reset()
                             },
@@ -311,12 +327,29 @@ fun RecognitionScreen(
                     }
                 }
             }
+            // Shown under the button while Keep listening is on
+            val autoListening by AutoRecognitionService.running.collectAsState()
+            if (autoListening) {
+                Text(
+                    text = stringResource(R.string.auto_recognise_caption),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 24.dp),
+                )
+                Text(
+                    text = stringResource(R.string.auto_recognise_caption_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ReadyState(onStartRecognition: () -> Unit) {
+private fun ReadyState(onStartRecognition: () -> Unit, onHoldFiveSeconds: () -> Unit) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var holding by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -335,7 +368,28 @@ private fun ReadyState(onStartRecognition: () -> Unit) {
                                     Color.Transparent,
                                 ),
                         ),
-                    ).clickable { onStartRecognition() },
+                    ).pointerInput(Unit) {
+                        // Tap: recognise once. Hold for 5 seconds: Keep listening on/off.
+                        detectTapGestures(
+                            onPress = {
+                                holding = true
+                                var held = false
+                                val timer = kotlinx.coroutines.coroutineScope {
+                                    val job = launch {
+                                        kotlinx.coroutines.delay(5_000)
+                                        held = true
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        onHoldFiveSeconds()
+                                    }
+                                    val released = tryAwaitRelease()
+                                    job.cancel()
+                                    released
+                                }
+                                holding = false
+                                if (timer && !held) onStartRecognition()
+                            },
+                        )
+                    },
             contentAlignment = Alignment.Center,
         ) {
             Box(
@@ -356,7 +410,7 @@ private fun ReadyState(onStartRecognition: () -> Unit) {
         }
 
         Text(
-            text = stringResource(R.string.tap_to_recognize),
+            text = stringResource(if (holding) R.string.auto_recognise_keep_holding else R.string.tap_to_recognize),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
