@@ -108,8 +108,18 @@ internal fun buildSpeedDialItems(
     home: List<YTItem>,
 ): List<YTItem> =
     (pinned + keepListening + quickPicks + home)
+        // Podcasts and episodes live in the Podcasts tab, so Speed dial leaves them out
+        .filterNot { it.isPodcastLike() }
         .distinctBy { it.id }
         .take(27)
+
+/** Podcast shows, podcast episodes and audiobook chapters (all of which have their own tabs). */
+internal fun YTItem.isPodcastLike(): Boolean =
+    this is com.metrolist.innertube.models.PodcastItem ||
+        this is com.metrolist.innertube.models.EpisodeItem ||
+        (this is SongItem && isEpisode) ||
+        id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) ||
+        id.startsWith(com.metrolist.music.constants.AUDIOBOOK_ID_PREFIX)
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -177,6 +187,7 @@ class HomeViewModel @Inject constructor(
                                     title = item.title,
                                     artists = item.artists.map { Artist(name = it.name, id = it.id) },
                                     thumbnail = item.thumbnailUrl ?: "",
+                                    isEpisode = item.song.isEpisode,
                                 )
 
                             is Album ->
@@ -202,7 +213,7 @@ class HomeViewModel @Inject constructor(
                         }
                     },
                 quickPicks =
-                    quick.orEmpty().map { song ->
+                    quick.orEmpty().filterNot { it.song.isEpisode }.map { song ->
                         SongItem(
                             id = song.id,
                             title = song.title,
@@ -698,7 +709,16 @@ class HomeViewModel @Inject constructor(
             var newReleasesSection: SpotifyHomeSection? = null
 
             Timber.d("spotifyHome: top tracks from profile cache = ${profileTracks.size}")
-            val topTracks = if (hideExplicit) profileTracks.filter { !it.explicit } else profileTracks
+            // Start listening is songs only: drop podcast episodes and audiobook chapters, which can come
+            // from Spotify itself or from Wavelength's own play history when Spotify has no data
+            val songsOnly = profileTracks.filterNot { track ->
+                track.uri?.contains(":episode:") == true ||
+                    track.uri?.contains(":show:") == true ||
+                    track.id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) ||
+                    track.id.startsWith(com.metrolist.music.constants.AUDIOBOOK_ID_PREFIX) ||
+                    runCatching { database.getSongById(track.id)?.song?.isEpisode == true }.getOrDefault(false)
+            }
+            val topTracks = if (hideExplicit) songsOnly.filter { !it.explicit } else songsOnly
             if (topTracks.isNotEmpty()) {
                 sections.add(SpotifyHomeSection(
                     title = "spotify_top_tracks",

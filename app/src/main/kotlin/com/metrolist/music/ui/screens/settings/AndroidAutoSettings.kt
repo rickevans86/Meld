@@ -76,6 +76,7 @@ enum class AndroidAutoSection(val id: String) {
     NEWS("news"),
     RADIO("radio"),
     SUBSONIC("subsonic"),
+    MEDIA_SERVER("media_server"),
 }
 
 @Composable
@@ -92,6 +93,7 @@ fun AndroidAutoSection.label(): String = when (this) {
     AndroidAutoSection.RADIO -> stringResource(R.string.radio_tab)
     AndroidAutoSection.CONTINUE -> stringResource(R.string.auto_continue_listening)
     AndroidAutoSection.SUBSONIC -> stringResource(R.string.subsonic_tab)
+    AndroidAutoSection.MEDIA_SERVER -> stringResource(R.string.media_server_tab)
 }
 
 fun serializeSections(sections: List<Pair<AndroidAutoSection, Boolean>>): String =
@@ -243,6 +245,7 @@ fun AndroidAutoSettings(
                                         AndroidAutoSection.RADIO -> R.drawable.radio
                                         AndroidAutoSection.CONTINUE -> R.drawable.history
                                         AndroidAutoSection.SUBSONIC -> R.drawable.dns
+                                        AndroidAutoSection.MEDIA_SERVER -> R.drawable.dns
                                     }
                                 ),
                                 title = { Text(section.label()) },

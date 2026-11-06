@@ -28,6 +28,8 @@ enum class WavelengthFeature(val id: String, val routes: Set<String>, val autoSe
     SECOND_SOURCE("second_source", setOf("home_alt"), emptySet()),
     NEWS("news", setOf("news", "news_sources"), setOf("news")),
     NAVIDROME("navidrome", setOf("subsonic"), setOf("subsonic")),
+    /** Jellyfin / Plex music (one tab; pick the server type when signing in). */
+    MEDIA_SERVER("media_server", setOf("media_server"), setOf("media_server")),
     AUDIOBOOKS("audiobooks", setOf("audiobooks"), setOf("audiobooks")),
     PODCASTS("podcasts", setOf("podcasts"), setOf("podcasts")),
     LOCAL_FILES("local_files", setOf("local_files"), setOf("local_files")),

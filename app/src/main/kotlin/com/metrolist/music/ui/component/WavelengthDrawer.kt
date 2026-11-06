@@ -42,7 +42,12 @@ data class DrawerDestination(
 object WavelengthDrawer {
     /** Home is the default source; the other source's home sits under its own name. */
     fun listen(alternateIsSpotify: Boolean) = listOf(
-        DrawerDestination("home", R.string.home, R.drawable.home_outlined),
+        // The main home is named after the default source: YouTube or Spotify
+        if (alternateIsSpotify) {
+            DrawerDestination("home", R.string.home_youtube, R.drawable.home_outlined)
+        } else {
+            DrawerDestination("home", R.string.home_spotify, R.drawable.spotify)
+        },
         if (alternateIsSpotify) {
             DrawerDestination(ALT_HOME_ROUTE, R.string.home_spotify, R.drawable.spotify)
         } else {
@@ -57,10 +62,13 @@ object WavelengthDrawer {
         DrawerDestination("audiobooks", R.string.filter_audiobooks, R.drawable.audiobook),
         DrawerDestination("radio", R.string.radio_tab, R.drawable.radio),
         DrawerDestination("subsonic", R.string.subsonic_tab, R.drawable.dns),
+        DrawerDestination("media_server", R.string.media_server_tab, R.drawable.dns),
         DrawerDestination("local_files", R.string.filter_local_files, R.drawable.folder),
     )
     val more = listOf(
         // Listen Together is switched off in Wavelength (see RemovedIntegrations)
+        // Song recognition ("Shazam"): listens and identifies the song playing
+        DrawerDestination("recognition", R.string.recognised_menu, R.drawable.mic, topLevel = false),
         DrawerDestination("history", R.string.history, R.drawable.history, topLevel = false),
         DrawerDestination("stats", R.string.stats, R.drawable.stats, topLevel = false),
         DrawerDestination("settings", R.string.settings, R.drawable.settings, topLevel = false),
@@ -70,7 +78,7 @@ object WavelengthDrawer {
     /** Top-level screens: they keep the bottom bar showing whether or not they're on it. */
     val drawerOnlyRoutes = setOf(
         "home", "search_input", "library", "podcasts", "news",
-        "audiobooks", "radio", "subsonic", "local_files", "home_alt",
+        "audiobooks", "radio", "subsonic", "media_server", "local_files", "home_alt",
     )
 
     const val ALT_HOME_ROUTE = "home_alt"

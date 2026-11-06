@@ -314,6 +314,7 @@ constructor(
                                     AndroidAutoSection.RADIO -> autoExtras.rootItem(AutoLibraryExtras.RADIO)
                                     AndroidAutoSection.CONTINUE -> autoExtras.rootItem(AutoLibraryExtras.CONTINUE)
                                     AndroidAutoSection.SUBSONIC -> autoExtras.rootItem(AutoLibraryExtras.SUBSONIC)
+                                    AndroidAutoSection.MEDIA_SERVER -> autoExtras.rootItem(AutoLibraryExtras.MEDIA_SERVER)
                                 }
                             }
                     }

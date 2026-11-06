@@ -67,10 +67,14 @@ sealed class Screens(
     )
 
     // Wavelength screens that can also be put on the bottom bar (Settings → Features → Bottom bar)
+    // The main home ("home") as shown on the bottom bar, named after the default source
+    object MainHomeYouTube : Screens(R.string.home_youtube, R.drawable.home_outlined, R.drawable.home_filled, "home")
+    object MainHomeSpotify : Screens(R.string.home_spotify, R.drawable.spotify, R.drawable.spotify, "home")
     object AltHomeSpotify : Screens(R.string.home_spotify, R.drawable.spotify, R.drawable.spotify, "home_alt")
     object AltHomeYouTube : Screens(R.string.home_youtube, R.drawable.home_outlined, R.drawable.home_filled, "home_alt")
     object Radio : Screens(R.string.radio_tab, R.drawable.radio, R.drawable.radio, "radio")
     object Subsonic : Screens(R.string.subsonic_tab, R.drawable.dns, R.drawable.dns, "subsonic")
+    object MediaServer : Screens(R.string.media_server_tab, R.drawable.dns, R.drawable.dns, "media_server")
     object LocalFiles : Screens(R.string.filter_local_files, R.drawable.folder, R.drawable.folder, "local_files")
 
     companion object {

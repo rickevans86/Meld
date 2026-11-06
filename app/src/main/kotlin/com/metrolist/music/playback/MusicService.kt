@@ -4604,6 +4604,12 @@ class MusicService :
                 val uri = subsonicRepository.streamUri(mediaId) ?: error("Not signed in to the music server")
                 return@Factory dataSpec.withUri(uri)
             }
+            // Jellyfin / Plex: stream the original file from the server
+            if (com.metrolist.music.constants.isMediaServerId(mediaId)) {
+                val uri = com.metrolist.music.mediaserver.MediaServerRepository.from(this@MusicService).streamUri(mediaId)
+                    ?: error("Not signed in to Jellyfin or Plex")
+                return@Factory dataSpec.withUri(uri)
+            }
 
             // Handle local audio files — resolve to content URI and bypass YouTube fetch
             if (isOnDeviceMediaId(mediaId)) {

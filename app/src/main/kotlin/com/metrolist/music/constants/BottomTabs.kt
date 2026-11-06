@@ -28,7 +28,8 @@ val DEFAULT_BOTTOM_TABS = listOf("home", "search_input", "podcasts", "news", "li
 
 /** Every screen that can go on the bar, in side-menu order. The second home is named after its source. */
 fun bottomTabChoices(alternateIsSpotify: Boolean): List<Screens> = listOf(
-    Screens.Home,
+    // Main home, named after the default source (the second home is the other one)
+    if (alternateIsSpotify) Screens.MainHomeYouTube else Screens.MainHomeSpotify,
     if (alternateIsSpotify) Screens.AltHomeSpotify else Screens.AltHomeYouTube,
     Screens.Search,
     Screens.Library,
@@ -37,6 +38,7 @@ fun bottomTabChoices(alternateIsSpotify: Boolean): List<Screens> = listOf(
     Screens.Audiobooks,
     Screens.Radio,
     Screens.Subsonic,
+    Screens.MediaServer,
     Screens.LocalFiles,
 )
 

@@ -182,6 +182,32 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
     Wavelength key is followed as a podcast and switched on as "Podcasts you follow".
   - Both use `PodcastOpmlViewModel` (now also `exportRadio`, `importRadio`, `exportNews`, `importNews`).
 
+### 0c-6. Jellyfin / Plex, song recognition playlist, home names, more podcast filtering
+- **Jellyfin / Plex tab** (`media_server` route, `WavelengthFeature.MEDIA_SERVER`, `Screens.MediaServer`, side menu,
+  bottom bar choice, Android Auto section `MEDIA_SERVER`). One tab; the sign-in screen picks the server type.
+  - `mediaserver/MediaServerRepository.kt`: Jellyfin/Emby sign-in (`/Users/AuthenticateByName`, keeps only the
+    access token) and Plex sign-in by PIN (`plex.tv/api/v2/pins`, user enters the code at plex.tv/link, then
+    `api/v2/resources` lists servers; direct connections tried before relay). Albums, artists, artist albums,
+    album songs, playlists, favourites (Jellyfin only), search (`/hubs/search` on Plex).
+  - Songs saved as `mediaserver:<item id>` (`MEDIA_SERVER_ID_PREFIX`, `isMediaServerId`, included in
+    `isOnDeviceMediaId`). Streams the original file: Jellyfin `/Audio/<id>/stream?static=true`, Plex the track's
+    part key (cached in `media_server_parts.json`). Hooked into `MusicService.createDataSourceFactory`,
+    `DownloadUtil` and `DownloadExporter` (folders "Jellyfin - <album/playlist>" / "Plex - …", from
+    `media_server_folders.json`).
+  - `MediaServerAuthStore.kt`: token encrypted with an Android-keystore key, plus a per-install device id.
+  - UI: `ui/screens/mediaserver/MediaServerScreen.kt`, `viewmodels/MediaServerViewModel.kt`.
+  - Android Auto (`AutoLibraryExtras`): Favourites (Jellyfin), Playlists, Albums, Artists → albums → songs.
+- **Song recognition → playlist**: `recognition/RecognisedSongs.kt`. When `MusicRecognitionService` recognises a
+  song it is found on YouTube Music (Shazam's own video id first), saved, and added to the playlist chosen in
+  Settings → Features → **Song recognition** (`RecognisedSongs.PlaylistKey`; Off, a new "Recognised songs"
+  playlist, or any editable playlist). Skips duplicates; synced YouTube playlists get it via `SyncUtils`.
+  A toast says what happened. Side menu has **Recognise song** (route `recognition`).
+- **Home named after its source**: main home is "YouTube" or "Spotify" in the side menu, top bar and bottom bar
+  (`Screens.MainHomeYouTube` / `MainHomeSpotify`, route `home`); the second home keeps the other name.
+- **More podcast filtering**: `buildSpeedDialItems` drops podcasts/episodes/audiobook items (`YTItem.isPodcastLike()`);
+  keep-listening and quick-pick episodes are marked/skipped; Home's "Similar to" rows drop podcast items and rows
+  based on an episode; Spotify "Start listening" drops episodes, shows and Wavelength podcast/audiobook items.
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -500,3 +526,4 @@ To see the exact diff at any time:
 - 2026-11-05: YouTube/Spotify logos on playlists (labels in Android Auto); Local files chip removed from Library; Pins on Playlists page; ⋮ on Spotify playlists.
 - 2026-11-05: Radio (M3U/PLS) and News (OPML) backup and import sections in Backup and restore.
 - 2026-11-05: Fixed a crash when the music service stopped (episode/audiobook position was read from a background thread in `MusicService.onDestroy`).
+- 2026-11-06: Jellyfin / Plex tab; recognised songs auto-added to a chosen playlist; home named YouTube/Spotify; podcasts removed from Speed dial, Similar to and Spotify Start listening.

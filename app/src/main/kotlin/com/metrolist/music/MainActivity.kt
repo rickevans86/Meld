@@ -764,7 +764,7 @@ class MainActivity : FragmentActivity() {
                             .mapNotNull { route -> choices.firstOrNull { it.route == route } }
                             .filterNot { disabledFeatures.hidesRoute(it.route) }
                             .take(com.metrolist.music.constants.MAX_BOTTOM_TABS)
-                            .ifEmpty { listOf(Screens.Home) }
+                            .ifEmpty { listOf(choices.first()) }
                     }
                 val routeIndexMap = remember(navigationItems) {
                     navigationItems.mapIndexed { i, s -> s.route to i }.toMap()
@@ -800,6 +800,7 @@ class MainActivity : FragmentActivity() {
                             "local_files",
                             "radio",
                             "subsonic",
+                            "media_server",
                             Screens.ListenTogether.route,
                             "settings",
                         )
@@ -1040,7 +1041,9 @@ class MainActivity : FragmentActivity() {
                 val currentTitleRes =
                     remember(navBackStackEntry, defaultHomeSource) {
                         when (navBackStackEntry?.destination?.route) {
-                            Screens.Home.route -> R.string.home
+                            // The main home is named after its source
+                            Screens.Home.route ->
+                                if (defaultHomeSource == com.metrolist.music.constants.HOME_SOURCE_SPOTIFY) R.string.home_spotify else R.string.home_youtube
                             Screens.Search.route -> R.string.search
                             Screens.Library.route -> R.string.filter_library
                             Screens.Podcasts.route -> R.string.filter_podcasts
@@ -1051,6 +1054,7 @@ class MainActivity : FragmentActivity() {
                             "local_files" -> R.string.filter_local_files
                             "radio" -> R.string.radio_tab
                             "subsonic" -> R.string.subsonic_tab
+                            "media_server" -> R.string.media_server_tab
                             Screens.ListenTogether.route -> R.string.together
                             else -> null
                         }

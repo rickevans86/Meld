@@ -153,6 +153,11 @@ fun NavGraphBuilder.navigationBuilder(
         com.metrolist.music.ui.screens.subsonic.SubsonicScreen(navController)
     }
 
+    // Jellyfin / Plex music
+    composable("media_server") {
+        com.metrolist.music.ui.screens.mediaserver.MediaServerScreen(navController)
+    }
+
     composable(Screens.Audiobooks.route) {
         com.metrolist.music.ui.screens.library.audiobooks.AudiobooksScreen(navController, filterContent = {})
     }

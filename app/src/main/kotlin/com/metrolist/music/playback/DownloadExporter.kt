@@ -84,6 +84,11 @@ class DownloadExporter(
             if (names.isEmpty()) {
                 names += com.metrolist.music.subsonic.SubsonicRepository.FOLDER_PREFIX + (song.song.albumName ?: "Songs")
             }
+        } else if (com.metrolist.music.constants.isMediaServerId(song.id)) {
+            // Jellyfin / Plex songs: "Jellyfin - <album or playlist>" / "Plex - …"
+            val server = com.metrolist.music.mediaserver.MediaServerRepository.from(context)
+            names += server.exportFolders(song.id)
+            if (names.isEmpty()) names += server.folderPrefix + (song.song.albumName ?: "Songs")
         } else if (song.song.liked) {
             names += if (youTubeSignedIn()) "YouTube - Liked songs" else "Liked songs"
         }

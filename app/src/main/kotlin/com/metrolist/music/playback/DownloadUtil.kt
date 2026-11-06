@@ -129,6 +129,12 @@ constructor(
                     ?: error("Not signed in to the music server")
                 return@Factory dataSpec.withUri(uri)
             }
+            // Jellyfin / Plex songs download the original file from the server
+            if (com.metrolist.music.constants.isMediaServerId(mediaId)) {
+                val uri = com.metrolist.music.mediaserver.MediaServerRepository.from(context).streamUri(mediaId)
+                    ?: error("Not signed in to Jellyfin or Plex")
+                return@Factory dataSpec.withUri(uri)
+            }
             if (com.metrolist.music.constants.isRadioId(mediaId)) error("Live radio can't be downloaded")
 
             if (playerCache.isCached(mediaId, dataSpec.position, length)) {

@@ -51,6 +51,7 @@ constructor(
     private val radio: com.metrolist.music.radio.RadioDirectory,
     private val downloadUtil: DownloadUtil,
     private val subsonic: com.metrolist.music.subsonic.SubsonicRepository,
+    private val mediaServer: com.metrolist.music.mediaserver.MediaServerRepository,
 ) {
     fun isBrowsable(mediaId: String): Boolean =
         mediaId == LOCAL_FILES ||
@@ -68,6 +69,13 @@ constructor(
             mediaId == SUB_FOLDERS ||
             (mediaId.startsWith("$SUB_DIR/") && mediaId.count { it == '/' } == 2) ||
             ((mediaId.startsWith("$SUB_ALBUM/") || mediaId.startsWith("$SUB_PLAYLIST/")) && mediaId.count { it == '/' } == 2) ||
+            mediaId == MEDIA_SERVER ||
+            mediaId == MS_FAVOURITES ||
+            mediaId == MS_PLAYLISTS ||
+            mediaId == MS_ALBUMS ||
+            mediaId == MS_ARTISTS ||
+            ((mediaId.startsWith("$MS_ALBUM/") || mediaId.startsWith("$MS_PLAYLIST/") || mediaId.startsWith("$MS_ARTIST/")) &&
+                mediaId.count { it == '/' } == 2) ||
             mediaId == AUDIOBOOKS ||
             mediaId == ABS_ALL ||
             mediaId == PODCASTS ||
@@ -81,6 +89,7 @@ constructor(
         RADIO -> folder(RADIO, context.getString(R.string.radio_tab), null, icon(R.drawable.radio), MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS)
         CONTINUE -> folder(CONTINUE, context.getString(R.string.auto_continue_listening), null, icon(R.drawable.history), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         SUBSONIC -> folder(SUBSONIC, context.getString(R.string.subsonic_tab), null, icon(R.drawable.dns), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+        MEDIA_SERVER -> folder(MEDIA_SERVER, context.getString(R.string.media_server_tab), null, icon(R.drawable.dns), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         AUDIOBOOKS -> folder(AUDIOBOOKS, context.getString(R.string.filter_audiobooks), null, icon(R.drawable.audiobook), MediaMetadata.MEDIA_TYPE_FOLDER_AUDIO_BOOKS)
         else -> folder(PODCASTS, context.getString(R.string.filter_podcasts), null, icon(R.drawable.mic), MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
     }
@@ -137,6 +146,23 @@ constructor(
             playable("$RADIO/${station.id}", station.name, station.details.ifBlank { null }, station.favicon?.toUri() ?: icon(R.drawable.radio))
         }
         parentId == SUBSONIC -> subsonicRoot()
+        // Jellyfin / Plex
+        parentId == MEDIA_SERVER -> mediaServerRoot()
+        parentId == MS_FAVOURITES -> msSongsWithShuffle(MS_FAVOURITES) { mediaServer.favourites() }
+        parentId == MS_PLAYLISTS -> serverCall { mediaServer.playlists() }.orEmpty().map {
+            folder("$MS_PLAYLIST/${it.id}", it.name, null, it.coverUrl?.toUri(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
+        }
+        parentId == MS_ALBUMS -> serverCall { mediaServer.albums() }.orEmpty().map {
+            folder("$MS_ALBUM/${it.id}", it.title, it.artist, it.coverUrl?.toUri(), MediaMetadata.MEDIA_TYPE_ALBUM)
+        }
+        parentId == MS_ARTISTS -> serverCall { mediaServer.artists() }.orEmpty().map {
+            folder("$MS_ARTIST/${it.id}", it.name, null, it.coverUrl?.toUri(), MediaMetadata.MEDIA_TYPE_ARTIST)
+        }
+        parentId.startsWith("$MS_ARTIST/") -> serverCall { mediaServer.artistAlbums(parentId.substringAfterLast('/')) }.orEmpty().map {
+            folder("$MS_ALBUM/${it.id}", it.title, it.year?.toString(), it.coverUrl?.toUri(), MediaMetadata.MEDIA_TYPE_ALBUM)
+        }
+        parentId.startsWith("$MS_ALBUM/") -> msSongsWithShuffle(parentId) { mediaServer.albumSongs(parentId.substringAfterLast('/'), null) }
+        parentId.startsWith("$MS_PLAYLIST/") -> msSongsWithShuffle(parentId) { mediaServer.playlistSongs(parentId.substringAfterLast('/'), null) }
         parentId == SUB_STARRED -> serverSongsWithShuffle(SUB_STARRED) { subsonic.starredSongs() }
         parentId == SUB_PLAYLISTS -> serverCall { subsonic.playlists() }.orEmpty().map {
             folder("$SUB_PLAYLIST/${it.id}", it.name, null, subsonic.coverUrl(it.coverArt)?.toUri(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
@@ -188,6 +214,7 @@ constructor(
             if (songs.isEmpty()) null else MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, start.coerceAtLeast(0), C.TIME_UNSET)
         }
         SUBSONIC -> playSubsonic(path)
+        MEDIA_SERVER -> playMediaServer(path)
         AUDIOBOOKS -> playAudiobook(path)
         PODCASTS -> playPodcast(path)
         else -> null
@@ -458,6 +485,45 @@ constructor(
         radio.favourites.value.ifEmpty {
             withTimeoutOrNull(NETWORK_TIMEOUT_MS) { runCatching { radio.popular().take(40) }.getOrNull() }.orEmpty()
         }
+
+    private fun mediaServerRoot(): List<MediaItem> {
+        if (mediaServer.session.value == null) return emptyList()
+        return listOfNotNull(
+            if (mediaServer.hasFavourites) {
+                folder(MS_FAVOURITES, context.getString(R.string.media_server_favourites), null, icon(R.drawable.favorite), MediaMetadata.MEDIA_TYPE_PLAYLIST)
+            } else {
+                null
+            },
+            folder(MS_PLAYLISTS, context.getString(R.string.playlists), null, icon(R.drawable.queue_music), MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS),
+            folder(MS_ALBUMS, context.getString(R.string.subsonic_albums), null, icon(R.drawable.album), MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS),
+            folder(MS_ARTISTS, context.getString(R.string.subsonic_artists), null, icon(R.drawable.artist), MediaMetadata.MEDIA_TYPE_FOLDER_ARTISTS),
+        )
+    }
+
+    private suspend fun msSongs(load: suspend () -> List<com.metrolist.music.mediaserver.MsSong>): List<Song> =
+        serverCall { mediaServer.prepare(load()) }.orEmpty()
+
+    private suspend fun msSongsWithShuffle(
+        parent: String,
+        load: suspend () -> List<com.metrolist.music.mediaserver.MsSong>,
+    ): List<MediaItem> {
+        val songs = msSongs(load)
+        return if (songs.isEmpty()) emptyList() else listOf(shuffleItem(parent)) + songs.map { it.toAutoItem(parent) }
+    }
+
+    /** Paths: media_server/favourites/<song>, media_server/album/<album>/<song>, media_server/playlist/<playlist>/<song>. */
+    private suspend fun playMediaServer(path: List<String>): MediaItemsWithStartPosition? {
+        val (songs, chosen) = when (path.getOrNull(1)) {
+            "favourites" -> msSongs { mediaServer.favourites() } to path.getOrNull(2)
+            "album" -> msSongs { mediaServer.albumSongs(path.getOrNull(2).orEmpty(), null) } to path.getOrNull(3)
+            "playlist" -> msSongs { mediaServer.playlistSongs(path.getOrNull(2).orEmpty(), null) } to path.getOrNull(3)
+            else -> return null
+        }
+        if (songs.isEmpty()) return null
+        if (chosen == SHUFFLE) return MediaItemsWithStartPosition(songs.shuffled().map { it.toMediaItem() }, 0, C.TIME_UNSET)
+        val start = songs.indexOfFirst { it.id == chosen }.coerceAtLeast(0)
+        return MediaItemsWithStartPosition(songs.map { it.toMediaItem() }, start, C.TIME_UNSET)
+    }
 
     private fun subsonicRoot(): List<MediaItem> {
         if (subsonic.session.value == null) return emptyList()
@@ -764,6 +830,14 @@ constructor(
         const val PODCASTS = "podcasts"
         const val RADIO = "radio"
         const val SUBSONIC = "subsonic"
+        const val MEDIA_SERVER = "media_server"
+        private const val MS_FAVOURITES = "$MEDIA_SERVER/favourites"
+        private const val MS_PLAYLISTS = "$MEDIA_SERVER/playlists"
+        private const val MS_ALBUMS = "$MEDIA_SERVER/albums"
+        private const val MS_ARTISTS = "$MEDIA_SERVER/artists"
+        private const val MS_ALBUM = "$MEDIA_SERVER/album"
+        private const val MS_PLAYLIST = "$MEDIA_SERVER/playlist"
+        private const val MS_ARTIST = "$MEDIA_SERVER/artist"
         private const val SUB_STARRED = "$SUBSONIC/starred"
         private const val SUB_PLAYLISTS = "$SUBSONIC/playlists"
         private const val SUB_ALBUMS = "$SUBSONIC/albums"

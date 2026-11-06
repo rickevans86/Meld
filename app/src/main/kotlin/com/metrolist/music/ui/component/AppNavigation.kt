@@ -77,7 +77,7 @@ fun AppNavigationRail(
             }
 
             val isSearchItem = screen == Screens.Search && onSearchLongClick != null
-            val isHomeHoldItem = screen == Screens.Home && onHomeLongHold != null
+            val isHomeHoldItem = screen.route == Screens.Home.route && onHomeLongHold != null
             val interactionSource = remember { MutableInteractionSource() }
 
             // Long press detection using InteractionSource
@@ -159,7 +159,7 @@ fun AppNavigationBar(
             }
 
             val isSearchItem = screen == Screens.Search && onSearchLongClick != null
-            val isHomeHoldItem = screen == Screens.Home && onHomeLongHold != null
+            val isHomeHoldItem = screen.route == Screens.Home.route && onHomeLongHold != null
             val interactionSource = remember { MutableInteractionSource() }
 
             // Long press detection using InteractionSource

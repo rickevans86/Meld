@@ -6,6 +6,14 @@
 package com.metrolist.music.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.map
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -198,6 +206,7 @@ fun FeaturesSettings(navController: NavController) {
                         if (secondIsYouTube) R.string.home_youtube to R.drawable.home_outlined else R.string.home_spotify to R.drawable.spotify
                     WavelengthFeature.NEWS -> R.string.news_tab to R.drawable.newspaper
                     WavelengthFeature.NAVIDROME -> R.string.subsonic_tab to R.drawable.dns
+                    WavelengthFeature.MEDIA_SERVER -> R.string.media_server_tab to R.drawable.dns
                     WavelengthFeature.AUDIOBOOKS -> R.string.filter_audiobooks to R.drawable.audiobook
                     WavelengthFeature.PODCASTS -> R.string.filter_podcasts to R.drawable.podcasts
                     WavelengthFeature.LOCAL_FILES -> R.string.filter_local_files to R.drawable.folder
@@ -230,6 +239,8 @@ fun FeaturesSettings(navController: NavController) {
                 )
             },
         )
+        Spacer(Modifier.height(16.dp))
+        RecognisedSongsSetting()
     }
 
     TopAppBar(
@@ -240,4 +251,87 @@ fun FeaturesSettings(navController: NavController) {
             }
         },
     )
+}
+
+/**
+ * Song recognition: which playlist recognised songs are added to automatically (or off).
+ * Lists Wavelength's own editable playlists, plus an option to create a "Recognised songs" playlist.
+ */
+@Composable
+private fun RecognisedSongsSetting() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val database = com.metrolist.music.LocalDatabase.current
+    val playlists by database.playlistsByCreateDateAsc().collectAsState(initial = emptyList())
+    val editable = playlists.filter { it.playlist.isEditable }
+    val selectedId by remember(context) {
+        context.dataStore.data.map { it[com.metrolist.music.recognition.RecognisedSongs.PlaylistKey].orEmpty() }
+    }.collectAsState(initial = "")
+    val selected = editable.firstOrNull { it.id == selectedId }
+    var choosing by remember { mutableStateOf(false) }
+    val newName = stringResource(R.string.recognised_default_playlist)
+
+    fun choose(id: String) {
+        scope.launch { context.dataStore.edit { it[com.metrolist.music.recognition.RecognisedSongs.PlaylistKey] = id } }
+        choosing = false
+    }
+
+    Material3SettingsGroup(
+        title = stringResource(R.string.recognised_section),
+        items = listOf(
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.mic),
+                title = { Text(stringResource(R.string.recognised_playlist_setting)) },
+                description = {
+                    Text(selected?.playlist?.name ?: stringResource(R.string.recognised_off))
+                },
+                onClick = { choosing = true },
+            ),
+        ),
+    )
+
+    if (choosing) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text(stringResource(R.string.recognised_playlist_setting)) },
+            text = {
+                androidx.compose.foundation.lazy.LazyColumn {
+                    item {
+                        RecognisedChoice(stringResource(R.string.recognised_off), selected == null) { choose("") }
+                    }
+                    if (editable.none { it.playlist.name.equals(newName, ignoreCase = true) }) {
+                        item {
+                            RecognisedChoice(stringResource(R.string.recognised_create, newName), false) {
+                                // New Wavelength playlist named "Recognised songs", then select it
+                                val entity = com.metrolist.music.db.entities.PlaylistEntity(name = newName)
+                                database.query { insert(entity) }
+                                choose(entity.id)
+                            }
+                        }
+                    }
+                    items(editable.size) { index ->
+                        val playlist = editable[index]
+                        RecognisedChoice(playlist.playlist.name, playlist.id == selectedId) { choose(playlist.id) }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { choosing = false }) { Text(stringResource(android.R.string.cancel)) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun RecognisedChoice(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+    ) {
+        androidx.compose.material3.RadioButton(selected = selected, onClick = onClick)
+        Text(label, modifier = Modifier.padding(start = 8.dp))
+    }
 }

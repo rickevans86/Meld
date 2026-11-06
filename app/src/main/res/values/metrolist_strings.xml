@@ -1481,4 +1481,28 @@
         <item quantity="one">Saved %d news source</item>
         <item quantity="other">Saved %d news sources</item>
     </plurals>
+    <string name="recognised_menu">Recognise song</string>
+    <string name="recognised_section">Song recognition</string>
+    <string name="recognised_playlist_setting">Add recognised songs to</string>
+    <string name="recognised_off">Off (don\'t add automatically)</string>
+    <string name="recognised_default_playlist">Recognised songs</string>
+    <string name="recognised_create">New playlist: %s</string>
+    <string name="recognised_added">Added \"%1$s\" to %2$s</string>
+    <string name="recognised_already_in">\"%1$s\" is already in %2$s</string>
+    <string name="recognised_not_found">Couldn\'t find \"%s\" on YouTube Music to add to your playlist</string>
+    <string name="recognised_playlist_missing">Your recognised songs playlist no longer exists. Pick another in Settings → Features.</string>
+    <string name="recognised_add_failed">Couldn\'t add \"%s\" to your playlist</string>
+    <string name="media_server_tab">Jellyfin / Plex</string>
+    <string name="media_server_sign_in_title">Connect Jellyfin or Plex</string>
+    <string name="media_server_jellyfin_intro">Sign in to your Jellyfin (or Emby) server to play its music here. Only an access token is kept on this phone, encrypted.</string>
+    <string name="media_server_plex_intro">Sign in with your Plex account. You\'ll get a short code to enter at plex.tv/link, so your password never goes into this app.</string>
+    <string name="media_server_plex_start">Get a sign-in code</string>
+    <string name="media_server_plex_enter_code">Go to plex.tv/link, sign in and enter this code:</string>
+    <string name="media_server_plex_open">Copy code and open plex.tv/link</string>
+    <string name="media_server_plex_waiting">Waiting for the code to be entered…</string>
+    <string name="media_server_plex_pick">Which Plex server do you want to use?</string>
+    <string name="media_server_search">Search your server</string>
+    <string name="media_server_refresh">Refresh</string>
+    <string name="media_server_favourites">Favourites</string>
+    <string name="media_server_songs">%d songs</string>
 </resources>

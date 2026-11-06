@@ -184,6 +184,7 @@ import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.utils.stripSpotifyPrefix
 import com.metrolist.music.viewmodels.CommunityPlaylistItem
 import com.metrolist.music.viewmodels.HomeViewModel
+import com.metrolist.music.viewmodels.isPodcastLike
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -688,7 +689,16 @@ fun HomeScreen(
     val recentlyPlayed = remember(rawRecentlyPlayed) { rawRecentlyPlayed?.filterNot { it.song.isEpisode } }
     val forgottenFavorites = remember(rawForgottenFavorites) { rawForgottenFavorites?.filterNot { it.song.isEpisode } }
     val keepListening = remember(rawKeepListening) { rawKeepListening?.filterNot { it is Song && it.song.isEpisode } }
-    val similarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
+    val rawSimilarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
+    // "Similar to" rows: no podcasts or episodes, and no rows based on an episode
+    val similarRecommendations = remember(rawSimilarRecommendations) {
+        rawSimilarRecommendations?.mapNotNull { rec ->
+            val title = rec.title
+            if (title is Song && title.song.isEpisode) return@mapNotNull null
+            val items = rec.items.filterNot { it.isPodcastLike() }
+            if (items.isEmpty()) null else rec.copy(items = items)
+        }
+    }
     val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
     val rawHomePage by viewModel.homePage.collectAsStateWithLifecycle()
     // Podcasts have their own tab, so Home leaves out the Podcasts chip, podcast rows and episodes
@@ -699,7 +709,8 @@ fun HomeScreen(
 
     val allLocalItems by viewModel.allLocalItems.collectAsStateWithLifecycle()
     val allYtItems by viewModel.allYtItems.collectAsStateWithLifecycle()
-    val speedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
+    val rawSpeedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
+    val speedDialItems = remember(rawSpeedDialItems) { rawSpeedDialItems.filterNot { it.isPodcastLike() } }
     val pinnedSpeedDialItems by viewModel.pinnedSpeedDialItems.collectAsStateWithLifecycle()
     val selectedChip by viewModel.selectedChip.collectAsStateWithLifecycle()
     // A Podcasts chip picked before podcasts left Home can't be seen any more, so switch it off
