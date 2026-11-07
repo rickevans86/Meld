@@ -41,6 +41,9 @@ object RecognisedSongs {
     /** Id of the Wavelength playlist recognised songs go into; missing or empty means off. */
     val PlaylistKey = stringPreferencesKey("wavelengthRecognisedPlaylist")
 
+    /** Id of the playlist the car's add button puts the radio's current song into; empty means not set. */
+    val RadioPlaylistKey = stringPreferencesKey("wavelengthRadioSongsPlaylist")
+
     private const val TAG = "RecognisedSongs"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -55,7 +58,9 @@ object RecognisedSongs {
     fun onRecognised(context: Context, result: RecognitionResult) {
         val app = context.applicationContext
         scope.launch {
-            val message = runCatching { addToPlaylist(app, result) }
+            val message = runCatching {
+                addToPlaylist(app, PlaylistKey, R.string.recognised_playlist_missing, result.title, result.artist, result.youtubeVideoId)
+            }
                 .onFailure { Timber.tag(TAG).w(it, "Couldn't add recognised song") }
                 .getOrElse { app.getString(R.string.recognised_add_failed, result.title) }
                 ?: return@launch
@@ -63,13 +68,53 @@ object RecognisedSongs {
         }
     }
 
-    /** Returns a message to show, or null when the feature is off. */
-    private suspend fun addToPlaylist(context: Context, result: RecognitionResult): String? {
-        val playlistId = context.dataStore.data.first()[PlaylistKey]?.takeIf { it.isNotBlank() } ?: return null
+    /**
+     * The car's add button on a radio station: [streamTitle] is what the station says is playing,
+     * usually "Artist - Title". The song is found on YouTube Music and added to the radio songs
+     * playlist (Settings → Features → Radio songs), like a recognised song.
+     */
+    fun addRadioSong(context: Context, streamTitle: String?) {
+        val app = context.applicationContext
+        scope.launch {
+            val text = streamTitle?.trim().orEmpty()
+            val message = if (text.isBlank()) {
+                app.getString(R.string.radio_song_unknown)
+            } else {
+                val (artist, title) = splitStreamTitle(text)
+                runCatching {
+                    addToPlaylist(app, RadioPlaylistKey, R.string.radio_song_playlist_missing, title, artist, null)
+                        ?: app.getString(R.string.radio_song_no_playlist)
+                }
+                    .onFailure { Timber.tag(TAG).w(it, "Couldn't add radio song") }
+                    .getOrElse { app.getString(R.string.recognised_add_failed, title) }
+            }
+            Handler(Looper.getMainLooper()).post { Toast.makeText(app, message, Toast.LENGTH_LONG).show() }
+        }
+    }
+
+    /** "Artist - Title" → (artist, title). Without a dash the whole text is the title. */
+    internal fun splitStreamTitle(text: String): Pair<String, String> {
+        val dash = Regex("\\s+[-–—]\\s+").find(text) ?: return "" to text
+        val artist = text.substring(0, dash.range.first).trim()
+        val title = text.substring(dash.range.last + 1).trim()
+        return if (artist.isBlank() || title.isBlank()) "" to text else artist to title
+    }
+
+    /** Returns a message to show, or null when no playlist is chosen for [key]. */
+    private suspend fun addToPlaylist(
+        context: Context,
+        key: androidx.datastore.preferences.core.Preferences.Key<String>,
+        missingMessage: Int,
+        title: String,
+        artist: String,
+        youtubeVideoId: String?,
+    ): String? {
+        val result = SongQuery(title, artist, youtubeVideoId)
+        val playlistId = context.dataStore.data.first()[key]?.takeIf { it.isNotBlank() } ?: return null
         val access = EntryPointAccessors.fromApplication(context, Access::class.java)
         val database = access.database()
         val playlist = database.playlist(playlistId).firstOrNull()
-            ?: return context.getString(R.string.recognised_playlist_missing)
+            ?: return context.getString(missingMessage)
         // Already in the playlist under the same name and artist (maybe a different upload)? Then skip it.
         val existing = database.playlistSongs(playlist.id).first()
         if (existing.any { sameSong(it.song.title, it.song.artists.map { a -> a.name }, result.title, result.artist) }) {
@@ -105,9 +150,11 @@ object RecognisedSongs {
         return artistsA.isEmpty() || b.isEmpty() || artistsA.any { a -> norm(a).isNotEmpty() && (b.contains(norm(a)) || norm(a).contains(b)) }
     }
 
-    /** The recognised song on YouTube Music: Shazam's own video if it gave one, else the best song match. */
-    private suspend fun findOnYouTube(result: RecognitionResult): SongItem? {
-        val songs = YouTube.search("${result.title} ${result.artist}", YouTube.SearchFilter.FILTER_SONG)
+    private class SongQuery(val title: String, val artist: String, val youtubeVideoId: String?)
+
+    /** The song on YouTube Music: Shazam's own video if it gave one, else the best song match. */
+    private suspend fun findOnYouTube(result: SongQuery): SongItem? {
+        val songs = YouTube.search("${result.title} ${result.artist}".trim(), YouTube.SearchFilter.FILTER_SONG)
             .getOrNull()?.items.orEmpty().filterIsInstance<SongItem>()
         result.youtubeVideoId?.let { id -> songs.firstOrNull { it.id == id }?.let { return it } }
         fun norm(text: String) = text.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }

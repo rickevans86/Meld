@@ -291,6 +291,24 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - **Liked songs auto-download:** `PlaylistAutoDownload.LIKED_ID` ("liked") in `AutoDownloadPlaylistsKey`; the
   worker runs `SyncUtils.syncLikedSongsSuspend()` and downloads liked songs not downloaded yet.
 
+### 0c-9. Car buttons that fit what's playing, radio songs to a playlist
+- **Per-content buttons** (`MusicService.buttonSet()` / `updateNotification()`, also run on every track change
+  in `onWavelengthTransition`). The custom layout (Android Auto and the notification) is built with
+  `listOfNotNull`:
+  - Music (YouTube/Spotify): heart, repeat, shuffle, YouTube radio, quick-add, as before.
+  - Navidrome, Jellyfin/Plex, phone files (`subsonic:`, `mediaserver:`, `local:`): no YouTube radio button,
+    which only works with YouTube songs.
+  - Podcasts, news and audiobooks (`podcast:`, `audiobook:`, or `isEpisode`): only the heart (save for later).
+  - Live radio (`radio:`): only the add button.
+- **Radio songs to a playlist:** on a radio station the add button (`addToTargetPlaylist`) takes the station's
+  ICY "now playing" text (`RadioDirectory.nowPlaying`), splits "Artist - Title"
+  (`RecognisedSongs.splitStreamTitle`), finds it on YouTube Music and adds it to the playlist in
+  `RecognisedSongs.RadioPlaylistKey`, with the same duplicate check and YouTube sync as recognised songs. A
+  toast says what happened (added, already in it, not found, no song name, no playlist chosen).
+- **Setting:** Settings → Features → Radio songs → Add radio songs to. Uses the same picker as song
+  recognition (`PlaylistTargetDialog`): Off, New playlist: Radio songs (private YouTube playlist when
+  signed in), or any editable playlist.
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -625,3 +643,4 @@ To see the exact diff at any time:
 - 2026-11-07: Removed Search from the bottom bar (each tab has its own search button; Search stays in the side menu).
 - 2026-11-07: Long-press a pin opens its menu; Play next, pin and auto-download in the ⋮ inside playlists and Liked; Liked can be pinned and auto-downloaded.
 - 2026-11-07: prompt.md updated with top-bar search, Spotify Recently played, Search off the bottom bar, pin menus and Liked pin/auto-download.
+- 2026-11-07: Android Auto buttons now fit what's playing (radio, podcasts/news/audiobooks, own servers, music); the add button on radio puts the current song into a Radio songs playlist chosen in Settings → Features.

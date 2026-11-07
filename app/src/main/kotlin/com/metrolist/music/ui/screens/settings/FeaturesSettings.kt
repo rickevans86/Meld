@@ -244,6 +244,8 @@ fun FeaturesSettings(navController: NavController) {
         Spacer(Modifier.height(16.dp))
         RecognisedSongsSetting()
         Spacer(Modifier.height(16.dp))
+        RadioSongsSetting()
+        Spacer(Modifier.height(16.dp))
         PodcastPlaylistsSetting()
     }
 
@@ -355,47 +357,126 @@ private fun RecognisedSongsSetting() {
     }
 
     if (choosing) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { choosing = false },
-            title = { Text(stringResource(R.string.recognised_playlist_setting)) },
-            text = {
-                androidx.compose.foundation.lazy.LazyColumn {
-                    item {
-                        RecognisedChoice(stringResource(R.string.recognised_off), selected == null) { choose("") }
-                    }
-                    if (editable.none { it.playlist.name.equals(newName, ignoreCase = true) }) {
-                        item {
-                            RecognisedChoice(stringResource(R.string.recognised_create, newName), false) {
-                                // New "Recognised songs" playlist, created on your YouTube account as a private
-                                // (hidden) playlist and linked here, then selected. Without a YouTube sign-in it's
-                                // made in Wavelength only. bookmarkedAt makes it one of your saved playlists.
-                                val syncUtils = dagger.hilt.android.EntryPointAccessors.fromApplication(
-                                    context.applicationContext,
-                                    com.metrolist.music.recognition.RecognisedSongs.Access::class.java,
-                                ).syncUtils()
-                                syncUtils.createPlaylist(
-                                    playlist = com.metrolist.music.db.entities.PlaylistEntity(
-                                        name = newName,
-                                        bookmarkedAt = java.time.LocalDateTime.now(),
-                                        isEditable = true,
-                                    ),
-                                    syncWithYouTube = true,
-                                ) { playlistId, _ -> choose(playlistId) }
-                                choosing = false
-                            }
-                        }
-                    }
-                    items(editable.size) { index ->
-                        val playlist = editable[index]
-                        RecognisedChoice(playlist.playlist.name, playlist.id == selectedId) { choose(playlist.id) }
-                    }
-                }
-            },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = { choosing = false }) { Text(stringResource(android.R.string.cancel)) }
-            },
+        PlaylistTargetDialog(
+            title = stringResource(R.string.recognised_playlist_setting),
+            offLabel = stringResource(R.string.recognised_off),
+            newName = newName,
+            editable = editable,
+            selectedId = selectedId,
+            onChoose = ::choose,
+            onDismiss = { choosing = false },
         )
     }
+}
+
+/**
+ * Radio songs: the playlist the add button in Android Auto puts the radio station's current song into.
+ */
+@Composable
+private fun RadioSongsSetting() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val database = com.metrolist.music.LocalDatabase.current
+    val playlists by database.playlistsByCreateDateAsc().collectAsState(initial = emptyList())
+    val editable = playlists.filter { it.playlist.isEditable }
+    val selectedId by remember(context) {
+        context.dataStore.data.map { it[com.metrolist.music.recognition.RecognisedSongs.RadioPlaylistKey].orEmpty() }
+    }.collectAsState(initial = "")
+    val selected = editable.firstOrNull { it.id == selectedId }
+    var choosing by remember { mutableStateOf(false) }
+
+    fun choose(id: String) {
+        scope.launch { context.dataStore.edit { it[com.metrolist.music.recognition.RecognisedSongs.RadioPlaylistKey] = id } }
+        choosing = false
+    }
+
+    Material3SettingsGroup(
+        title = stringResource(R.string.radio_songs_section),
+        items = listOf(
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.radio),
+                title = { Text(stringResource(R.string.radio_songs_setting)) },
+                description = {
+                    Text(
+                        (selected?.playlist?.name ?: stringResource(R.string.recognised_off)) + "\n" +
+                            stringResource(R.string.radio_songs_desc),
+                    )
+                },
+                onClick = { choosing = true },
+            ),
+        ),
+    )
+
+    if (choosing) {
+        PlaylistTargetDialog(
+            title = stringResource(R.string.radio_songs_setting),
+            offLabel = stringResource(R.string.recognised_off),
+            newName = stringResource(R.string.radio_songs_default_playlist),
+            editable = editable,
+            selectedId = selectedId,
+            onChoose = ::choose,
+            onDismiss = { choosing = false },
+        )
+    }
+}
+
+/**
+ * Picks the playlist songs are added to automatically: Off, a new playlist called [newName]
+ * (created as a private YouTube playlist when signed in), or one of your editable playlists.
+ */
+@Composable
+private fun PlaylistTargetDialog(
+    title: String,
+    offLabel: String,
+    newName: String,
+    editable: List<com.metrolist.music.db.entities.Playlist>,
+    selectedId: String,
+    onChoose: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val selected = editable.firstOrNull { it.id == selectedId }
+    fun choose(id: String) = onChoose(id)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            androidx.compose.foundation.lazy.LazyColumn {
+                item {
+                    RecognisedChoice(offLabel, selected == null) { choose("") }
+                }
+                if (editable.none { it.playlist.name.equals(newName, ignoreCase = true) }) {
+                    item {
+                        RecognisedChoice(stringResource(R.string.recognised_create, newName), false) {
+                            // New playlist named [newName], created on your YouTube account as a private
+                            // (hidden) playlist and linked here, then selected. Without a YouTube sign-in it's
+                            // made in Wavelength only. bookmarkedAt makes it one of your saved playlists.
+                            val syncUtils = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                                context.applicationContext,
+                                com.metrolist.music.recognition.RecognisedSongs.Access::class.java,
+                            ).syncUtils()
+                            syncUtils.createPlaylist(
+                                playlist = com.metrolist.music.db.entities.PlaylistEntity(
+                                    name = newName,
+                                    bookmarkedAt = java.time.LocalDateTime.now(),
+                                    isEditable = true,
+                                ),
+                                syncWithYouTube = true,
+                            ) { playlistId, _ -> choose(playlistId) }
+                            onDismiss()
+                        }
+                    }
+                }
+                items(editable.size) { index ->
+                    val playlist = editable[index]
+                    RecognisedChoice(playlist.playlist.name, playlist.id == selectedId) { choose(playlist.id) }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+        },
+    )
 }
 
 @Composable

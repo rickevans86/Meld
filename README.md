@@ -84,6 +84,9 @@ where `<n>` is the build number.
 
 ### Radio
 - **Live radio stations** you can search, save and play.
+- **Save the song that's playing.** In Android Auto, the add button on a radio station finds the song the
+  station says is playing on YouTube Music and adds it to a playlist you choose in
+  Settings → Features → Radio songs (or a new "Radio songs" playlist).
 
 ### Your own media
 - **Navidrome / Subsonic.** Browse your server by artist, album, playlist, starred songs, or as a folder
@@ -105,6 +108,9 @@ where `<n>` is the build number.
 - **YouTube page.** Liked songs at the top, then your pinned playlists, then the rest.
 - **Spotify page.** The same layout for your Spotify library.
 - **Source labels.** Items are marked "YouTube ·" or "Spotify ·" so you can tell them apart.
+- **Only buttons that work.** The player buttons change with what's playing: live radio shows only the add
+  button, podcasts, news and audiobooks show only the heart (save for later), and your own servers and
+  phone files leave out YouTube radio.
 - **More sections.** Podcasts (including Downloaded and your podcast playlists), news, radio, Navidrome,
   Jellyfin/Plex, audiobooks and local files.
 - **Continue listening.** A Continue section in the car. Settings → Android Auto lets you remove items

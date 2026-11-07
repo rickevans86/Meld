@@ -1492,6 +1492,14 @@
     <string name="recognised_not_found">Couldn\'t find \"%s\" on YouTube Music to add to your playlist</string>
     <string name="recognised_playlist_missing">Your recognised songs playlist no longer exists. Pick another in Settings → Features.</string>
     <string name="recognised_add_failed">Couldn\'t add \"%s\" to your playlist</string>
+    <string name="radio_songs_section">Radio songs</string>
+    <string name="radio_songs_setting">Add radio songs to</string>
+    <string name="radio_songs_desc">In Android Auto, the add button on a radio station finds the song that\'s playing on YouTube Music and adds it to this playlist.</string>
+    <string name="radio_songs_default_playlist">Radio songs</string>
+    <string name="radio_song_add">Add this song to your radio songs playlist</string>
+    <string name="radio_song_unknown">This station isn\'t saying which song is playing</string>
+    <string name="radio_song_no_playlist">Choose a playlist for radio songs in Settings → Features → Radio songs</string>
+    <string name="radio_song_playlist_missing">Your radio songs playlist no longer exists. Pick another in Settings → Features.</string>
     <string name="media_server_tab">Jellyfin / Plex</string>
     <string name="media_server_sign_in_title">Connect Jellyfin or Plex</string>
     <string name="media_server_jellyfin_intro">Sign in to your Jellyfin (or Emby) server to play its music here. Only an access token is kept on this phone, encrypted.</string>

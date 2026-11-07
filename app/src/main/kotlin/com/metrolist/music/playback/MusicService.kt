@@ -1773,9 +1773,31 @@ class MusicService :
         player.pause()
     }
 
+    /**
+     * Wavelength: which of the car/notification buttons make sense for what's playing.
+     * Live radio: only the add button (adds the station's current song to a playlist).
+     * Podcasts, news and audiobooks: only the heart (save for later on episodes).
+     * Navidrome, Jellyfin/Plex and phone files: everything except YouTube radio.
+     */
+    private enum class ButtonSet { MUSIC, OWN_MEDIA, SPOKEN, LIVE_RADIO }
+
+    private fun buttonSet(): ButtonSet {
+        val id = player.currentMediaItem?.mediaId ?: currentMediaMetadata.value?.id ?: return ButtonSet.MUSIC
+        val isEpisode = currentSong.value?.song?.takeIf { it.id == id }?.isEpisode == true ||
+            player.currentMetadata?.isEpisode == true
+        return when {
+            com.metrolist.music.constants.isRadioId(id) -> ButtonSet.LIVE_RADIO
+            isAudiobookId(id) || isEpisode || id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) -> ButtonSet.SPOKEN
+            com.metrolist.music.constants.isSubsonicId(id) || com.metrolist.music.constants.isMediaServerId(id) ||
+                id.startsWith("local:") -> ButtonSet.OWN_MEDIA
+            else -> ButtonSet.MUSIC
+        }
+    }
+
     private fun updateNotification(isLiked: Boolean? = currentSong.value?.song?.let { if (it.isEpisode) it.inLibrary != null else it.liked }) {
+        val set = buttonSet()
         mediaSession?.setCustomLayout(
-            listOf(
+            listOfNotNull(
                 CommandButton
                     .Builder()
                     .setDisplayName(
@@ -1791,7 +1813,8 @@ class MusicService :
                     // Enable as long as a track is playing, even if it isn't cached in the
                     // local DB yet (e.g. Spotify/YouTube tracks). toggleLike() inserts it on demand.
                     .setEnabled(currentMediaMetadata.value != null)
-                    .build(),
+                    .build()
+                    .takeIf { set != ButtonSet.LIVE_RADIO },
                 CommandButton
                     .Builder()
                     .setDisplayName(
@@ -1811,27 +1834,33 @@ class MusicService :
                             else -> throw IllegalStateException()
                         },
                     ).setSessionCommand(CommandToggleRepeatMode)
-                    .build(),
+                    .build()
+                    .takeIf { set == ButtonSet.MUSIC || set == ButtonSet.OWN_MEDIA },
                 CommandButton
                     .Builder()
                     .setDisplayName(getString(if (player.shuffleModeEnabled) R.string.action_shuffle_off else R.string.action_shuffle_on))
                     .setIconResId(if (player.shuffleModeEnabled) R.drawable.shuffle_on else R.drawable.shuffle)
                     .setSessionCommand(CommandToggleShuffle)
-                    .build(),
+                    .build()
+                    .takeIf { set == ButtonSet.MUSIC || set == ButtonSet.OWN_MEDIA },
                 CommandButton
                     .Builder()
                     .setDisplayName(getString(R.string.start_radio))
                     .setIconResId(R.drawable.radio)
                     .setSessionCommand(CommandToggleStartRadio)
                     .setEnabled(currentSong.value != null)
-                    .build(),
+                    .build()
+                    .takeIf { set == ButtonSet.MUSIC },
                 CommandButton
                     .Builder()
-                    .setDisplayName(getString(R.string.android_auto_target_playlist))
+                    .setDisplayName(
+                        getString(if (set == ButtonSet.LIVE_RADIO) R.string.radio_song_add else R.string.android_auto_target_playlist),
+                    )
                     .setIconResId(R.drawable.playlist_add)
                     .setSessionCommand(CommandAddToTargetPlaylist)
-                    .setEnabled(currentSong.value != null)
-                    .build(),
+                    .setEnabled(set == ButtonSet.LIVE_RADIO || currentSong.value != null)
+                    .build()
+                    .takeIf { set != ButtonSet.SPOKEN },
             ),
         )
     }
@@ -2492,6 +2521,13 @@ class MusicService :
     }
 
     fun addToTargetPlaylist() {
+        // Live radio: add the song the station says is playing to the radio songs playlist
+        val radioId = player.currentMediaItem?.mediaId
+        if (com.metrolist.music.constants.isRadioId(radioId)) {
+            val title = radioDirectory.nowPlaying.value?.takeIf { it.first == radioId }?.second
+            com.metrolist.music.recognition.RecognisedSongs.addRadioSong(this, title)
+            return
+        }
         scope.launch {
             val currentSong = currentSong.first() ?: return@launch
             val targetPlaylistId = dataStore.get(AndroidAutoTargetPlaylistKey, MediaSessionConstants.TARGET_PLAYLIST_AUTO)
@@ -2840,6 +2876,8 @@ class MusicService :
         }
         radioDirectory.setNowPlaying(id.orEmpty(), null)
         if (com.metrolist.music.constants.isRadioId(id)) radioDirectory.reportPlay(id!!)
+        // Show the car buttons that fit this kind of track straight away
+        updateNotification()
         // Podcast episodes download as soon as they start playing (Settings → Features → Podcasts)
         val episodeMetadata = mediaItem?.metadata
         // An episode removed from Android Auto's Continue listening comes back once it's played again
