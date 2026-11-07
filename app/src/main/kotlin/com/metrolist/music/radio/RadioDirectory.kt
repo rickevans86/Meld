@@ -126,6 +126,15 @@ constructor(
             .onFailure { Timber.tag(TAG).w(it, "Could not save radio hearts") }
     }
 
+    /** True when the station with this song id is in your stations. */
+    fun isSavedSong(songId: String) = _favourites.value.any { it.songId == songId }
+
+    /** "Add to / Remove from my stations" in the player menu, for the playing station. */
+    fun toggleSavedSong(songId: String) {
+        val station = _favourites.value.firstOrNull { it.songId == songId } ?: known[songId] ?: return
+        setFavourite(station, !isFavourite(station))
+    }
+
     /** The heart in the player and Android Auto: [songId] is the playing station's song id. */
     fun toggleStarred(songId: String) {
         val id = songId.removePrefix(RADIO_ID_PREFIX)

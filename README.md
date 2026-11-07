@@ -95,7 +95,8 @@ Every push to this fork builds and publishes a new release automatically. Releas
   favourite; favourites stay at the top of the list in the app and in the car.
 - **Save the song that's playing.** In Android Auto, the add button on a radio station finds the song the
   station says is playing on YouTube Music and adds it to a playlist you choose in
-  Settings → Features → Radio songs (or a new "Radio songs" playlist).
+  Settings → Features → Radio songs (or a new "Radio songs" playlist). On the phone, the player's ⋮ →
+  Add song to playlist does the same with any playlist you pick.
 
 ### Your own media
 - **Navidrome / Subsonic.** Browse your server by artist, album, playlist, starred songs, or as a folder

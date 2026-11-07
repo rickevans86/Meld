@@ -142,6 +142,30 @@ fun PlayerMenu(
     val qobuzEnabled by rememberPreference(com.metrolist.music.constants.EnableQobuzKey, defaultValue = false)
 
     val librarySong by database.song(mediaMetadata.id).collectAsStateWithLifecycle(initialValue = null)
+    // Wavelength: on a live radio station the menu works on the song the station says is playing
+    val isRadio = com.metrolist.music.constants.isRadioId(mediaMetadata.id)
+    val radioDirectory = remember(playerConnection) { runCatching { playerConnection.service.radioDirectory }.getOrNull() }
+    val radioSavedIds by (radioDirectory?.favourites ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList<com.metrolist.music.radio.RadioStation>()))
+        .collectAsStateWithLifecycle()
+    val radioSaved = radioSavedIds.any { it.songId == mediaMetadata.id }
+    val radioSongCache = remember(mediaMetadata.id) { mutableMapOf<String, String?>() }
+    suspend fun radioSongIds(): List<String> {
+        val title = com.metrolist.music.radio.RadioDirectory.nowPlayingTitle.value
+            ?.takeIf { it.first == mediaMetadata.id }?.second
+        val key = title.orEmpty()
+        val id = if (radioSongCache.containsKey(key)) radioSongCache[key] else
+            com.metrolist.music.recognition.RecognisedSongs.resolveRadioSong(context, title).also { radioSongCache[key] = it }
+        if (id == null) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                Toast.makeText(
+                    context,
+                    if (title.isNullOrBlank()) R.string.radio_song_unknown else R.string.radio_song_not_found,
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+        return listOfNotNull(id)
+    }
     val coroutineScope = rememberCoroutineScope()
     val downloadUtil = LocalDownloadUtil.current
 
@@ -252,12 +276,16 @@ fun PlayerMenu(
     AddToPlaylistDialog(
         isVisible = showChoosePlaylistDialog,
         onGetSong = {
-            database.withTransaction {
-                insert(mediaMetadata)
+            if (isRadio) {
+                radioSongIds()
+            } else {
+                database.withTransaction {
+                    insert(mediaMetadata)
+                }
+                listOf(mediaMetadata.id)
             }
-            listOf(mediaMetadata.id)
         },
-        onGetSongIds = { listOf(mediaMetadata.id) },
+        onGetSongIds = { if (isRadio) radioSongIds() else listOf(mediaMetadata.id) },
         onDismiss = {
             showChoosePlaylistDialog = false
         },
@@ -399,7 +427,7 @@ fun PlayerMenu(
             NewActionGrid(
                 actions =
                     listOfNotNull(
-                        if (!isListenTogetherGuest) {
+                        if (!isListenTogetherGuest && !isRadio) {
                             NewAction(
                                 icon = {
                                     Icon(
@@ -428,10 +456,10 @@ fun PlayerMenu(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             },
-                            text = stringResource(R.string.add_to_playlist),
+                            text = stringResource(if (isRadio) R.string.radio_add_song_to_playlist else R.string.add_to_playlist),
                             onClick = { showChoosePlaylistDialog = true },
                         ),
-                        NewAction(
+                        if (isRadio) null else NewAction(
                             icon = {
                                 Icon(
                                     painter = painterResource(R.drawable.link),
@@ -458,7 +486,7 @@ fun PlayerMenu(
                                 onDismiss()
                             },
                         ),
-                    ) + if (com.metrolist.spotify.Spotify.isAuthenticated()) {
+                    ) + if (com.metrolist.spotify.Spotify.isAuthenticated() && !isRadio) {
                         listOf(
                             NewAction(
                                 icon = {
@@ -476,7 +504,7 @@ fun PlayerMenu(
                     } else {
                         emptyList()
                     },
-                columns = if (isListenTogetherGuest) 2 else 3,
+                columns = if (isListenTogetherGuest || isRadio) 2 else 3,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 16.dp),
             )
         }
@@ -489,7 +517,7 @@ fun PlayerMenu(
                 items =
                     buildList {
                         // Don't show "View Artist" for podcasts - only show "View Podcast"
-                        if (artists.isNotEmpty() && !isPodcast) {
+                        if (artists.isNotEmpty() && !isPodcast && !isRadio) {
                             add(
                                 Material3MenuItemData(
                                     title = { Text(text = stringResource(R.string.view_artist)) },
@@ -549,8 +577,8 @@ fun PlayerMenu(
                                 ),
                             )
                         }
-                        // Add to Library option
-                        val isInLibrary = librarySong?.song?.inLibrary != null
+                        // Add to Library option (on a radio station: your stations)
+                        val isInLibrary = if (isRadio) radioSaved else librarySong?.song?.inLibrary != null
                         add(
                             Material3MenuItemData(
                                 title = {
@@ -580,7 +608,7 @@ fun PlayerMenu(
                                     )
                                 },
                                 onClick = {
-                                    playerConnection.toggleLibrary()
+                                    if (isRadio) radioDirectory?.toggleSavedSong(mediaMetadata.id) else playerConnection.toggleLibrary()
                                     onDismiss()
                                 },
                             ),

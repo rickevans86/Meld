@@ -309,6 +309,10 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   (`RecognisedSongs.splitStreamTitle`), finds it on YouTube Music and adds it to the playlist in
   `RecognisedSongs.RadioPlaylistKey`, with the same duplicate check and YouTube sync as recognised songs. A
   toast says what happened (added, already in it, not found, no song name, no playlist chosen).
+- **Phone player menu on radio** (`PlayerMenu`): "Add song to playlist" resolves the station's current song
+  (`RecognisedSongs.resolveRadioSong`, cached per song name) and adds that, not the station. Start radio, Copy
+  link, Spotify playlist and View artist are hidden; Add to / Remove from library acts on My stations
+  (`RadioDirectory.toggleSavedSong`).
 - **Setting:** Settings → Features → Radio songs → Add radio songs to. Uses the same picker as song
   recognition (`PlaylistTargetDialog`): Off, New playlist: Radio songs (private YouTube playlist when
   signed in), or any editable playlist.
@@ -666,3 +670,4 @@ To see the exact diff at any time:
 - 2026-11-07: New installs start with every feature off except the YouTube home and Library; updates keep their current features.
 - 2026-11-07: Releases renamed to "Wavelength <version>" with Wavelength.apk (the first such release is a bridge with the plain number title). The updater reads the version from the tag.
 - 2026-11-07: Merged Meld upstream 24c15950 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
+- 2026-11-08: Phone player ⋮ on radio: Add song to playlist adds the playing song, not the station; non-working items hidden; library item acts on My stations.

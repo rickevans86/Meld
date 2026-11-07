@@ -1494,6 +1494,8 @@
     <string name="recognised_add_failed">Couldn\'t add \"%s\" to your playlist</string>
     <string name="radio_add_to_library">Add to my stations</string>
     <string name="radio_remove_from_library">Remove from my stations</string>
+    <string name="radio_add_song_to_playlist">Add song to playlist</string>
+    <string name="radio_song_not_found">Couldn\'t find this song on YouTube Music</string>
     <string name="radio_songs_section">Radio songs</string>
     <string name="radio_songs_setting">Add radio songs to</string>
     <string name="radio_songs_desc">In Android Auto, the add button on a radio station finds the song that\'s playing on YouTube Music and adds it to this playlist.</string>

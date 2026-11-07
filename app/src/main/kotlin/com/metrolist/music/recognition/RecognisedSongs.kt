@@ -92,6 +92,19 @@ object RecognisedSongs {
         }
     }
 
+    /**
+     * The player menu's "Add to playlist" on a radio station: finds the song the station says is
+     * playing on YouTube Music, saves it to the database and returns its id (null if not found).
+     */
+    suspend fun resolveRadioSong(context: Context, streamTitle: String?): String? {
+        val text = streamTitle?.trim().orEmpty().ifBlank { return null }
+        val (artist, title) = splitStreamTitle(text)
+        val song = runCatching { findOnYouTube(SongQuery(title, artist, null)) }.getOrNull() ?: return null
+        val database = EntryPointAccessors.fromApplication(context.applicationContext, Access::class.java).database()
+        database.insert(song.toMediaMetadata())
+        return song.id
+    }
+
     /** "Artist - Title" → (artist, title). Without a dash the whole text is the title. */
     internal fun splitStreamTitle(text: String): Pair<String, String> {
         val dash = Regex("\\s+[-–—]\\s+").find(text) ?: return "" to text
