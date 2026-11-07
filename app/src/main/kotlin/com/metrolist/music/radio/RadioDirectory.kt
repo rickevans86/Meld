@@ -24,6 +24,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -89,11 +91,47 @@ constructor(
     private val json = Json { ignoreUnknownKeys = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val favouritesFile = File(context.filesDir, "radio_favourites.json")
+    private val starredFile = File(context.filesDir, "radio_starred.json")
     private val known = ConcurrentHashMap<String, RadioStation>()
     private val resolved = ConcurrentHashMap<String, Pair<String, Boolean>>()
 
+    init {
+        starredIds.value = runCatching {
+            if (starredFile.exists()) json.decodeFromString(ListSerializer(String.serializer()), starredFile.readText()).toSet() else emptySet()
+        }.getOrDefault(emptySet())
+    }
+
     private val _favourites = MutableStateFlow(loadFavourites())
-    val favourites = _favourites.asStateFlow()
+
+    /**
+     * Your saved stations (the library), with the ones you've hearted first. Android Auto and the
+     * Radio tab both show them in this order.
+     */
+    val favourites: kotlinx.coroutines.flow.StateFlow<List<RadioStation>> =
+        kotlinx.coroutines.flow.combine(_favourites, starredIds) { list, starred -> sortStarred(list, starred) }
+            .stateIn(scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, sortStarred(_favourites.value, starredIds.value))
+
+    private fun sortStarred(list: List<RadioStation>, starred: Set<String>) =
+        list.filter { it.id in starred } + list.filterNot { it.id in starred }
+
+    /** True when the station is hearted (shown at the top of your stations). */
+    fun isStarred(stationId: String) = stationId in starredIds.value
+
+    /** Hearts a station (and saves it to your stations), or takes the heart off. */
+    fun setStarred(station: RadioStation, starred: Boolean) {
+        if (starred && !isFavourite(station)) setFavourite(station, true)
+        val ids = if (starred) starredIds.value + station.id else starredIds.value - station.id
+        starredIds.value = ids
+        runCatching { starredFile.writeText(json.encodeToString(ListSerializer(String.serializer()), ids.toList())) }
+            .onFailure { Timber.tag(TAG).w(it, "Could not save radio hearts") }
+    }
+
+    /** The heart in the player and Android Auto: [songId] is the playing station's song id. */
+    fun toggleStarred(songId: String) {
+        val id = songId.removePrefix(RADIO_ID_PREFIX)
+        val station = _favourites.value.firstOrNull { it.id == id } ?: known[songId] ?: return
+        setStarred(station, !isStarred(id))
+    }
 
     /** The song title the playing station last announced (ICY metadata), keyed by its song id. */
     private val _nowPlaying = MutableStateFlow<Pair<String, String>?>(null)
@@ -172,6 +210,8 @@ constructor(
     fun isFavourite(station: RadioStation) = _favourites.value.any { it.id == station.id }
 
     fun setFavourite(station: RadioStation, favourite: Boolean) {
+        // Removed from your stations: its heart goes too
+        if (!favourite && station.id in starredIds.value) setStarred(station, false)
         val others = _favourites.value.filterNot { it.id == station.id }
         _favourites.value = if (favourite) others + station else others
         runCatching {
@@ -467,6 +507,9 @@ constructor(
     }.getOrDefault(emptyList())
 
     companion object {
+        /** Ids of hearted stations; shared so the player screens can show the heart. */
+        val starredIds = MutableStateFlow<Set<String>>(emptySet())
+
         /** The same "now playing" as [nowPlaying], for screens that can't inject this class. */
         val nowPlayingTitle = MutableStateFlow<Pair<String, String>?>(null)
 

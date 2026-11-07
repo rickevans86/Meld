@@ -321,6 +321,10 @@ fun BottomSheetPlayer(
         playerConnection.mediaMetadata.withRadioNowPlaying()
     }.collectAsState(initial = playerConnection.mediaMetadata.value)
     val currentSong by playerConnection.currentSong.collectAsStateWithLifecycle(initialValue = null)
+    // Wavelength: on a radio station the heart shows whether it's one of your hearted stations
+    val radioHearts by com.metrolist.music.radio.RadioDirectory.starredIds.collectAsStateWithLifecycle()
+    val radioHearted = currentSong?.id?.takeIf { com.metrolist.music.constants.isRadioId(it) }
+        ?.let { it.removePrefix(com.metrolist.music.constants.RADIO_ID_PREFIX) in radioHearts }
     val automix by playerConnection.service.automixItems.collectAsStateWithLifecycle()
     val repeatMode by playerConnection.repeatMode.collectAsStateWithLifecycle()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
@@ -1238,7 +1242,7 @@ fun BottomSheetPlayer(
                             } else {
                                 // For episodes, show saved state (inLibrary); for songs, show liked state
                                 val isEpisode = currentSong?.song?.isEpisode == true
-                                val isFavorite = if (isEpisode) currentSong?.song?.inLibrary != null else currentSong?.song?.liked == true
+                                val isFavorite = radioHearted ?: if (isEpisode) currentSong?.song?.inLibrary != null else currentSong?.song?.liked == true
                                 FilledIconButton(
                                     onClick = playerConnection::toggleLike,
                                     shape = favShape,
@@ -1822,7 +1826,7 @@ fun BottomSheetPlayer(
                             Box(modifier = Modifier.weight(1f)) {
                                 // For episodes, show saved state (inLibrary); for songs, show liked state
                                 val isEpisode = currentSong?.song?.isEpisode == true
-                                val isFavorite = if (isEpisode) currentSong?.song?.inLibrary != null else currentSong?.song?.liked == true
+                                val isFavorite = radioHearted ?: if (isEpisode) currentSong?.song?.inLibrary != null else currentSong?.song?.liked == true
                                 ResizableIconButton(
                                     icon = if (isFavorite) R.drawable.favorite else R.drawable.favorite_border,
                                     color = if (isFavorite) MaterialTheme.colorScheme.error else TextBackgroundColor,

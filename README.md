@@ -83,7 +83,9 @@ where `<n>` is the build number.
   crossed out and marked "Can't play", with a Check again button.
 
 ### Radio
-- **Live radio stations** you can search, save and play.
+- **Live radio stations** you can search, save and play. Each station's ⋮ menu adds it to or removes it
+  from My stations. Tap the heart (on the station or in the player, including Android Auto) to make it a
+  favourite; favourites stay at the top of the list in the app and in the car.
 - **Save the song that's playing.** In Android Auto, the add button on a radio station finds the song the
   station says is playing on YouTube Music and adds it to a playlist you choose in
   Settings → Features → Radio songs (or a new "Radio songs" playlist).
@@ -108,8 +110,8 @@ where `<n>` is the build number.
 - **YouTube page.** Liked songs at the top, then your pinned playlists, then the rest.
 - **Spotify page.** The same layout for your Spotify library.
 - **Source labels.** Items are marked "YouTube ·" or "Spotify ·" so you can tell them apart.
-- **Only buttons that work.** The player buttons change with what's playing: live radio shows only the add
-  button, podcasts, news and audiobooks show only the heart (save for later), and your own servers and
+- **Only buttons that work.** The player buttons change with what's playing: live radio shows only the heart (favourite
+  station) and the add button, podcasts, news and audiobooks show only the heart (save for later), and your own servers and
   phone files leave out YouTube radio.
 - **More sections.** Podcasts (including Downloaded and your podcast playlists), news, radio, Navidrome,
   Jellyfin/Plex, audiobooks and local files.

@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,6 +75,7 @@ fun RadioScreen(
     val list by viewModel.list.collectAsState()
     val stations by viewModel.stations.collectAsState()
     val favourites by viewModel.favourites.collectAsState()
+    val starred by viewModel.starred.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
     val nowPlaying by viewModel.nowPlaying.collectAsState()
@@ -226,8 +228,10 @@ fun RadioScreen(
                 StationRow(
                     station = station,
                     isCurrent = current?.id == station.songId,
-                    isFavourite = favourites.any { it.id == station.id },
-                    onToggleFavourite = { viewModel.toggleFavourite(station) },
+                    inLibrary = favourites.any { it.id == station.id },
+                    isFavourite = station.id in starred,
+                    onToggleFavourite = { viewModel.toggleStarred(station) },
+                    onToggleLibrary = { viewModel.toggleFavourite(station) },
                     onClick = {
                         if (current?.id == station.songId) {
                             playerConnection.togglePlayPause()
@@ -315,10 +319,13 @@ internal fun AddStationDialog(
 private fun StationRow(
     station: RadioStation,
     isCurrent: Boolean,
+    inLibrary: Boolean,
     isFavourite: Boolean,
     onToggleFavourite: () -> Unit,
+    onToggleLibrary: () -> Unit,
     onClick: () -> Unit,
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -369,6 +376,24 @@ private fun StationRow(
                 contentDescription = stringResource(R.string.radio_favourite),
                 tint = if (isFavourite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        // ⋮: add the station to your stations, or remove it
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(painterResource(R.drawable.more_vert), contentDescription = null)
+            }
+            androidx.compose.material3.DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(stringResource(if (inLibrary) R.string.radio_remove_from_library else R.string.radio_add_to_library)) },
+                    leadingIcon = {
+                        Icon(painterResource(if (inLibrary) R.drawable.library_add_check else R.drawable.library_add), contentDescription = null)
+                    },
+                    onClick = {
+                        menuOpen = false
+                        onToggleLibrary()
+                    },
+                )
+            }
         }
     }
 }

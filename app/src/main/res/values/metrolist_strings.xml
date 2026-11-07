@@ -1371,14 +1371,14 @@
     <string name="news_no_recent">No bulletin in the last two days</string>
     <string name="radio_tab">Radio</string>
     <string name="radio_search_hint">Search stations, cities or genres</string>
-    <string name="radio_favourites">Favourites</string>
+    <string name="radio_favourites">My stations</string>
     <string name="radio_popular">Popular near you</string>
     <string name="radio_now_playing">Now playing on %1$s</string>
-    <string name="radio_no_favourites">No favourite stations yet. Tap the heart next to a station to keep it here.</string>
+    <string name="radio_no_favourites">No stations saved yet. Use ⋮ → Add to my stations, or tap the heart to save a station and keep it at the top.</string>
     <string name="radio_no_results">No stations found.</string>
     <string name="radio_favourite">Favourite</string>
     <string name="radio_add_station">Add station</string>
-    <string name="radio_add_station_intro">Paste a stream link, for example one copied from StreamURL.link or FMSTREAM. Playlist links (.pls, .m3u) work too. It\'s saved to your favourites.</string>
+    <string name="radio_add_station_intro">Paste a stream link, for example one copied from StreamURL.link or FMSTREAM. Playlist links (.pls, .m3u) work too. It\'s saved to your stations.</string>
     <string name="radio_stream_link">Stream link</string>
     <string name="radio_station_name">Station name (optional)</string>
     <string name="radio_add">Add</string>
@@ -1492,6 +1492,8 @@
     <string name="recognised_not_found">Couldn\'t find \"%s\" on YouTube Music to add to your playlist</string>
     <string name="recognised_playlist_missing">Your recognised songs playlist no longer exists. Pick another in Settings → Features.</string>
     <string name="recognised_add_failed">Couldn\'t add \"%s\" to your playlist</string>
+    <string name="radio_add_to_library">Add to my stations</string>
+    <string name="radio_remove_from_library">Remove from my stations</string>
     <string name="radio_songs_section">Radio songs</string>
     <string name="radio_songs_setting">Add radio songs to</string>
     <string name="radio_songs_desc">In Android Auto, the add button on a radio station finds the song that\'s playing on YouTube Music and adds it to this playlist.</string>

@@ -299,7 +299,7 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   - Navidrome, Jellyfin/Plex, phone files (`subsonic:`, `mediaserver:`, `local:`): no YouTube radio button,
     which only works with YouTube songs.
   - Podcasts, news and audiobooks (`podcast:`, `audiobook:`, or `isEpisode`): only the heart (save for later).
-  - Live radio (`radio:`): only the add button.
+  - Live radio (`radio:`): the heart (favourite station) and the add button.
 - **Radio songs to a playlist:** on a radio station the add button (`addToTargetPlaylist`) takes the station's
   ICY "now playing" text (`RadioDirectory.nowPlaying`), splits "Artist - Title"
   (`RecognisedSongs.splitStreamTitle`), finds it on YouTube Music and adds it to the playlist in
@@ -308,6 +308,14 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - **Setting:** Settings → Features → Radio songs → Add radio songs to. Uses the same picker as song
   recognition (`PlaylistTargetDialog`): Off, New playlist: Radio songs (private YouTube playlist when
   signed in), or any editable playlist.
+
+- **Radio favourites and My stations:** the saved-stations list (chip renamed "My stations") is changed from
+  each row's ⋮ menu (Add to / Remove from my stations). The heart now marks a favourite: hearted ids are kept in
+  `radio_starred.json` (`RadioDirectory.starredIds`, a companion StateFlow so player screens can read it),
+  and `RadioDirectory.favourites` lists hearted stations first, so they're at the top in the Radio tab and
+  Android Auto. Hearting a station also saves it; removing it takes its heart off. The heart in the player
+  (`Player.kt`, `MiniPlayer.kt`) and in Android Auto (`MusicService.toggleLike`) hearts the playing station.
+  Android Auto's Radio list refreshes when the stations change (`notifyChildrenChanged(RADIO)`).
 
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
@@ -644,3 +652,4 @@ To see the exact diff at any time:
 - 2026-11-07: Long-press a pin opens its menu; Play next, pin and auto-download in the ⋮ inside playlists and Liked; Liked can be pinned and auto-downloaded.
 - 2026-11-07: prompt.md updated with top-bar search, Spotify Recently played, Search off the bottom bar, pin menus and Liked pin/auto-download.
 - 2026-11-07: Android Auto buttons now fit what's playing (radio, podcasts/news/audiobooks, own servers, music); the add button on radio puts the current song into a Radio songs playlist chosen in Settings → Features.
+- 2026-11-07: Radio: ⋮ menu adds or removes a station from My stations; the heart makes a station a favourite, kept at the top in the app and Android Auto (also from the player's heart).

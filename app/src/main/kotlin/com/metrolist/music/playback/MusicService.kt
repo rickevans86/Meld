@@ -267,6 +267,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -1179,6 +1180,12 @@ class MusicService :
         scope.launch {
             radioDirectory.nowPlaying.collect { sessionPlayer?.notifyMetadataChanged() }
         }
+        // Your stations changed (added, removed, hearted): Android Auto re-reads its Radio list
+        scope.launch {
+            radioDirectory.favourites.drop(1).collect {
+                mediaSession?.notifyChildrenChanged(AutoLibraryExtras.RADIO, it.size, null)
+            }
+        }
         com.metrolist.music.podcasts.PlayedEpisodes.init(this@MusicService)
         if (podcastDirectory.followed.value.any { it.autoDownload }) {
             com.metrolist.music.podcasts.PodcastAutoDownload.schedule(this@MusicService)
@@ -1775,7 +1782,8 @@ class MusicService :
 
     /**
      * Wavelength: which of the car/notification buttons make sense for what's playing.
-     * Live radio: only the add button (adds the station's current song to a playlist).
+     * Live radio: the heart (puts the station at the top of your stations) and the add button (adds the
+     * station's current song to a playlist).
      * Podcasts, news and audiobooks: only the heart (save for later on episodes).
      * Navidrome, Jellyfin/Plex and phone files: everything except YouTube radio.
      */
@@ -1796,25 +1804,26 @@ class MusicService :
 
     private fun updateNotification(isLiked: Boolean? = currentSong.value?.song?.let { if (it.isEpisode) it.inLibrary != null else it.liked }) {
         val set = buttonSet()
+        val radioId = player.currentMediaItem?.mediaId?.takeIf { set == ButtonSet.LIVE_RADIO }
+        val liked = if (radioId != null) radioDirectory.isStarred(radioId.removePrefix(com.metrolist.music.constants.RADIO_ID_PREFIX)) else isLiked == true
         mediaSession?.setCustomLayout(
             listOfNotNull(
                 CommandButton
                     .Builder()
                     .setDisplayName(
                         getString(
-                            if (isLiked == true) {
+                            if (liked) {
                                 R.string.action_remove_like
                             } else {
                                 R.string.action_like
                             },
                         ),
-                    ).setIconResId(if (isLiked == true) R.drawable.ic_heart else R.drawable.ic_heart_outline)
+                    ).setIconResId(if (liked) R.drawable.ic_heart else R.drawable.ic_heart_outline)
                     .setSessionCommand(CommandToggleLike)
                     // Enable as long as a track is playing, even if it isn't cached in the
                     // local DB yet (e.g. Spotify/YouTube tracks). toggleLike() inserts it on demand.
                     .setEnabled(currentMediaMetadata.value != null)
-                    .build()
-                    .takeIf { set != ButtonSet.LIVE_RADIO },
+                    .build(),
                 CommandButton
                     .Builder()
                     .setDisplayName(
@@ -2483,6 +2492,12 @@ class MusicService :
     }
 
     fun toggleLike() {
+        // Live radio: the heart moves the station to the top of your stations
+        player.currentMediaItem?.mediaId?.takeIf { com.metrolist.music.constants.isRadioId(it) }?.let { id ->
+            radioDirectory.toggleStarred(id)
+            updateNotification()
+            return
+        }
         scope.launch {
             var songToToggle = currentSong.first()
             // The current track may not be cached in the local DB yet (common for

@@ -1111,7 +1111,10 @@ private fun FavoriteButton(
     val librarySong by database.song(songId).collectAsStateWithLifecycle(initialValue = null)
     // For episodes, show saved state (inLibrary); for songs, show liked state
     val isEpisode = librarySong?.song?.isEpisode == true
-    val isLiked = if (isEpisode) librarySong?.song?.inLibrary != null else librarySong?.song?.liked == true
+    val radioHearts by com.metrolist.music.radio.RadioDirectory.starredIds.collectAsStateWithLifecycle()
+    val isLiked = if (com.metrolist.music.constants.isRadioId(songId)) {
+        songId.removePrefix(com.metrolist.music.constants.RADIO_ID_PREFIX) in radioHearts
+    } else if (isEpisode) librarySong?.song?.inLibrary != null else librarySong?.song?.liked == true
 
     Box(
         contentAlignment = Alignment.Center,

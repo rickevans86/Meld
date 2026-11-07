@@ -110,6 +110,11 @@ constructor(
 
     fun toggleFavourite(station: RadioStation) = directory.setFavourite(station, !isFavourite(station))
 
+    /** Hearted stations go to the top of your stations (here and in Android Auto). */
+    val starred = RadioDirectory.starredIds
+
+    fun toggleStarred(station: RadioStation) = directory.setStarred(station, station.id !in starred.value)
+
     /** Queues the shown stations so next/previous flip between them, starting at [index]. */
     fun play(stations: List<RadioStation>, index: Int, onReady: (List<Song>, Int) -> Unit) {
         viewModelScope.launch {
