@@ -100,21 +100,36 @@ jobs:
         run: |
           apk=$(find app/build/outputs/apk -name '*.apk' | grep -i foss | grep -v unsigned | head -1)
           [ -n "$apk" ] || { echo "No APK produced"; exit 1; }
-          cp "$apk" Meld.apk
+          cp "$apk" Wavelength.apk
 
       - name: Upload APK to the run
         uses: actions/upload-artifact@v6
         with:
-          name: meld-${{ env.VERSION }}
-          path: Meld.apk
+          name: wavelength-${{ env.VERSION }}
+          path: Wavelength.apk
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git log -1 --format='%s%n%n%b' > notes.md
-          gh release create "v$VERSION" Meld.apk \
+          # Releases are named "Wavelength <version>" with Wavelength.apk. Apps before the first such build
+          # read the version from the release title and only knew Meld.apk, so the first release made by
+          # this step is a bridge: plain number title, plus Meld.apk. (Its updater reads the tag instead.)
+          bridged=$(gh release list --repo "${{ github.repository }}" --limit 30 --json tagName -q '.[].tagName' |
+            while read -r tag; do
+              gh release view "$tag" --repo "${{ github.repository }}" --json assets -q '.assets[].name' | grep -qx Wavelength.apk && { echo yes; break; }
+            done)
+          if [ "$bridged" != "yes" ]; then
+            cp Wavelength.apk Meld.apk
+            assets="Wavelength.apk Meld.apk"
+            title="$VERSION"
+          else
+            assets="Wavelength.apk"
+            title="Wavelength $VERSION"
+          fi
+          gh release create "v$VERSION" $assets \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
-            --title "$VERSION" \
+            --title "$title" \
             --notes-file notes.md

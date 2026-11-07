@@ -65,6 +65,17 @@ object Updater {
      * Checks if the latest version is newer than the current version.
      * Returns true if an update is available (latestVersion > currentVersion)
      */
+    /**
+     * Wavelength: the version number of a release, from its tag ("v0.9.2.73"), since release titles read
+     * "Wavelength 0.9.2.73". Falls back to the first version-like part of the title.
+     */
+    private fun releaseVersion(release: org.json.JSONObject): String {
+        val pattern = Regex("\\d+(\\.\\d+)+")
+        return pattern.find(release.optString("tag_name"))?.value
+            ?: pattern.find(release.optString("name"))?.value
+            ?: release.optString("name")
+    }
+
     fun isUpdateAvailable(currentVersion: String, latestVersion: String): Boolean {
         return compareVersions(latestVersion, currentVersion) > 0
     }
@@ -96,7 +107,8 @@ object Updater {
             
             // Parse architecture and variant from filename
             val (arch, variant) = when {
-                name == "Meld.apk" -> "universal" to "foss"
+                // Wavelength: releases carry Wavelength.apk (older ones Meld.apk)
+                name == "Wavelength.apk" || name == "Meld.apk" -> "universal" to "foss"
                 name == "Meld-with-Google-Cast.apk" -> "universal" to "gms"
                 name.startsWith("app-") && name.endsWith("-release.apk") -> {
                     val arch = name.removePrefix("app-").removeSuffix("-release.apk")
@@ -134,7 +146,7 @@ object Updater {
                 
                 val releaseInfo = ReleaseInfo(
                     tagName = json.getString("tag_name"),
-                    versionName = json.getString("name"),
+                    versionName = releaseVersion(json),
                     description = json.getString("body"),
                     releaseDate = json.getString("published_at"),
                     assets = parseAssets(json.getJSONArray("assets"))
@@ -174,7 +186,7 @@ object Updater {
                         val releaseObj = json.getJSONObject(i)
                         releases.add(ReleaseInfo(
                             tagName = releaseObj.getString("tag_name"),
-                            versionName = releaseObj.getString("name"),
+                            versionName = releaseVersion(releaseObj),
                             description = releaseObj.getString("body"),
                             releaseDate = releaseObj.getString("published_at"),
                             assets = parseAssets(releaseObj.getJSONArray("assets"))

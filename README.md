@@ -26,12 +26,12 @@ every day. Nothing is ever pushed back to the original Meld repository.
 
 ## Download
 
-Go to the [latest release](https://github.com/rickevans86/Meld/releases/latest) and download **Meld.apk**
-(the file keeps its original name). Open it on your Android phone and allow "Install from unknown sources"
+Go to the [latest release](https://github.com/rickevans86/Meld/releases/latest) and download **Wavelength.apk**
+(older releases named it Meld.apk). Open it on your Android phone and allow "Install from unknown sources"
 if asked. After that, the app checks this repository for new versions and can update itself.
 
-Every push to this fork builds and publishes a new release automatically. Versions look like `0.9.2.<n>`,
-where `<n>` is the build number.
+Every push to this fork builds and publishes a new release automatically. Releases are named
+"Wavelength 0.9.2.<n>", where `<n>` is the build number.
 
 ## Features
 

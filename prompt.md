@@ -61,11 +61,12 @@ Add a GitHub Actions workflow "Build and Release" that runs on every push to `fe
 - Version: keep the base version and append the run number, e.g. `0.9.2.<n>`; versionCode = base × 10000 + n.
 - Sign every build with the same key from a repository secret (`DEBUG_KEYSTORE_BASE64`), checked with keytool.
   Release builds must use that key so updates install over each other.
-- Publish a GitHub release `v<version>` with the APK attached.
+- Publish a GitHub release `v<version>` titled "Wavelength <version>" with the APK attached as `Wavelength.apk`.
 
 ## Part 2: In-app updater and icon
 
-- Point Meld's in-app updater at my fork's GitHub releases. Add "Download and install": download the APK to the
+- Point Meld's in-app updater at my fork's GitHub releases. It reads the version from the release tag (the title
+  starts with "Wavelength") and downloads `Wavelength.apk`. Add "Download and install": download the APK to the
   cache folder and install it through a FileProvider, asking once for "install unknown apps" permission.
 - Give the app an original icon (purple-to-orange headphones) at every density, including adaptive and monochrome
   versions. Don't copy any brand's logo.

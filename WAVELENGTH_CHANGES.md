@@ -55,7 +55,7 @@ and re-apply the small edits listed for each upstream file.
 | App name | Set by the `METROLIST_APP_NAME: Wavelength` env in the workflow |
 | Version | `app/build.gradle.kts`: the `FORK_BUILD_NUMBER` env sets versionCode to `versionCode * 10000 + n` and versionName to `0.9.2.n` |
 | Signing | `DEBUG_KEYSTORE_BASE64` secret, validated with `keytool`. If it's invalid, the workflow falls back to a cached key |
-| Output | `Meld.apk` attached to the GitHub release `v<version>` |
+| Output | Release `v<version>` titled "Wavelength <version>" with `Wavelength.apk`. The first release with `Wavelength.apk` is a bridge (plain number title, plus `Meld.apk`) because older apps read the version from the title and only knew `Meld.apk`. `Updater.releaseVersion` now reads the tag |
 
 The build task is `:app:assembleFossRelease` (a proper, non-debuggable, minified release build) with
 `PULL_REQUEST=false`, and it retries once with `--refresh-dependencies`. `METROLIST_APPLICATION_ID=com.meld.app.debug`
@@ -664,3 +664,4 @@ To see the exact diff at any time:
 - 2026-11-07: Radio: ⋮ menu adds or removes a station from My stations; the heart makes a station a favourite, kept at the top in the app and Android Auto (also from the player's heart).
 - 2026-11-07: News sources: Google-only sources (no public feed) are removed after the check; added more daily news podcasts and a Science category.
 - 2026-11-07: New installs start with every feature off except the YouTube home and Library; updates keep their current features.
+- 2026-11-07: Releases renamed to "Wavelength <version>" with Wavelength.apk (the first such release is a bridge with the plain number title). The updater reads the version from the tag.
