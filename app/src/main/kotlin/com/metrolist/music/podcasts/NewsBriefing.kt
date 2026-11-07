@@ -88,10 +88,13 @@ constructor(
     private val json = Json { ignoreUnknownKeys = true }
     private val feedUrls = ConcurrentHashMap<String, String>()
 
-    /** All sources in the user's order, enabled ones first; followed podcasts can be switched on too. */
-    val choices: Flow<List<NewsSourceChoice>> =
-        combine(context.dataStore.data.map { it[NewsSourcesKey] }, directory.followed) { saved, followed ->
-            val available = BUILT_IN + CATALOGUE + followed.map {
+    /**
+     * All sources in the user's order, enabled ones first; followed podcasts can be switched on too.
+     * Catalogue sources the check found have no public feed (made only for Google News) are left out.
+     */
+    val choices: Flow<List<NewsSourceChoice>> by lazy {
+        combine(context.dataStore.data.map { it[NewsSourcesKey] }, directory.followed, _statuses) { saved, followed, statuses ->
+            val available = (BUILT_IN + CATALOGUE).filterNot { statuses[it.key] == SourceStatus.NO_FEED } + followed.map {
                 NewsSource("feed:${it.feedUrl}", it.title, "Podcasts you follow", it.artworkUrl)
             }.distinctBy { it.key }
             val enabledKeys = (saved ?: DEFAULT_SOURCES.joinToString(SEPARATOR))
@@ -100,6 +103,7 @@ constructor(
             enabled.map { NewsSourceChoice(it, true) } +
                 available.filter { it !in enabled }.map { NewsSourceChoice(it, false) }
         }
+    }
 
     val sortSetting: Flow<Pair<NewsSort, Boolean>> = context.dataStore.data.map { prefs ->
         (prefs[NewsSortKey]?.let { name -> NewsSort.entries.firstOrNull { it.name == name } } ?: NewsSort.YOUR_ORDER) to
@@ -518,13 +522,56 @@ constructor(
             "The Space" to "Entertainment & lifestyle",
         )
 
-        val CATEGORIES = listOf("Australia", "Australian local", "International", "Business", "Technology", "Sport", "Entertainment & lifestyle")
+        /**
+         * More daily news podcasts with public feeds (name and publisher, to pick the right show).
+         * Any that can't be found are left out automatically, like the Google-only ones.
+         */
+        private val MORE_SOURCES = listOf(
+            Triple("ABC News Daily", "ABC", "Australia"),
+            Triple("RN Breakfast", "ABC", "Australia"),
+            Triple("The Daily Aus", "The Daily Aus", "Australia"),
+            Triple("Squiz Today", "Squiz", "Australia"),
+            Triple("The Briefing", "LiSTNR", "Australia"),
+            Triple("Up First", "NPR", "International"),
+            Triple("Consider This from NPR", "NPR", "International"),
+            Triple("The Daily", "The New York Times", "International"),
+            Triple("Today, Explained", "Vox", "International"),
+            Triple("ABC News Update", "ABC News", "International"),
+            Triple("World News Tonight with David Muir", "ABC News", "International"),
+            Triple("Newshour", "BBC World Service", "International"),
+            Triple("Today in Focus", "The Guardian", "International"),
+            Triple("The Times News Briefing", "The Times", "International"),
+            Triple("Sky News Daily", "Sky News", "International"),
+            Triple("Axios Today", "Axios", "International"),
+            Triple("Apple News Today", "Apple News", "International"),
+            Triple("The NewsWorthy", "Erica Mandy", "International"),
+            Triple("The Take", "Al Jazeera", "International"),
+            Triple("Front Burner", "CBC", "International"),
+            Triple("The World", "PRX", "International"),
+            Triple("FT News Briefing", "Financial Times", "Business"),
+            Triple("WSJ What's News", "The Wall Street Journal", "Business"),
+            Triple("The Journal.", "The Wall Street Journal", "Business"),
+            Triple("Marketplace Morning Report", "Marketplace", "Business"),
+            Triple("Squawk Pod", "CNBC", "Business"),
+            Triple("Techmeme Ride Home", "Techmeme", "Technology"),
+            Triple("Daily Tech News Show", "Tom Merritt", "Technology"),
+            Triple("Short Wave", "NPR", "Science"),
+            Triple("Science Quickly", "Scientific American", "Science"),
+            Triple("Football Daily", "BBC", "Sport"),
+            Triple("AFL Daily", "Herald Sun", "Sport"),
+        )
+
+        val CATEGORIES = listOf("Australia", "Australian local", "International", "Business", "Technology", "Science", "Sport", "Entertainment & lifestyle")
 
         private val CATALOGUE: List<NewsSource> = run {
             val builtInNames = BUILT_IN.flatMap { listOf(it.name.lowercase(), it.name.lowercase().removePrefix("the ")) }.toSet()
-            CATALOGUE_NAMES
+            val listed = CATALOGUE_NAMES
                 .filter { (name, _) -> name.lowercase() !in builtInNames }
                 .map { (name, category) -> NewsSource("search:$name::", name, category) }
+            val names = listed.map { it.name.lowercase() }.toSet() + builtInNames
+            listed + MORE_SOURCES
+                .filter { (name, _, _) -> name.lowercase() !in names }
+                .map { (name, publisher, category) -> NewsSource("search:$name::$publisher", name, category) }
         }
 
         /** Mirrors a typical Android Auto news line-up: local first, then world and tech. */

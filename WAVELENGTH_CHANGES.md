@@ -402,6 +402,11 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - Built-in sources are listed in `NewsBriefing.BUILT_IN`. Google News' audio line-up is in `CATALOGUE_NAMES`,
   with categories. A `search:` source is checked for a public feed when it's ticked; Google-only feeds are
   reported as unavailable.
+- **Google-only sources removed:** `NewsBriefing.choices` leaves out catalogue sources whose check returned
+  NO_FEED (no public feed found by name), so they disappear after the first check.
+- **More sources:** `MORE_SOURCES` (name, publisher, category) adds daily news podcasts with public feeds
+  (Australia, International, Business, Technology, new Science category, Sport). Any that can't be found are
+  removed the same way.
 - **News sources** screen (`news_sources`) has search, category chips and reordering.
 - The News sources screen checks **every source in the background** when it opens (`NewsBriefing.checkSources`,
   6 at a time, each re-checked after 6 hours; results in `filesDir/news_status.json`, `SourceStatus` =
@@ -653,3 +658,4 @@ To see the exact diff at any time:
 - 2026-11-07: prompt.md updated with top-bar search, Spotify Recently played, Search off the bottom bar, pin menus and Liked pin/auto-download.
 - 2026-11-07: Android Auto buttons now fit what's playing (radio, podcasts/news/audiobooks, own servers, music); the add button on radio puts the current song into a Radio songs playlist chosen in Settings → Features.
 - 2026-11-07: Radio: ⋮ menu adds or removes a station from My stations; the heart makes a station a favourite, kept at the top in the app and Android Auto (also from the player's heart).
+- 2026-11-07: News sources: Google-only sources (no public feed) are removed after the check; added more daily news podcasts and a Science category.

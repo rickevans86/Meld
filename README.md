@@ -79,8 +79,13 @@ where `<n>` is the build number.
 ### News
 - **News bulletins** from sources you choose, played as short audio briefings and labelled with the
   source name. Nothing is hard-coded: every source can be switched on or off.
-- **Source checker.** Each source is checked to see whether it can be played. Sources that can't are
-  crossed out and marked "Can't play", with a Check again button.
+- **Source checker.** Each source is checked to see whether it can be played. Sources from the list that
+  have no public feed (made only for Google News) are removed automatically; others that can't play right
+  now are marked, with a Check again button.
+- **Where sources come from.** Each source is a public podcast feed found in the Apple Podcasts directory:
+  a built-in set, Google News' old audio line-up, and more daily news shows (ABC News Daily, The Daily Aus,
+  Up First, The Daily, FT News Briefing, Techmeme Ride Home, Short Wave and others). Podcasts you follow can be
+  added too.
 
 ### Radio
 - **Live radio stations** you can search, save and play. Each station's ⋮ menu adds it to or removes it
