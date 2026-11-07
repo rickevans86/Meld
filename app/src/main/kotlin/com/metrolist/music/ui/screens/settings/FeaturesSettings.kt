@@ -103,7 +103,7 @@ fun FeaturesSettings(navController: NavController) {
     fun setEnabled(feature: WavelengthFeature, enabled: Boolean) {
         scope.launch {
             context.dataStore.edit { prefs ->
-                val current = prefs[DisabledFeaturesKey].orEmpty()
+                val current = prefs[DisabledFeaturesKey] ?: com.metrolist.music.constants.DEFAULT_DISABLED_FEATURE_IDS
                 prefs[DisabledFeaturesKey] = if (enabled) current - feature.id else current + feature.id
             }
         }

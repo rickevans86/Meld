@@ -14,6 +14,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.metrolist.music.utils.dataStore
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /** Wavelength features that can be switched off in Settings → Features. Stored as the set of ids turned off. */
@@ -36,8 +37,32 @@ enum class WavelengthFeature(val id: String, val routes: Set<String>, val autoSe
     RADIO("radio", setOf("radio"), setOf("radio")),
 }
 
+/**
+ * A new install starts with only the YouTube home and the Library: every feature is off until switched on
+ * in Settings → Features. (Installs from before this change keep everything on; see [settleFeatureDefaults].)
+ */
+val DEFAULT_DISABLED_FEATURE_IDS: Set<String> = WavelengthFeature.entries.mapTo(HashSet()) { it.id }
+
+/** The saved switched-off features, or the new-install default when nothing is saved yet. */
+fun Preferences.disabledFeatureIds(): Set<String> = this[DisabledFeaturesKey] ?: DEFAULT_DISABLED_FEATURE_IDS
+
+/**
+ * Saves the feature switches on first start, so the default never changes under someone: an update
+ * from a version without this default keeps every feature on; a new install saves the all-off default.
+ */
+suspend fun settleFeatureDefaults(context: android.content.Context) {
+    if (context.dataStore.data.first()[DisabledFeaturesKey] != null) return
+    val info = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
+    val upgraded = info != null && info.firstInstallTime != info.lastUpdateTime
+    context.dataStore.edit { prefs ->
+        if (prefs[DisabledFeaturesKey] == null) {
+            prefs[DisabledFeaturesKey] = if (upgraded) emptySet() else DEFAULT_DISABLED_FEATURE_IDS
+        }
+    }
+}
+
 fun Preferences.disabledFeatures(): Set<WavelengthFeature> {
-    val ids = this[DisabledFeaturesKey].orEmpty()
+    val ids = disabledFeatureIds()
     return WavelengthFeature.entries.filterTo(HashSet()) { it.id in ids }
 }
 

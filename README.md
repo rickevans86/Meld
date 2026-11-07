@@ -51,7 +51,9 @@ where `<n>` is the build number.
   stations, Navidrome, your media server, news sources, audiobooks or files on the phone from those tabs.
   Every search uses the same search bar, so Search is no longer a bottom-bar tab (the combined Search
   screen is still in the side menu).
-- **Features settings.** Settings → Features turns whole sections on or off.
+- **Features settings.** Settings → Features turns whole sections on or off. A new install starts with only
+  the YouTube home and Library; switch on Spotify, Podcasts, News, Radio, Audiobooks, Navidrome, Media server
+  or Local files there. (Updating from an older version keeps your sections as they were.)
 
 ### Library
 - **YouTube and Spotify together.** Both libraries show on the same page.

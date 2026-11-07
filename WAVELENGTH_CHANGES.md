@@ -100,6 +100,10 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
 - Settings → Wavelength → **Features** (`settings/features`, `FeaturesSettings.kt`) turns off: the second music
   source (whichever of YouTube/Spotify isn't the default home), News, Navidrome, Audiobooks, Podcasts, Local files
   and Radio. Stored as `DisabledFeaturesKey` (set of ids); see `constants/Features.kt` (`WavelengthFeature`).
+- **New-install default:** every feature off (only the YouTube home and Library). An unset key means
+  `DEFAULT_DISABLED_FEATURE_IDS`; `settleFeatureDefaults` (run from `App.onCreate`) saves the key on first start:
+  empty (all on) when the app was updated from an older version (`firstInstallTime != lastUpdateTime`), the
+  all-off default for a new install.
 - Turned-off features are hidden from the bottom bar (`navigationItems` in `MainActivity`), the side menu
   (`WavelengthDrawerSheet`), Android Auto (`hiddenAutoSections()` filter on the root in
   `MediaLibrarySessionCallback`), and for Local files the Library chip. Turning off Spotify as the second source
@@ -659,3 +663,4 @@ To see the exact diff at any time:
 - 2026-11-07: Android Auto buttons now fit what's playing (radio, podcasts/news/audiobooks, own servers, music); the add button on radio puts the current song into a Radio songs playlist chosen in Settings → Features.
 - 2026-11-07: Radio: ⋮ menu adds or removes a station from My stations; the heart makes a station a favourite, kept at the top in the app and Android Auto (also from the player's heart).
 - 2026-11-07: News sources: Google-only sources (no public feed) are removed after the check; added more daily news podcasts and a Science category.
+- 2026-11-07: New installs start with every feature off except the YouTube home and Library; updates keep their current features.
