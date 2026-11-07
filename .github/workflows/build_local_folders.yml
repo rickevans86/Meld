@@ -118,8 +118,11 @@ jobs:
           # this step is a bridge: plain number title, plus Meld.apk. (Its updater reads the tag instead.)
           bridged=$(gh release list --repo "${{ github.repository }}" --limit 30 --json tagName -q '.[].tagName' |
             while read -r tag; do
-              gh release view "$tag" --repo "${{ github.repository }}" --json assets -q '.assets[].name' | grep -qx Wavelength.apk && { echo yes; break; }
-            done)
+              if gh release view "$tag" --repo "${{ github.repository }}" --json assets -q '.assets[].name' | grep -qx Wavelength.apk; then
+                echo yes
+                break
+              fi
+            done || true)
           if [ "$bridged" != "yes" ]; then
             cp Wavelength.apk Meld.apk
             assets="Wavelength.apk Meld.apk"
