@@ -6,7 +6,7 @@ the update in or to rebuild these features on top of the new code.
 
 - **Fork:** `rickevans86/Meld`, branch `feat/local-folders`
 - **Upstream:** `FrancescoGrazioso/Meld`, branch `main`
-- **Last upstream commit this is based on:** `24c15950e09b1c4801b14c30197f06876c27e276`
+- **Last upstream commit this is based on:** `86e33c001c704e668e61199099ee0107ba49f4d3`
 
 > Keep this file up to date: every change to Wavelength should update the matching section below
 > and add a line to the change log at the end.
@@ -671,3 +671,4 @@ To see the exact diff at any time:
 - 2026-11-07: Releases renamed to "Wavelength <version>" with Wavelength.apk (the first such release is a bridge with the plain number title). The updater reads the version from the tag.
 - 2026-11-07: Merged Meld upstream 24c15950 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
 - 2026-11-08: Phone player ⋮ on radio: Add song to playlist adds the playing song, not the station; non-working items hidden; library item acts on My stations.
+- 2026-11-08: Merged Meld upstream 86e33c00 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
