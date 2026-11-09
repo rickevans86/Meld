@@ -342,7 +342,9 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   (with haptic) changes episode (`seekToPreviousMediaItem` / `seekToNext`).
 - **Session** (Android Auto, notification, headset): `RadioMetadataPlayer` takes a `skip` lambda
   (`MusicService.podcastSkipAmounts`). While it applies, the track commands (next/previous) are removed from
-  the session's available commands (listeners are wrapped so command updates are filtered too) and
+  the session's available commands (listeners are wrapped in `FilteringListener`, which forwards every
+  `Player.Listener` method by hand: Kotlin's `by` delegation skips Java default methods, which in 0.9.2.78
+  left Android Auto on "Tap to open") and
   next/previous calls skip instead. The custom layout starts with two skip `CommandButton`s
   (`CommandSkipBack`/`CommandSkipForward`, slots BACK/FORWARD, Media3's 5/10/15/30 s icons or the plain skip
   icon), so Android Auto shows them in place of previous/next. Refreshed on track change and when the setting
@@ -698,3 +700,4 @@ To see the exact diff at any time:
 - 2026-11-09: Merged Meld upstream cf7201fa (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
 - 2026-11-09: Podcasts: Newest first / Oldest first sort chip on podcast pages and New episodes.
 - 2026-11-09: Podcast skip buttons: next/previous jump forward/back by a chosen amount in podcasts (app, notification, Android Auto), seconds shown on the buttons, hold in the app to change episode.
+- 2026-11-10: Fixed Android Auto showing "Tap to open" while playing (the session's player listeners weren't receiving events).

@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
  * the episode, and the session isn't told it can change track, so Android Auto and the notification
  * show the skip buttons from the custom layout in place of next and previous.
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class RadioMetadataPlayer(
     player: Player,
     private val nowPlaying: () -> Pair<String, String>?,
@@ -28,13 +29,62 @@ class RadioMetadataPlayer(
     private val listeners = ConcurrentHashMap<Player.Listener, Player.Listener>()
 
     override fun addListener(listener: Player.Listener) {
-        val wrapper = object : Player.Listener by listener {
-            override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
-                listener.onAvailableCommandsChanged(filter(availableCommands))
-            }
-        }
+        val wrapper = FilteringListener(listener)
         listeners[listener] = wrapper
         super.addListener(wrapper)
+    }
+
+    /**
+     * Passes every event on, filtering the available commands. Written out in full: Kotlin's `by`
+     * delegation skips Java default methods, so a delegated listener would hear nothing (Android Auto
+     * then showed "Tap to open" while playing).
+     */
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private inner class FilteringListener(private val l: Player.Listener) : Player.Listener {
+        override fun onAvailableCommandsChanged(availableCommands: Player.Commands) =
+            l.onAvailableCommandsChanged(filter(availableCommands))
+        override fun onEvents(player: Player, events: Player.Events) = l.onEvents(player, events)
+        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) = l.onTimelineChanged(timeline, reason)
+        override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) = l.onMediaItemTransition(mediaItem, reason)
+        override fun onTracksChanged(tracks: androidx.media3.common.Tracks) = l.onTracksChanged(tracks)
+        override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) = l.onMediaMetadataChanged(mediaMetadata)
+        override fun onPlaylistMetadataChanged(mediaMetadata: MediaMetadata) = l.onPlaylistMetadataChanged(mediaMetadata)
+        override fun onIsLoadingChanged(isLoading: Boolean) = l.onIsLoadingChanged(isLoading)
+        override fun onLoadingChanged(isLoading: Boolean) = l.onLoadingChanged(isLoading)
+        override fun onTrackSelectionParametersChanged(parameters: androidx.media3.common.TrackSelectionParameters) =
+            l.onTrackSelectionParametersChanged(parameters)
+        override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) = l.onPlayerStateChanged(playWhenReady, playbackState)
+        override fun onPlaybackStateChanged(playbackState: Int) = l.onPlaybackStateChanged(playbackState)
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = l.onPlayWhenReadyChanged(playWhenReady, reason)
+        override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) =
+            l.onPlaybackSuppressionReasonChanged(playbackSuppressionReason)
+        override fun onIsPlayingChanged(isPlaying: Boolean) = l.onIsPlayingChanged(isPlaying)
+        override fun onRepeatModeChanged(repeatMode: Int) = l.onRepeatModeChanged(repeatMode)
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) = l.onShuffleModeEnabledChanged(shuffleModeEnabled)
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) = l.onPlayerError(error)
+        override fun onPlayerErrorChanged(error: androidx.media3.common.PlaybackException?) = l.onPlayerErrorChanged(error)
+        override fun onPositionDiscontinuity(reason: Int) = l.onPositionDiscontinuity(reason)
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) =
+            l.onPositionDiscontinuity(oldPosition, newPosition, reason)
+        override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) =
+            l.onPlaybackParametersChanged(playbackParameters)
+        override fun onSeekBackIncrementChanged(seekBackIncrementMs: Long) = l.onSeekBackIncrementChanged(seekBackIncrementMs)
+        override fun onSeekForwardIncrementChanged(seekForwardIncrementMs: Long) = l.onSeekForwardIncrementChanged(seekForwardIncrementMs)
+        override fun onMaxSeekToPreviousPositionChanged(maxSeekToPreviousPositionMs: Long) =
+            l.onMaxSeekToPreviousPositionChanged(maxSeekToPreviousPositionMs)
+        override fun onAudioSessionIdChanged(audioSessionId: Int) = l.onAudioSessionIdChanged(audioSessionId)
+        override fun onAudioAttributesChanged(audioAttributes: androidx.media3.common.AudioAttributes) = l.onAudioAttributesChanged(audioAttributes)
+        override fun onVolumeChanged(volume: Float) = l.onVolumeChanged(volume)
+        override fun onSkipSilenceEnabledChanged(skipSilenceEnabled: Boolean) = l.onSkipSilenceEnabledChanged(skipSilenceEnabled)
+        override fun onDeviceInfoChanged(deviceInfo: androidx.media3.common.DeviceInfo) = l.onDeviceInfoChanged(deviceInfo)
+        override fun onDeviceVolumeChanged(volume: Int, muted: Boolean) = l.onDeviceVolumeChanged(volume, muted)
+        override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) = l.onVideoSizeChanged(videoSize)
+        override fun onSurfaceSizeChanged(width: Int, height: Int) = l.onSurfaceSizeChanged(width, height)
+        override fun onRenderedFirstFrame() = l.onRenderedFirstFrame()
+        override fun onCues(cues: MutableList<androidx.media3.common.text.Cue>) = l.onCues(cues)
+        override fun onCues(cueGroup: androidx.media3.common.text.CueGroup) = l.onCues(cueGroup)
+        override fun onMetadata(metadata: androidx.media3.common.Metadata) = l.onMetadata(metadata)
     }
 
     override fun removeListener(listener: Player.Listener) {
