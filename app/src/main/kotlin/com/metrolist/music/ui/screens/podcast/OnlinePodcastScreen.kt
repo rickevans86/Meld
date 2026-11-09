@@ -112,12 +112,15 @@ fun OnlinePodcastScreen(
     var isSearching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
 
-    val filteredEpisodes = remember(episodes, query) {
-        if (query.text.isEmpty()) episodes
+    val (oldestFirst, onOldestFirstChange) = com.metrolist.music.utils.rememberPreference(com.metrolist.music.podcasts.PodcastOldestFirstKey, false)
+    val filteredEpisodes = remember(episodes, query, oldestFirst) {
+        val matching = if (query.text.isEmpty()) episodes
         else episodes.filter { episode ->
             episode.title.contains(query.text, ignoreCase = true) ||
                 episode.author?.name?.contains(query.text, ignoreCase = true) == true
         }
+        // Episodes come newest first; "Oldest first" reverses them (and the play order)
+        if (oldestFirst) matching.reversed() else matching
     }
 
     val focusRequester = remember { FocusRequester() }
@@ -181,6 +184,13 @@ fun OnlinePodcastScreen(
                                         navController.navigate("artist/$channelId?isPodcastChannel=true")
                                     }
                                 }
+                            )
+                        }
+                        item(key = "episode_sort") {
+                            com.metrolist.music.podcasts.EpisodeSortChip(
+                                oldestFirst,
+                                onOldestFirstChange,
+                                modifier = Modifier.padding(horizontal = 16.dp),
                             )
                         }
                     }

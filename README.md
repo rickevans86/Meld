@@ -75,6 +75,8 @@ Every push to this fork builds and publishes a new release automatically. Releas
 - **Episode downloads.** Episodes download when you play them and delete themselves when you finish (both
   can be switched off). Each episode also has a button to download or delete it by hand.
 - **Downloaded filter.** A Downloaded chip in the podcast pages shows only episodes you have offline.
+- **Sort episodes.** A Newest first / Oldest first chip on podcast pages and in New episodes. Episodes play in
+  the order shown, so Oldest first plays on to newer episodes.
 - **Unfollow anything.** Followed feeds, including ones that are no longer available, have a ⋮ menu with
   Unfollow and Share.
 

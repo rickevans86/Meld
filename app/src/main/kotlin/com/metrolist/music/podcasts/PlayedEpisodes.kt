@@ -17,9 +17,40 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import timber.log.Timber
 import java.io.File
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 
 /** Whether played podcast episodes are hidden on show pages and in New episodes (and on Android Auto). */
 val HidePlayedEpisodesKey = booleanPreferencesKey("hidePlayedEpisodes")
+
+/** Podcast episode lists show the oldest episode first when true (newest first by default). */
+val PodcastOldestFirstKey = booleanPreferencesKey("podcastOldestFirst")
+
+/** The sort chip on podcast pages and New episodes: "Newest first" / "Oldest first". */
+@androidx.compose.runtime.Composable
+fun EpisodeSortChip(oldestFirst: Boolean, onChange: (Boolean) -> Unit, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
+    androidx.compose.material3.FilterChip(
+        selected = oldestFirst,
+        onClick = { onChange(!oldestFirst) },
+        label = {
+            androidx.compose.material3.Text(
+                androidx.compose.ui.res.stringResource(
+                    if (oldestFirst) com.metrolist.music.R.string.podcast_sort_oldest else com.metrolist.music.R.string.podcast_sort_newest,
+                ),
+            )
+        },
+        leadingIcon = {
+            androidx.compose.material3.Icon(
+                androidx.compose.ui.res.painterResource(
+                    if (oldestFirst) com.metrolist.music.R.drawable.arrow_upward else com.metrolist.music.R.drawable.arrow_downward,
+                ),
+                contentDescription = null,
+                modifier = androidx.compose.ui.Modifier.size(18.dp),
+            )
+        },
+        modifier = modifier,
+    )
+}
 
 /**
  * Which podcast episodes have been played (by song id). Kept in a small file because the song

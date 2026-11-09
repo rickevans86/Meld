@@ -104,6 +104,7 @@ fun PodcastDirectoryScreen(
     val downloadStates by com.metrolist.music.LocalDownloadUtil.current.downloads.collectAsState()
     val speeds by viewModel.speeds.collectAsState()
     val (hidePlayed, onHidePlayedChange) = rememberPreference(com.metrolist.music.podcasts.HidePlayedEpisodesKey, false)
+    val (oldestFirst, onOldestFirstChange) = rememberPreference(com.metrolist.music.podcasts.PodcastOldestFirstKey, false)
 
     val followed by viewModel.followed.collectAsState()
     val results by viewModel.results.collectAsState()
@@ -261,14 +262,21 @@ fun PodcastDirectoryScreen(
                 // Played episodes can be hidden; indexes stay those of the full list for playing
                 // "Downloaded" chip: only episodes saved on the phone
                 item(key = "downloaded_filter") {
-                    androidx.compose.material3.FilterChip(
-                        selected = downloadedOnly,
-                        onClick = { downloadedOnly = !downloadedOnly },
-                        label = { Text(stringResource(R.string.filter_downloaded)) },
+                    androidx.compose.foundation.layout.Row(
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(horizontal = 16.dp),
-                    )
+                    ) {
+                        com.metrolist.music.podcasts.EpisodeSortChip(oldestFirst, onOldestFirstChange)
+                        androidx.compose.material3.FilterChip(
+                            selected = downloadedOnly,
+                            onClick = { downloadedOnly = !downloadedOnly },
+                            label = { Text(stringResource(R.string.filter_downloaded)) },
+                        )
+                    }
                 }
-                val visible = current.songs.withIndex().filter { (_, song) ->
+                // The feed is newest first; "Oldest first" shows (and plays) it the other way round
+                val ordered = current.songs.withIndex().toList().let { if (oldestFirst) it.reversed() else it }
+                val visible = ordered.filter { (_, song) ->
                     (!hidePlayed || song.id !in played || song.id == mediaMetadata?.id) &&
                         (!downloadedOnly || downloadStates[song.id]?.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED)
                 }
@@ -307,7 +315,12 @@ fun PodcastDirectoryScreen(
                                     playerConnection.togglePlayPause()
                                 } else {
                                     viewModel.play(index) { songs, start ->
-                                        playerConnection.playQueue(queueOf(show.title, songs, start))
+                                        if (oldestFirst) {
+                                            // Play on towards newer episodes
+                                            playerConnection.playQueue(queueOf(show.title, songs.reversed(), songs.lastIndex - start))
+                                        } else {
+                                            playerConnection.playQueue(queueOf(show.title, songs, start))
+                                        }
                                     }
                                 }
                             },

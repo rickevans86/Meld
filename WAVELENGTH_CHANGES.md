@@ -325,6 +325,13 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   (`Player.kt`, `MiniPlayer.kt`) and in Android Auto (`MusicService.toggleLike`) hearts the playing station.
   Android Auto's Radio list refreshes when the stations change (`notifyChildrenChanged(RADIO)`).
 
+### 0c-10. Podcast episode sort
+- `PodcastOldestFirstKey` (saved, shared) and `EpisodeSortChip` (`podcasts/PlayedEpisodes.kt`): a Newest first /
+  Oldest first chip on the Apple podcast page (`PodcastDirectoryScreen`, next to Downloaded), the YouTube podcast
+  page (`OnlinePodcastScreen`, under the header) and New episodes (`NewEpisodesScreen`). Lists arrive newest
+  first, so Oldest first reverses them; the play queue follows the shown order (the Apple page reverses the
+  queue and maps the start index).
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -673,3 +680,4 @@ To see the exact diff at any time:
 - 2026-11-08: Phone player ⋮ on radio: Add song to playlist adds the playing song, not the station; non-working items hidden; library item acts on My stations.
 - 2026-11-08: Merged Meld upstream 86e33c00 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
 - 2026-11-09: Merged Meld upstream cf7201fa (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
+- 2026-11-09: Podcasts: Newest first / Oldest first sort chip on podcast pages and New episodes.

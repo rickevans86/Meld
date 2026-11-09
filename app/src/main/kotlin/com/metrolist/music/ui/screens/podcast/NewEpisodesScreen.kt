@@ -69,14 +69,19 @@ fun NewEpisodesScreen(
         com.metrolist.music.podcasts.HidePlayedEpisodesKey,
         false,
     )
-    val followed = followedAll?.filter { !hidePlayed || it.first.id !in played }
-    val youtube = youtubeAll?.filter { !hidePlayed || it.id !in played }
+    val (oldestFirst, onOldestFirstChange) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.podcasts.PodcastOldestFirstKey,
+        false,
+    )
+    // Both lists arrive newest first; "Oldest first" reverses them
+    val followed = followedAll?.filter { !hidePlayed || it.first.id !in played }?.let { if (oldestFirst) it.reversed() else it }
+    val youtube = youtubeAll?.filter { !hidePlayed || it.id !in played }?.let { if (oldestFirst) it.reversed() else it }
     val refreshing by viewModel.refreshing.collectAsState()
     val current by playerConnection.mediaMetadata.collectAsState()
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState(initial = false)
     val title = stringResource(R.string.new_episodes)
 
-    // Followed podcasts first (newest first), then YouTube subscriptions
+    // Followed podcasts first, then YouTube subscriptions, each in the chosen order
     val queue = followed.orEmpty().map { it.first.toMediaItem() } + youtube.orEmpty().map { it.toMediaItem() }
     fun playFrom(index: Int) {
         if (queue.isNotEmpty()) playerConnection.playQueue(ListQueue(title = title, items = queue, startIndex = index))
@@ -104,6 +109,7 @@ fun NewEpisodesScreen(
                     onClick = { onHidePlayedChange(!hidePlayed) },
                     label = { Text(stringResource(R.string.podcast_hide_played)) },
                 )
+                com.metrolist.music.podcasts.EpisodeSortChip(oldestFirst, onOldestFirstChange)
                 Spacer(Modifier.weight(1f))
                 if (refreshing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 IconButton(onClick = viewModel::refresh, enabled = !refreshing) {
