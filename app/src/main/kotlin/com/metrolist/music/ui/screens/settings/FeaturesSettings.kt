@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -537,6 +539,17 @@ private fun PodcastPlaylistsSetting() {
         true,
     )
     val notFound = stringResource(R.string.podcast_playlists_link_bad)
+    // Skip buttons: next/previous jump inside an episode (hold to change episode)
+    val (skipEnabled, onSkipEnabled) = com.metrolist.music.utils.rememberPreference(com.metrolist.music.podcasts.PodcastSkip.EnabledKey, false)
+    val (skipForward, onSkipForward) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.podcasts.PodcastSkip.ForwardKey,
+        com.metrolist.music.podcasts.PodcastSkip.DEFAULT_FORWARD,
+    )
+    val (skipBack, onSkipBack) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.podcasts.PodcastSkip.BackKey,
+        com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK,
+    )
+    var pickingSkip by remember { mutableStateOf<Boolean?>(null) } // true = forward, false = back
 
     // Your YouTube account's playlists, loaded when the list opens
     LaunchedEffect(choosing) {
@@ -581,8 +594,59 @@ private fun PodcastPlaylistsSetting() {
                 trailingContent = { Switch(checked = deleteOnFinish, onCheckedChange = onDeleteOnFinish) },
                 onClick = { onDeleteOnFinish(!deleteOnFinish) },
             ),
-        ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.fast_forward),
+                title = { Text(stringResource(R.string.podcast_skip_setting)) },
+                description = { Text(stringResource(R.string.podcast_skip_setting_desc)) },
+                trailingContent = { Switch(checked = skipEnabled, onCheckedChange = onSkipEnabled) },
+                onClick = { onSkipEnabled(!skipEnabled) },
+            ),
+        ) + if (skipEnabled) listOf(
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.skip_next),
+                title = { Text(stringResource(R.string.podcast_skip_forward)) },
+                description = { Text(com.metrolist.music.podcasts.PodcastSkip.label(skipForward)) },
+                onClick = { pickingSkip = true },
+            ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.skip_previous),
+                title = { Text(stringResource(R.string.podcast_skip_back)) },
+                description = { Text(com.metrolist.music.podcasts.PodcastSkip.label(skipBack)) },
+                onClick = { pickingSkip = false },
+            ),
+        ) else emptyList(),
     )
+
+    pickingSkip?.let { forward ->
+        val current = if (forward) skipForward else skipBack
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pickingSkip = null },
+            title = { Text(stringResource(if (forward) R.string.podcast_skip_forward else R.string.podcast_skip_back)) },
+            text = {
+                Column {
+                    com.metrolist.music.podcasts.PodcastSkip.CHOICES.forEach { seconds ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (forward) onSkipForward(seconds) else onSkipBack(seconds)
+                                    pickingSkip = null
+                                }
+                                .padding(vertical = 4.dp),
+                        ) {
+                            androidx.compose.material3.RadioButton(selected = seconds == current, onClick = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(com.metrolist.music.podcasts.PodcastSkip.label(seconds))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { pickingSkip = null }) { Text(stringResource(android.R.string.cancel)) }
+            },
+        )
+    }
 
     if (choosing) {
         val savedBrowseIds = playlists.mapNotNull { it.playlist.browseId }.toSet()

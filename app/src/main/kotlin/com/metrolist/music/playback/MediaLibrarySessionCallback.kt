@@ -125,6 +125,8 @@ constructor(
                 .add(MediaSessionConstants.CommandToggleShuffle)
                 .add(MediaSessionConstants.CommandToggleRepeatMode)
                 .add(MediaSessionConstants.CommandAddToTargetPlaylist)
+                .add(MediaSessionConstants.CommandSkipBack)
+                .add(MediaSessionConstants.CommandSkipForward)
                 .build(),
             connectionResult.availablePlayerCommands,
         )
@@ -145,6 +147,8 @@ constructor(
 
             MediaSessionConstants.ACTION_TOGGLE_REPEAT_MODE -> session.player.toggleRepeatMode()
             MediaSessionConstants.ACTION_ADD_TO_TARGET_PLAYLIST -> addToTargetPlaylist()
+            MediaSessionConstants.ACTION_SKIP_BACK -> service.podcastSkip(forward = false)
+            MediaSessionConstants.ACTION_SKIP_FORWARD -> service.podcastSkip(forward = true)
         }
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
     }

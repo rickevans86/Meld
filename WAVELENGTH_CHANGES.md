@@ -332,6 +332,22 @@ legacy versions at every density. Upstream icon changes will conflict here; keep
   first, so Oldest first reverses them; the play queue follows the shown order (the Apple page reverses the
   queue and maps the start index).
 
+### 0c-11. Podcast skip buttons
+- **Setting** (`podcasts/PodcastSkip.kt`: `EnabledKey`, `ForwardKey`, `BackKey`, choices 5 s–2 min; defaults
+  30 s forward, 15 s back): Settings → Features → Podcasts → Skip buttons, with "Next skips forward by" and
+  "Previous skips back by" pickers. Applies to podcast episodes (`podcast:` ids or `isEpisode`), including
+  news bulletins.
+- **Phone player** (`Player.kt`, both button styles; legacy mini player's next button): next/previous show
+  `SkipIcon` (the replay arrow, mirrored for forward, with the seconds in the middle). Tap skips; hold
+  (with haptic) changes episode (`seekToPreviousMediaItem` / `seekToNext`).
+- **Session** (Android Auto, notification, headset): `RadioMetadataPlayer` takes a `skip` lambda
+  (`MusicService.podcastSkipAmounts`). While it applies, the track commands (next/previous) are removed from
+  the session's available commands (listeners are wrapped so command updates are filtered too) and
+  next/previous calls skip instead. The custom layout starts with two skip `CommandButton`s
+  (`CommandSkipBack`/`CommandSkipForward`, slots BACK/FORWARD, Media3's 5/10/15/30 s icons or the plain skip
+  icon), so Android Auto shows them in place of previous/next. Refreshed on track change and when the setting
+  changes. No hold in the car (Android Auto has no long press).
+
 ### 0d. Removed integrations: Discord, Last.fm, Listen Together
 - Switched off and hidden rather than deleted, so Meld updates still merge cleanly. Flags live in
   `RemovedIntegrations` (`constants/Features.kt`); set one to `false` to bring it back.
@@ -681,3 +697,4 @@ To see the exact diff at any time:
 - 2026-11-08: Merged Meld upstream 86e33c00 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
 - 2026-11-09: Merged Meld upstream cf7201fa (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
 - 2026-11-09: Podcasts: Newest first / Oldest first sort chip on podcast pages and New episodes.
+- 2026-11-09: Podcast skip buttons: next/previous jump forward/back by a chosen amount in podcasts (app, notification, Android Auto), seconds shown on the buttons, hold in the app to change episode.

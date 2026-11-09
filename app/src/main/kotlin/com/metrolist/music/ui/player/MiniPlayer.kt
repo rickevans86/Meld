@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -873,7 +874,35 @@ private fun LegacyMiniPlayer(
                 listenTogetherManager = listenTogetherManager,
             )
 
-            IconButton(
+            // Wavelength: on a podcast with skip buttons on, tap jumps forward and hold goes to the next episode
+            val podcastSkip = com.metrolist.music.podcasts.rememberPodcastSkip(mediaMetadata)
+            if (podcastSkip != null && !isListenTogetherGuest) {
+                val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .combinedClickable(
+                            onClick = {
+                                val p = playerConnection.player
+                                val duration = p.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+                                p.seekTo((p.currentPosition + podcastSkip.forward * 1000L).coerceIn(0L, duration))
+                            },
+                            onLongClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                playerConnection.seekToNext()
+                            },
+                        ),
+                ) {
+                    com.metrolist.music.podcasts.SkipIcon(
+                        forward = true,
+                        seconds = podcastSkip.forward,
+                        tint = androidx.compose.material3.LocalContentColor.current,
+                        size = 26.dp,
+                    )
+                }
+            } else IconButton(
                 enabled = canSkipNext && !isListenTogetherGuest,
                 onClick = if (isListenTogetherGuest) ({}) else ({ playerConnection.seekToNext() }),
             ) {

@@ -785,7 +785,7 @@ class MusicService :
             toggleLibrary = ::toggleLibrary
             addToTargetPlaylist = ::addToTargetPlaylist
         }
-        val radioAwarePlayer = RadioMetadataPlayer(player) { radioDirectory.nowPlaying.value }
+        val radioAwarePlayer = RadioMetadataPlayer(player, { radioDirectory.nowPlaying.value }, ::podcastSkipAmounts)
         sessionPlayer = radioAwarePlayer
         mediaSession =
             MediaLibrarySession
@@ -1155,7 +1155,7 @@ class MusicService :
                 sleepTimer?.player = newPlayer
 
                 try {
-                    val radioAwarePlayer = RadioMetadataPlayer(newPlayer) { radioDirectory.nowPlaying.value }
+                    val radioAwarePlayer = RadioMetadataPlayer(newPlayer, { radioDirectory.nowPlaying.value }, ::podcastSkipAmounts)
                     sessionPlayer = radioAwarePlayer
                     mediaSession?.let { (it as MediaSession).player = radioAwarePlayer }
                 } catch (e: Exception) {
@@ -1179,6 +1179,22 @@ class MusicService :
         // Radio "now playing" titles: refresh the notification and Android Auto when they change
         scope.launch {
             radioDirectory.nowPlaying.collect { sessionPlayer?.notifyMetadataChanged() }
+        }
+        // Podcast skip buttons setting: keep it at hand and refresh the buttons when it changes
+        scope.launch {
+            dataStore.data.map {
+                Triple(
+                    it[com.metrolist.music.podcasts.PodcastSkip.EnabledKey] ?: false,
+                    it[com.metrolist.music.podcasts.PodcastSkip.BackKey] ?: com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK,
+                    it[com.metrolist.music.podcasts.PodcastSkip.ForwardKey] ?: com.metrolist.music.podcasts.PodcastSkip.DEFAULT_FORWARD,
+                )
+            }.distinctUntilChanged().collect {
+                podcastSkipSetting = it
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    sessionPlayer?.notifyAvailableCommandsChanged()
+                    updateNotification()
+                }
+            }
         }
         // Your stations changed (added, removed, hearted): Android Auto re-reads its Radio list
         scope.launch {
@@ -1789,6 +1805,44 @@ class MusicService :
      */
     private enum class ButtonSet { MUSIC, OWN_MEDIA, SPOKEN, LIVE_RADIO }
 
+    /** Podcast skip buttons setting (enabled, back seconds, forward seconds), kept up to date. */
+    @Volatile
+    private var podcastSkipSetting = Triple(false, com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK, com.metrolist.music.podcasts.PodcastSkip.DEFAULT_FORWARD)
+
+    /** (back, forward) seconds when next/previous should skip inside the playing podcast; null otherwise. */
+    fun podcastSkipAmounts(): Pair<Int, Int>? {
+        val (enabled, back, forward) = podcastSkipSetting
+        if (!enabled) return null
+        val id = player.currentMediaItem?.mediaId ?: return null
+        val isEpisode = player.currentMetadata?.isEpisode == true
+        return if (com.metrolist.music.podcasts.PodcastSkip.isPodcast(id, isEpisode)) back to forward else null
+    }
+
+    /** The skip buttons in Android Auto and the notification. */
+    fun podcastSkip(forward: Boolean) {
+        val (back, fwd) = podcastSkipAmounts() ?: (podcastSkipSetting.second to podcastSkipSetting.third)
+        sessionPlayer?.skipBy(if (forward) fwd else -back)
+    }
+
+    /** Media3's built-in skip icons have 5/10/15/30 seconds on them; other amounts use the plain arrow. */
+    private fun skipIcon(forward: Boolean, seconds: Int): Int = if (forward) {
+        when (seconds) {
+            5 -> CommandButton.ICON_SKIP_FORWARD_5
+            10 -> CommandButton.ICON_SKIP_FORWARD_10
+            15 -> CommandButton.ICON_SKIP_FORWARD_15
+            30 -> CommandButton.ICON_SKIP_FORWARD_30
+            else -> CommandButton.ICON_SKIP_FORWARD
+        }
+    } else {
+        when (seconds) {
+            5 -> CommandButton.ICON_SKIP_BACK_5
+            10 -> CommandButton.ICON_SKIP_BACK_10
+            15 -> CommandButton.ICON_SKIP_BACK_15
+            30 -> CommandButton.ICON_SKIP_BACK_30
+            else -> CommandButton.ICON_SKIP_BACK
+        }
+    }
+
     private fun buttonSet(): ButtonSet {
         val id = player.currentMediaItem?.mediaId ?: currentMediaMetadata.value?.id ?: return ButtonSet.MUSIC
         val isEpisode = currentSong.value?.song?.takeIf { it.id == id }?.isEpisode == true ||
@@ -1805,9 +1859,22 @@ class MusicService :
     private fun updateNotification(isLiked: Boolean? = currentSong.value?.song?.let { if (it.isEpisode) it.inLibrary != null else it.liked }) {
         val set = buttonSet()
         val radioId = player.currentMediaItem?.mediaId?.takeIf { set == ButtonSet.LIVE_RADIO }
+        val skip = podcastSkipAmounts()
+        val skipButtons = if (skip == null) emptyList() else listOf(
+            CommandButton.Builder(skipIcon(forward = false, seconds = skip.first))
+                .setDisplayName(getString(R.string.podcast_skip_back_by, skip.first))
+                .setSessionCommand(com.metrolist.music.constants.MediaSessionConstants.CommandSkipBack)
+                .setSlots(CommandButton.SLOT_BACK)
+                .build(),
+            CommandButton.Builder(skipIcon(forward = true, seconds = skip.second))
+                .setDisplayName(getString(R.string.podcast_skip_forward_by, skip.second))
+                .setSessionCommand(com.metrolist.music.constants.MediaSessionConstants.CommandSkipForward)
+                .setSlots(CommandButton.SLOT_FORWARD)
+                .build(),
+        )
         val liked = if (radioId != null) radioDirectory.isStarred(radioId.removePrefix(com.metrolist.music.constants.RADIO_ID_PREFIX)) else isLiked == true
         mediaSession?.setCustomLayout(
-            listOfNotNull(
+            skipButtons + listOfNotNull(
                 CommandButton
                     .Builder()
                     .setDisplayName(
@@ -2892,6 +2959,7 @@ class MusicService :
         radioDirectory.setNowPlaying(id.orEmpty(), null)
         if (com.metrolist.music.constants.isRadioId(id)) radioDirectory.reportPlay(id!!)
         // Show the car buttons that fit this kind of track straight away
+        sessionPlayer?.notifyAvailableCommandsChanged()
         updateNotification()
         // Podcast episodes download as soon as they start playing (Settings → Features → Podcasts)
         val episodeMetadata = mediaItem?.metadata

@@ -1498,6 +1498,12 @@
     <string name="radio_song_not_found">Couldn\'t find this song on YouTube Music</string>
     <string name="podcast_sort_newest">Newest first</string>
     <string name="podcast_sort_oldest">Oldest first</string>
+    <string name="podcast_skip_setting">Skip buttons</string>
+    <string name="podcast_skip_setting_desc">In podcasts, next and previous jump forward and back in the episode, in the app, notification and Android Auto. Hold either button in the app to change episode.</string>
+    <string name="podcast_skip_forward">Next skips forward by</string>
+    <string name="podcast_skip_back">Previous skips back by</string>
+    <string name="podcast_skip_forward_by">Forward %1$d seconds</string>
+    <string name="podcast_skip_back_by">Back %1$d seconds</string>
     <string name="radio_songs_section">Radio songs</string>
     <string name="radio_songs_setting">Add radio songs to</string>
     <string name="radio_songs_desc">In Android Auto, the add button on a radio station finds the song that\'s playing on YouTube Music and adds it to this playlist.</string>

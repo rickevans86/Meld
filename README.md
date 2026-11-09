@@ -75,6 +75,10 @@ Every push to this fork builds and publishes a new release automatically. Releas
 - **Episode downloads.** Episodes download when you play them and delete themselves when you finish (both
   can be switched off). Each episode also has a button to download or delete it by hand.
 - **Downloaded filter.** A Downloaded chip in the podcast pages shows only episodes you have offline.
+- **Skip buttons.** Settings → Features → Podcasts → Skip buttons makes next and previous jump forward and
+  back inside an episode (choose how far: 5 seconds to 2 minutes). The buttons show a circular arrow with the
+  number of seconds. In the app, hold either button to change episode instead. Android Auto and the
+  notification show the same skip buttons.
 - **Sort episodes.** A Newest first / Oldest first chip on podcast pages and in New episodes. Episodes play in
   the order shown, so Oldest first plays on to newer episodes.
 - **Unfollow anything.** Followed feeds, including ones that are no longer available, have a ⋮ menu with
