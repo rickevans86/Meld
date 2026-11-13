@@ -1,7 +1,7 @@
 # PHONE-AUDIOBOOK-TABS
 
 AI: Claude
-Status: implemented; owner authorized merge to main and release on 2026-11-13. Temporary task ID because GitHub Issues are disabled.
+Status: merged and released as Wavelength 0.9.2.83 (owner-authorized, 2026-11-13). Temporary task ID because GitHub Issues are disabled.
 Branch: feat/phone-audiobook-tabs (from main cc955f6c)
 Overlap check: no open feature PR touches these files. PR #2 is the documentation records PR. AUTO-AUDIOBOOKS (PR #3) is merged; its car code only gains an optional sort argument on AbsRepository.books, whose default keeps title order.
 
@@ -25,3 +25,5 @@ Verification:
 - Every R.string/R.drawable/R.plurals reference in the changed files resolves, and metrolist_strings.xml parses.
 - PR #4 (https://github.com/rickevans86/Meld/pull/4), CI run 43411817378 on 26a1cdfa, passed: full :app:testFossDebugUnitTest and :innertube:test, assembleFossDebug, review APK upload, and :app:lintFossDebug.
 - Not done: physical phone testing and a live Audiobookshelf check of the server sort orders.
+
+Release: PR #4 merged into main as e6e32e0c (merge commit). "Build and Release" run 43413832192 published Wavelength 0.9.2.83 (https://github.com/rickevans86/Meld/releases/tag/v0.9.2.83), tagged at e6e32e0c. Claude downloaded the APK: application ID com.meld.app.debug, version code 280083 (previous 280082), and the same signing certificate as 0.9.2.82. Phone testing is still outstanding.
