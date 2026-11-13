@@ -90,6 +90,14 @@ class BackupRestoreViewModel @Inject constructor(
                         }
                     outputStream.putNextEntry(ZipEntry(ArtistNameAliases.BACKUP_FILENAME))
                     outputStream.write(ArtistNameAliases.serialize().encodeToByteArray())
+                    // Wavelength: podcast follows, radio stations, played episodes and podcast speeds
+                    WavelengthBackupFiles.NAMES.forEach { name ->
+                        val file = File(context.filesDir, name)
+                        if (file.isFile) {
+                            outputStream.putNextEntry(ZipEntry(WavelengthBackupFiles.entryName(name)))
+                            file.inputStream().use { it.copyTo(outputStream) }
+                        }
+                    }
                     runBlocking(Dispatchers.IO) {
                         database.checkpoint()
                     }
@@ -148,6 +156,7 @@ class BackupRestoreViewModel @Inject constructor(
                 var foundDb = false
                 var foundSettings = false
                 var restoredArtistNameAliases: Map<String, String>? = null
+                val restoredWavelengthFiles = mutableMapOf<String, ByteArray>()
 
                 context.applicationContext.contentResolver.openInputStream(uri)?.use { raw ->
                     raw.zipInputStream().use { inputStream ->
@@ -173,7 +182,9 @@ class BackupRestoreViewModel @Inject constructor(
                                 "${InternalDatabase.DB_NAME}-shm" -> {
                                     // Skip SHM — we'll open cleanly
                                 }
-                                else -> Timber.tag("RESTORE").i("Skipping unexpected entry: ${entry.name}")
+                                else -> WavelengthBackupFiles.fileName(entry.name)?.let { name ->
+                                    restoredWavelengthFiles[name] = inputStream.readBytes()
+                                } ?: Timber.tag("RESTORE").i("Skipping unexpected entry: ${entry.name}")
                             }
                             entry = tryOrNull { inputStream.nextEntry }
                         }
@@ -317,6 +328,7 @@ class BackupRestoreViewModel @Inject constructor(
                         }
                     }
 
+                    restoredWavelengthFiles.forEach { (name, bytes) -> File(context.filesDir, name).writeBytes(bytes) }
                     context.filesDir.resolve(PERSISTENT_QUEUE_FILE).delete()
                     context.filesDir.resolve(PERSISTENT_AUTOMIX_FILE).delete()
                     context.filesDir.resolve(PERSISTENT_PLAYER_STATE_FILE).delete()
@@ -661,4 +673,21 @@ class BackupRestoreViewModel @Inject constructor(
     companion object {
         const val SETTINGS_FILENAME = "settings.preferences_pb"
     }
+}
+
+/** Wavelength data kept in files outside the database and settings, included in backups. */
+internal object WavelengthBackupFiles {
+    val NAMES = listOf(
+        "podcast_follows.json",
+        "radio_favourites.json",
+        "radio_starred.json",
+        "played_episodes.json",
+        "podcast_speeds.json",
+    )
+    private const val PREFIX = "wavelength/"
+
+    fun entryName(name: String) = PREFIX + name
+
+    /** The file to restore for a zip entry, or null for anything else (including path tricks). */
+    fun fileName(entry: String): String? = entry.removePrefix(PREFIX).takeIf { entry.startsWith(PREFIX) && it in NAMES }
 }

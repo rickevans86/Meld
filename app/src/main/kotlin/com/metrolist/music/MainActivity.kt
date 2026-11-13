@@ -737,6 +737,11 @@ class MainActivity : FragmentActivity() {
 
                 val navController = rememberNavController()
 
+                // Wavelength: guide for moving from the old com.meld.app.debug app to the new app ID
+                com.metrolist.music.ui.component.WavelengthMove.Dialog(
+                    onOpenBackup = { runCatching { navController.navigate(com.metrolist.music.ui.component.WavelengthMove.BACKUP_ROUTE) } },
+                )
+
                 LaunchedEffect(Unit) {
                     val lastSeenVersion = dataStore.data.first()[LastSeenVersionKey] ?: ""
                     val currentVersion = BuildConfig.BASE_VERSION_NAME

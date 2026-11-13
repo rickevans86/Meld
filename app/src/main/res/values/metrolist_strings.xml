@@ -1616,4 +1616,14 @@
     <string name="audiobook_none_downloaded">No downloaded audiobooks yet. Open a book and tap Download to listen offline.</string>
     <string name="audiobook_none_listening">Nothing in progress. Books you start and haven\'t finished show here.</string>
     <string name="audiobook_all_on_phone">Every book in your phone folder plays offline.</string>
+    <!-- Wavelength: move to its own app ID -->
+    <string name="wavelength_move_title">Wavelength is moving to a new app</string>
+    <string name="wavelength_move_old_text">So Play Protect stops warning when you install it, the next update installs Wavelength as a new app next to this one. Make a backup now (Settings → Backup and restore) so you can restore your library, settings, podcasts and stations in the new app. Server sign-ins and downloads stay with this app, so you\'ll sign in again there.</string>
+    <string name="wavelength_move_back_up">Back up now</string>
+    <string name="wavelength_move_later">Later</string>
+    <string name="wavelength_move_new_title">Finish moving to the new Wavelength</string>
+    <string name="wavelength_move_new_text">The old Wavelength is still installed. 1. Restore the backup you made in the old app. 2. Sign in to your servers again and pick your folders. 3. Remove the old app.</string>
+    <string name="wavelength_move_restore">Restore backup</string>
+    <string name="wavelength_move_remove_old">Remove old app</string>
+    <string name="wavelength_move_done">Done</string>
 </resources>
