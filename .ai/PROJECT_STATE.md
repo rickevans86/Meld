@@ -29,3 +29,11 @@ Claude then added explicit pagination for Android Auto's 100-children limit in 6
 PR run 43403522870 on 23d4c232 passed: full unit suite (including 6 new pagination tests), FOSS debug build, review APK and lint. No local Gradle build was possible in Claude's workspace (no Android SDK). Physical Android Auto testing and live Audiobookshelf testing are still outstanding.
 
 The phone audiobook Library / Downloaded / Listening tabs are a separate design request, not part of PR #3.
+
+## Release 0.9.2.82 — 2026-11-13, Claude
+
+The owner instructed "Publish to release". Claude merged PR #3 into main as 5e6a7b47 (merge commit; Codex's and Claude's commits preserved). Signed "Build and Release" run 43408784962 published [Wavelength 0.9.2.82](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.82), tagged at 5e6a7b47, with Wavelength.apk.
+
+Claude downloaded the public APK and checked it: application ID com.meld.app.debug, version code 280082 (previous 280081), and the same signing certificate as 0.9.2.81. Main is now cc955f6c, a release-record commit marked [skip ci].
+
+This is the latest released baseline. Still outstanding: physical Android Auto testing, live Audiobookshelf testing, and CI-NIGHTLY-SIGNING.
