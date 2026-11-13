@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.offline.Download
 import com.metrolist.music.LocalListenTogetherManager
 import com.metrolist.music.R
+import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.db.entities.Playlist
 import com.metrolist.music.db.entities.PlaylistSong
 import com.metrolist.music.db.entities.Song
@@ -124,8 +125,17 @@ fun LocalPlaylistMenu(
 
     val isYouTubePlaylist = playlist.playlist.browseId != null
 
+    // Same extras as the playlist's ⋮ in the Library: Play next, pin to Library, auto-download new songs
+    val wavelengthItems = wavelengthPlaylistItems(
+        songs = songs.map { it.song },
+        pinKey = "playlist:${playlist.id}",
+        autoDownloadId = playlist.id,
+        onDismiss = onDismiss,
+    )
+
     val menuItems =
         buildList {
+            addAll(wavelengthItems)
             add(
                 Material3MenuItemData(
                     title = { Text(stringResource(R.string.edit)) },
@@ -319,6 +329,8 @@ fun AutoPlaylistMenu(
     onDismiss: () -> Unit,
     songs: List<Song> = emptyList(),
     playlistName: String = "Playlist",
+    /** Wavelength: "liked", "downloaded", ... — Liked songs can be pinned and auto-downloaded. */
+    autoPlaylistId: String? = null,
 ) {
     val listenTogetherManager = LocalListenTogetherManager.current
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
@@ -381,9 +393,16 @@ fun AutoPlaylistMenu(
             }
         }
 
+    val wavelengthItems = wavelengthPlaylistItems(
+        songs = songs,
+        pinKey = if (autoPlaylistId == "liked") "auto:liked" else null,
+        autoDownloadId = if (autoPlaylistId == "liked") com.metrolist.music.playback.PlaylistAutoDownload.LIKED_ID else null,
+        onDismiss = onDismiss,
+    )
+
     Material3MenuGroup(
         items =
-            listOfNotNull(
+            wavelengthItems + listOfNotNull(
                 if (!isGuest) {
                     Material3MenuItemData(
                         title = { Text(stringResource(R.string.add_to_queue)) },
@@ -749,4 +768,55 @@ fun CachePlaylistMenu(
                 downloadMenuItem,
             ),
     )
+}
+
+/**
+ * Wavelength: Play next, Pin to top of Library and Auto-download new songs, shared by the ⋮ menus
+ * inside a playlist (local playlists and Liked songs) so they match the playlist's menu in the Library.
+ */
+@Composable
+private fun wavelengthPlaylistItems(
+    songs: List<Song>,
+    pinKey: String?,
+    autoDownloadId: String?,
+    onDismiss: () -> Unit,
+): List<Material3MenuItemData> {
+    val playerConnection = com.metrolist.music.LocalPlayerConnection.current
+    val context = LocalContext.current
+    val pin = pinKey?.let { com.metrolist.music.constants.libraryPinMenuItem(it, onDismiss) }
+    val autoIds = com.metrolist.music.playback.PlaylistAutoDownload.rememberEnabledIds()
+    val autoOn = autoDownloadId != null && autoDownloadId in autoIds
+    return buildList {
+        if (songs.isNotEmpty() && playerConnection != null) {
+            add(
+                Material3MenuItemData(
+                    title = { Text(stringResource(R.string.play_next)) },
+                    description = { Text(stringResource(R.string.play_next_desc)) },
+                    icon = { Icon(painter = painterResource(R.drawable.playlist_play), contentDescription = null) },
+                    onClick = {
+                        playerConnection.playNext(songs.map { it.toMediaItem() })
+                        onDismiss()
+                    },
+                ),
+            )
+        }
+        pin?.let { add(it) }
+        if (autoDownloadId != null) {
+            add(
+                Material3MenuItemData(
+                    title = {
+                        Text(stringResource(if (autoOn) R.string.playlist_auto_download_off else R.string.playlist_auto_download_on))
+                    },
+                    icon = { Icon(painter = painterResource(R.drawable.download), contentDescription = null) },
+                    onClick = {
+                        val app = context.applicationContext
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                            com.metrolist.music.playback.PlaylistAutoDownload.setEnabled(app, autoDownloadId, !autoOn)
+                        }
+                        onDismiss()
+                    },
+                ),
+            )
+        }
+    }
 }

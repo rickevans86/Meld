@@ -91,6 +91,8 @@ import com.metrolist.music.utils.joinByBullet
 import com.metrolist.music.utils.makeTimeString
 import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
+import com.metrolist.music.constants.sortedShows
+import com.metrolist.music.constants.sortInfo
 import com.metrolist.music.viewmodels.LibraryPodcastsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -99,7 +101,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun LibraryPodcastsScreen(
     navController: NavController,
-    onDeselect: () -> Unit,
+    /** Null when shown as its own tab rather than as a Library chip, which hides the close chip. */
+    onDeselect: (() -> Unit)?,
     viewModel: LibraryPodcastsViewModel = hiltViewModel(),
 ) {
     val downloadedEpisodesStr = stringResource(R.string.downloaded_episodes)
@@ -119,10 +122,53 @@ fun LibraryPodcastsScreen(
     val (sortDescending, onSortDescendingChange) = rememberPreference(SongSortDescendingKey, true)
 
     val subscribedChannels by viewModel.subscribedChannels.collectAsStateWithLifecycle()
+    val followedFeedsUnsorted by viewModel.followedFeeds.collectAsStateWithLifecycle()
+    // Playlists you've marked as podcasts, in the order you chose them
+    val podcastPlaylistIds = com.metrolist.music.constants.rememberPodcastPlaylistIds()
+    val allPlaylists by viewModel.allPlaylists.collectAsStateWithLifecycle()
+    val youTubePodcastPlaylists = com.metrolist.music.constants.rememberYouTubePodcastPlaylists()
+    val podcastPlaylists = remember(podcastPlaylistIds, allPlaylists, youTubePodcastPlaylists) {
+        podcastPlaylistIds.mapNotNull { id -> allPlaylists.firstOrNull { it.id == id } } +
+            // YouTube account playlists not saved in Wavelength open as online playlists
+            youTubePodcastPlaylists.map { yt ->
+                com.metrolist.music.db.entities.Playlist(
+                    playlist = com.metrolist.music.db.entities.PlaylistEntity(
+                        id = "yt_${yt.id}",
+                        name = yt.title,
+                        browseId = yt.id,
+                        isEditable = false,
+                        thumbnailUrl = yt.thumbnail,
+                    ),
+                    songCount = 0,
+                    songThumbnails = emptyList(),
+                )
+            }
+    }
+    // Sort for shows (also used by Android Auto's Podcasts page)
+    val (sortName, onSortName) = rememberPreference(
+        com.metrolist.music.constants.PodcastShowSortKey,
+        com.metrolist.music.constants.PodcastShowSort.RECENTLY_FOLLOWED.name,
+    )
+    val (sortReversed, onSortReversed) = rememberPreference(com.metrolist.music.constants.PodcastShowSortReversedKey, false)
+    val showSort = com.metrolist.music.constants.PodcastShowSort.entries.firstOrNull { it.name == sortName }
+        ?: com.metrolist.music.constants.PodcastShowSort.RECENTLY_FOLLOWED
+    val followedFeeds = remember(followedFeedsUnsorted, showSort, sortReversed) {
+        followedFeedsUnsorted.sortedShows(showSort, sortReversed) { it.sortInfo() }
+    }
     val downloadedEpisodes by viewModel.downloadedEpisodes.collectAsStateWithLifecycle()
     val savedEpisodes by viewModel.savedEpisodes.collectAsStateWithLifecycle()
     val sePlaylist by viewModel.sePlaylist.collectAsStateWithLifecycle()
-    val podcastChannels by viewModel.podcastChannels.collectAsStateWithLifecycle()
+    val podcastChannelsUnsorted by viewModel.podcastChannels.collectAsStateWithLifecycle()
+    // YouTube channels only carry a name here, so name and publisher sorts apply; others keep YouTube's order
+    val podcastChannels = remember(podcastChannelsUnsorted, showSort, sortReversed) {
+        when (showSort) {
+            com.metrolist.music.constants.PodcastShowSort.NAME,
+            com.metrolist.music.constants.PodcastShowSort.PUBLISHER ->
+                podcastChannelsUnsorted.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+                    .let { if (sortReversed) it.reversed() else it }
+            else -> podcastChannelsUnsorted
+        }
+    }
     val rdpnPlaylist by viewModel.rdpnPlaylist.collectAsStateWithLifecycle()
 
     // Refresh channels when screen becomes visible (ON_RESUME)
@@ -179,7 +225,7 @@ fun LibraryPodcastsScreen(
         val chipsHeader = @Composable {
             Row {
                 Spacer(Modifier.width(12.dp))
-                FilterChip(
+                if (onDeselect != null) FilterChip(
                     label = { Text(stringResource(R.string.filter_podcasts)) },
                     selected = true,
                     colors =
@@ -202,15 +248,42 @@ fun LibraryPodcastsScreen(
                             PodcastFilter.EPISODES to stringResource(R.string.filter_episodes),
                             PodcastFilter.CHANNELS to stringResource(R.string.filter_channels),
                             PodcastFilter.DOWNLOADED to stringResource(R.string.filter_downloaded),
+                            PodcastFilter.DISCOVER to stringResource(R.string.podcast_discover),
                         ),
                     currentValue = podcastFilter,
                     onValueUpdate = { podcastFilter = it },
                     modifier = Modifier.weight(1f),
                 )
+                com.metrolist.music.ui.component.SortMenuButton(
+                    options = listOf(
+                        com.metrolist.music.constants.PodcastShowSort.NAME to stringResource(R.string.sort_name),
+                        com.metrolist.music.constants.PodcastShowSort.LATEST_EPISODE to stringResource(R.string.sort_latest_episode),
+                        com.metrolist.music.constants.PodcastShowSort.RECENTLY_FOLLOWED to stringResource(R.string.sort_recently_followed),
+                        com.metrolist.music.constants.PodcastShowSort.PUBLISHER to stringResource(R.string.sort_publisher),
+                    ),
+                    selected = showSort,
+                    reversed = sortReversed,
+                    onSelect = { onSortName(it.name) },
+                    onReversedChange = onSortReversed,
+                )
+                // On the Podcasts tab, search is the top-bar search button; inside Library it stays here
+                if (onDeselect != null) IconButton(onClick = { navController.navigate("podcast_directory") }) {
+                    Icon(
+                        painter = painterResource(R.drawable.search),
+                        contentDescription = stringResource(R.string.podcast_directory),
+                    )
+                }
             }
         }
 
         when (podcastFilter) {
+            // ── DISCOVER tab — top charts to follow from ─────────────────
+            PodcastFilter.DISCOVER -> com.metrolist.music.ui.screens.podcast.PodcastDiscoverList(
+                navController = navController,
+                lazyListState = lazyListState,
+                header = { chipsHeader() },
+            )
+
             // ── EPISODES FOR LATER tab ────────────────────────────────────
             PodcastFilter.EPISODES -> {
                 LazyColumn(
@@ -227,7 +300,7 @@ fun LibraryPodcastsScreen(
                             title = stringResource(R.string.new_episodes),
                             thumbnailUrl = rdpnPlaylist?.thumbnail,
                             episodeCount = rdpnPlaylist?.songCountText,
-                            onClick = { navController.navigate("online_playlist/RDPN") },
+                            onClick = { navController.navigate("new_episodes") },
                         )
                     }
 
@@ -267,6 +340,58 @@ fun LibraryPodcastsScreen(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
+                                    .animateItem(),
+                        )
+                    }
+
+                    // Shows followed from Find podcasts
+                    itemsIndexed(
+                        items = followedFeeds,
+                        key = { _, show -> "feed:${show.feedUrl}" },
+                        contentType = { _, _ -> CONTENT_TYPE_SONG },
+                    ) { _, show ->
+                        PodcastEpisodePlaylistItem(
+                            podcast = PodcastEntity(
+                                id = show.feedUrl,
+                                title = show.title,
+                                author = show.author,
+                                thumbnailUrl = show.artworkUrl,
+                            ),
+                            onClick = { navController.navigate("podcast_directory?feed=${android.net.Uri.encode(show.feedUrl)}") },
+                            onMenuClick = {
+                                menuState.show {
+                                    FollowedFeedMenu(
+                                        show = show,
+                                        onUnfollow = { viewModel.unfollowFeed(show) },
+                                        onDismiss = menuState::dismiss,
+                                    )
+                                }
+                            },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .animateItem(),
+                        )
+                    }
+
+                    // Your own playlists marked as podcasts (Settings → Features → Podcasts)
+                    itemsIndexed(
+                        items = podcastPlaylists,
+                        key = { _, playlist -> "podcast_playlist:${playlist.id}" },
+                        contentType = { _, _ -> CONTENT_TYPE_SONG },
+                    ) { _, playlist ->
+                        com.metrolist.music.ui.component.PlaylistListItem(
+                            playlist = playlist,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.browseId != null) {
+                                            navController.navigate("online_playlist/${playlist.playlist.browseId}")
+                                        } else {
+                                            navController.navigate("local_playlist/${playlist.id}")
+                                        }
+                                    }
                                     .animateItem(),
                         )
                     }
@@ -567,7 +692,7 @@ private fun AutoPlaylistCard(
 private fun PodcastEpisodePlaylistItem(
     podcast: PodcastEntity,
     onClick: () -> Unit,
-    onMenuClick: () -> Unit,
+    onMenuClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -625,13 +750,54 @@ private fun PodcastEpisodePlaylistItem(
             }
         }
 
-        IconButton(onClick = onMenuClick) {
-            Icon(
-                painter = painterResource(R.drawable.more_vert),
-                contentDescription = stringResource(R.string.more_options),
-            )
+        if (onMenuClick != null) {
+            IconButton(onClick = onMenuClick) {
+                Icon(
+                    painter = painterResource(R.drawable.more_vert),
+                    contentDescription = stringResource(R.string.more_options),
+                )
+            }
         }
     }
+}
+
+/** Menu for a podcast followed from its public feed: unfollow it, or share its feed address. */
+@Composable
+private fun FollowedFeedMenu(
+    show: com.metrolist.music.podcasts.PodcastShow,
+    onUnfollow: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    Spacer(Modifier.height(12.dp))
+    Material3MenuGroup(
+        items =
+            listOf(
+                Material3MenuItemData(
+                    title = { Text(text = stringResource(R.string.podcast_unfollow)) },
+                    icon = { Icon(painter = painterResource(R.drawable.delete), contentDescription = null) },
+                    onClick = {
+                        onUnfollow()
+                        onDismiss()
+                    },
+                ),
+                Material3MenuItemData(
+                    title = { Text(text = stringResource(R.string.share)) },
+                    icon = { Icon(painter = painterResource(R.drawable.share), contentDescription = null) },
+                    onClick = {
+                        val intent =
+                            Intent().apply {
+                                action = Intent.ACTION_SEND
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, show.feedUrl)
+                            }
+                        context.startActivity(Intent.createChooser(intent, null))
+                        onDismiss()
+                    },
+                ),
+            ),
+    )
+    Spacer(Modifier.height(12.dp))
 }
 
 /** Menu shown when tapping the three-dot icon on an episode playlist */

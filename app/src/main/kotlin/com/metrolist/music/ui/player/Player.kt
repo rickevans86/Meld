@@ -80,6 +80,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.metrolist.music.radio.withRadioNowPlaying
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -315,8 +316,22 @@ fun BottomSheetPlayer(
         }
 
     val playbackState by playerConnection.playbackState.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    // Radio stations show the song they're playing (Wavelength)
+    val mediaMetadata by remember(playerConnection) {
+        playerConnection.mediaMetadata.withRadioNowPlaying()
+    }.collectAsState(initial = playerConnection.mediaMetadata.value)
     val currentSong by playerConnection.currentSong.collectAsStateWithLifecycle(initialValue = null)
+    // Wavelength: on a radio station the heart shows whether it's one of your hearted stations
+    val radioHearts by com.metrolist.music.radio.RadioDirectory.starredIds.collectAsStateWithLifecycle()
+    val radioHearted = currentSong?.id?.takeIf { com.metrolist.music.constants.isRadioId(it) }
+        ?.let { it.removePrefix(com.metrolist.music.constants.RADIO_ID_PREFIX) in radioHearts }
+    // Wavelength: podcast skip buttons (next/previous jump inside the episode; hold to change episode)
+    val podcastSkip = com.metrolist.music.podcasts.rememberPodcastSkip(mediaMetadata)
+    fun skipBy(seconds: Int) {
+        val p = playerConnection.player
+        val duration = p.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+        p.seekTo((p.currentPosition + seconds * 1000L).coerceIn(0L, duration))
+    }
     val automix by playerConnection.service.automixItems.collectAsStateWithLifecycle()
     val repeatMode by playerConnection.repeatMode.collectAsStateWithLifecycle()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
@@ -998,7 +1013,7 @@ fun BottomSheetPlayer(
                     modifier = Modifier.weight(1f),
                 ) {
                     AnimatedContent(
-                        targetState = mediaMetadata.title,
+                        targetState = if (com.metrolist.music.constants.isAudiobookId(mediaMetadata.id)) currentSong?.song?.albumName ?: mediaMetadata.title else mediaMetadata.title,
                         transitionSpec = { fadeIn() togetherWith fadeOut() },
                         label = "",
                     ) { title ->
@@ -1017,7 +1032,7 @@ fun BottomSheetPlayer(
                                         indication = null,
                                         interactionSource = remember { MutableInteractionSource() },
                                         onClick = {
-                                            if (mediaMetadata.album != null) {
+                                            if (mediaMetadata.album != null && !com.metrolist.music.constants.isAudiobookId(mediaMetadata.id)) {
                                                 state.collapseSoft()
                                                 navController.navigate("album/${mediaMetadata.album.id}")
                                             }
@@ -1234,7 +1249,7 @@ fun BottomSheetPlayer(
                             } else {
                                 // For episodes, show saved state (inLibrary); for songs, show liked state
                                 val isEpisode = currentSong?.song?.isEpisode == true
-                                val isFavorite = if (isEpisode) currentSong?.song?.inLibrary != null else currentSong?.song?.liked == true
+                                val isFavorite = radioHearted ?: if (isEpisode) currentSong?.song?.inLibrary != null else currentSong?.song?.liked == true
                                 FilledIconButton(
                                     onClick = playerConnection::toggleLike,
                                     shape = favShape,
@@ -1519,7 +1534,20 @@ fun BottomSheetPlayer(
                 exit = shrinkVertically(shrinkTowards = Alignment.Top) + slideOutVertically(targetOffsetY = { it }) + fadeOut(),
             ) {
                 Column {
-                    if (useNewPlayerDesign) {
+                    if (com.metrolist.music.constants.isAudiobookId(mediaMetadata.id) && !isCasting && !isListenTogetherGuest) {
+                        AudiobookPlayerControls(
+                            connection = playerConnection,
+                            isPlaying = effectiveIsPlaying,
+                            enabled = true,
+                            positionMs = effectivePosition,
+                            color = TextBackgroundColor,
+                            onPlayPause = {
+                                if (playbackState == STATE_ENDED) playerConnection.player.seekTo(0L)
+                                playerConnection.player.togglePlayPause()
+                            },
+                            onSleepTimer = { showSleepTimerDialog = true },
+                        )
+                    } else if (useNewPlayerDesign) {
                         Row(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically,
@@ -1587,7 +1615,18 @@ fun BottomSheetPlayer(
                                 label = "nextButtonWeight",
                             )
 
-                            FilledIconButton(
+                            if (podcastSkip != null && !isListenTogetherGuest) {
+                                SkipCapsuleButton(
+                                    forward = false,
+                                    seconds = podcastSkip.back,
+                                    containerColor = sideButtonContainerColor,
+                                    contentColor = sideButtonContentColor,
+                                    interactionSource = backInteractionSource,
+                                    onClick = { skipBy(-podcastSkip.back) },
+                                    onLongClick = { playerConnection.player.seekToPreviousMediaItem() },
+                                    modifier = Modifier.height(68.dp).weight(backButtonWeight),
+                                )
+                            } else FilledIconButton(
                                 onClick = playerConnection::seekToPrevious,
                                 enabled = canSkipPrevious && !isListenTogetherGuest,
                                 shape = RoundedCornerShape(50),
@@ -1679,7 +1718,18 @@ fun BottomSheetPlayer(
 
                             Spacer(modifier = Modifier.width(8.dp))
 
-                            FilledIconButton(
+                            if (podcastSkip != null && !isListenTogetherGuest) {
+                                SkipCapsuleButton(
+                                    forward = true,
+                                    seconds = podcastSkip.forward,
+                                    containerColor = sideButtonContainerColor,
+                                    contentColor = sideButtonContentColor,
+                                    interactionSource = nextInteractionSource,
+                                    onClick = { skipBy(podcastSkip.forward) },
+                                    onLongClick = { playerConnection.seekToNext() },
+                                    modifier = Modifier.height(68.dp).weight(nextButtonWeight),
+                                )
+                            } else FilledIconButton(
                                 onClick = playerConnection::seekToNext,
                                 enabled = canSkipNext && !isListenTogetherGuest,
                                 shape = RoundedCornerShape(50),
@@ -1734,6 +1784,16 @@ fun BottomSheetPlayer(
                             }
 
                             Box(modifier = Modifier.weight(1f)) {
+                                if (podcastSkip != null && !isListenTogetherGuest) {
+                                    SkipPlainButton(
+                                        forward = false,
+                                        seconds = podcastSkip.back,
+                                        color = TextBackgroundColor,
+                                        onClick = { skipBy(-podcastSkip.back) },
+                                        onLongClick = { playerConnection.player.seekToPreviousMediaItem() },
+                                        modifier = Modifier.align(Alignment.Center),
+                                    )
+                                } else {
                                 ResizableIconButton(
                                     icon = R.drawable.skip_previous,
                                     enabled = canSkipPrevious && !isListenTogetherGuest,
@@ -1745,6 +1805,7 @@ fun BottomSheetPlayer(
                                             .alpha(if (isListenTogetherGuest) 0.5f else 1f),
                                     onClick = playerConnection::seekToPrevious,
                                 )
+                                }
                             }
 
                             Spacer(Modifier.width(8.dp))
@@ -1802,6 +1863,16 @@ fun BottomSheetPlayer(
                             Spacer(Modifier.width(8.dp))
 
                             Box(modifier = Modifier.weight(1f)) {
+                                if (podcastSkip != null && !isListenTogetherGuest) {
+                                    SkipPlainButton(
+                                        forward = true,
+                                        seconds = podcastSkip.forward,
+                                        color = TextBackgroundColor,
+                                        onClick = { skipBy(podcastSkip.forward) },
+                                        onLongClick = { playerConnection.seekToNext() },
+                                        modifier = Modifier.align(Alignment.Center),
+                                    )
+                                } else {
                                 ResizableIconButton(
                                     icon = R.drawable.skip_next,
                                     enabled = canSkipNext && !isListenTogetherGuest,
@@ -1813,12 +1884,13 @@ fun BottomSheetPlayer(
                                             .alpha(if (isListenTogetherGuest) 0.5f else 1f),
                                     onClick = playerConnection::seekToNext,
                                 )
+                                }
                             }
 
                             Box(modifier = Modifier.weight(1f)) {
                                 // For episodes, show saved state (inLibrary); for songs, show liked state
                                 val isEpisode = currentSong?.song?.isEpisode == true
-                                val isFavorite = if (isEpisode) currentSong?.song?.inLibrary != null else currentSong?.song?.liked == true
+                                val isFavorite = radioHearted ?: if (isEpisode) currentSong?.song?.inLibrary != null else currentSong?.song?.liked == true
                                 ResizableIconButton(
                                     icon = if (isFavorite) R.drawable.favorite else R.drawable.favorite_border,
                                     color = if (isFavorite) MaterialTheme.colorScheme.error else TextBackgroundColor,
@@ -2173,5 +2245,66 @@ private fun PlayerMoreMenuButton(
             contentDescription = null,
             colorFilter = ColorFilter.tint(iconButtonColor),
         )
+    }
+}
+
+/** Wavelength: a podcast skip button in the capsule style; tap skips, hold changes episode. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun SkipCapsuleButton(
+    forward: Boolean,
+    seconds: Int,
+    containerColor: Color,
+    contentColor: Color,
+    interactionSource: MutableInteractionSource,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(containerColor)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.material3.ripple(),
+                onClick = onClick,
+                onLongClick = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    onLongClick()
+                },
+            ),
+    ) {
+        com.metrolist.music.podcasts.SkipIcon(forward = forward, seconds = seconds, tint = contentColor, size = 34.dp)
+    }
+}
+
+/** Wavelength: a podcast skip button in the plain icon style; tap skips, hold changes episode. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun SkipPlainButton(
+    forward: Boolean,
+    seconds: Int,
+    color: Color,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    onLongClick()
+                },
+            ),
+    ) {
+        com.metrolist.music.podcasts.SkipIcon(forward = forward, seconds = seconds, tint = color, size = 34.dp)
     }
 }

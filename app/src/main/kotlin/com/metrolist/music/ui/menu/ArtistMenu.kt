@@ -5,6 +5,7 @@
 
 package com.metrolist.music.ui.menu
 
+import com.metrolist.music.constants.libraryPinMenuItem
 import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.PaddingValues
@@ -221,8 +222,11 @@ fun ArtistMenu(
         }
 
         item {
+            // Pins this artist to the top of the Library
+            val libraryPin = libraryPinMenuItem("artist:${artist.id}", onDismiss)
             Material3MenuGroup(
                 items = listOf(
+                    libraryPin,
                     Material3MenuItemData(
                         title = {
                             Text(text = if (artist.artist.bookmarkedAt != null) stringResource(R.string.subscribed) else stringResource(R.string.subscribe))

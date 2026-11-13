@@ -5,6 +5,7 @@
 
 package com.metrolist.music.ui.menu
 
+import com.metrolist.music.constants.libraryPinMenuItem
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Icon
@@ -97,8 +98,11 @@ private fun SpotifyPlaylistMenuContent(
 
     Spacer(Modifier.height(8.dp))
 
+    // Pins this Spotify playlist to the top of the Library (key is "spotify:<id>")
+    val libraryPin = libraryPinMenuItem(speedDialId, onDismiss)
     Material3MenuGroup(
         items = listOf(
+            libraryPin,
             Material3MenuItemData(
                 title = {
                     Text(

@@ -32,6 +32,11 @@ fun LibraryScreen() {
     var libraryViewType by rememberEnumPreference(AlbumViewTypeKey, LibraryViewType.GRID)
     var playlistViewType by rememberEnumPreference(PlaylistViewTypeKey, LibraryViewType.GRID)
 
+    // Local files has its own tab, so its Library chip is gone; go back to the main Library view
+    androidx.compose.runtime.LaunchedEffect(filterType) {
+        if (filterType == LibraryFilter.LOCAL_FILES) filterType = LibraryFilter.LIBRARY
+    }
+
     val filterContent = @Composable {
         Row {
             ChipsRow(
@@ -40,8 +45,6 @@ fun LibraryScreen() {
                     LibraryFilter.SONGS to stringResource(R.string.filter_songs),
                     LibraryFilter.ALBUMS to stringResource(R.string.filter_albums),
                     LibraryFilter.ARTISTS to stringResource(R.string.filter_artists),
-                    LibraryFilter.PODCASTS to stringResource(R.string.filter_podcasts),
-                    LibraryFilter.LOCAL_FILES to stringResource(R.string.filter_local_files),
                 ),
                 currentValue = filterType,
                 onValueUpdate = {
@@ -78,14 +81,18 @@ fun LibraryScreen() {
                 navController,
                 { filterType = LibraryFilter.LIBRARY },
             )
-            LibraryFilter.PODCASTS -> LibraryPodcastsScreen(
-                navController,
-                { filterType = LibraryFilter.LIBRARY },
-            )
 
             LibraryFilter.LOCAL_FILES -> LocalFilesScreen(
                 navController,
                 filterContent,
+            )
+
+            // Podcasts and audiobooks have their own bottom tabs now
+            LibraryFilter.PODCASTS, LibraryFilter.AUDIOBOOKS -> LibraryMixScreen(
+                navController = navController,
+                filterContent = filterContent,
+                viewType = libraryViewType,
+                onViewTypeChange = { libraryViewType = it },
             )
         }
     }

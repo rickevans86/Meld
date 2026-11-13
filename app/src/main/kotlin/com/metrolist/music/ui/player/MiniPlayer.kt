@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -54,10 +55,13 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.metrolist.music.radio.withRadioNowPlaying
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -152,7 +156,9 @@ fun MiniPlayer(
     // Create stable progress state - doesn't cause recomposition on position changes
     val progressState = remember { ProgressState(positionState, durationState) }
 
-    if (useNewMiniPlayerDesign) {
+    val connection = LocalPlayerConnection.current ?: return
+    val metadata by connection.mediaMetadata.collectAsStateWithLifecycle()
+    if (useNewMiniPlayerDesign && !com.metrolist.music.constants.isAudiobookId(metadata?.id)) {
         NewMiniPlayer(
             progressState = progressState,
             modifier = modifier,
@@ -200,7 +206,10 @@ private fun NewMiniPlayer(
 
     // Player states - only collect what's needed at this level
     val playbackState by playerConnection.playbackState.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    // Radio stations show the song they're playing (Wavelength)
+    val mediaMetadata by remember(playerConnection) {
+        playerConnection.mediaMetadata.withRadioNowPlaying()
+    }.collectAsState(initial = playerConnection.mediaMetadata.value)
     val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
 
@@ -695,10 +704,14 @@ private fun LegacyMiniPlayer(
     onClick: () -> Unit = {},
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
+    val context = LocalContext.current
     val pureBlack by rememberPreference(PureBlackMiniPlayerKey, defaultValue = false)
 
     val playbackState by playerConnection.playbackState.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    // Radio stations show the song they're playing (Wavelength)
+    val mediaMetadata by remember(playerConnection) {
+        playerConnection.mediaMetadata.withRadioNowPlaying()
+    }.collectAsState(initial = playerConnection.mediaMetadata.value)
     val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
 
@@ -858,6 +871,28 @@ private fun LegacyMiniPlayer(
                 }
             }
 
+            // Wavelength: on a podcast with skip buttons on, tap jumps forward and hold goes to the next episode
+            val storedAudiobookBack by rememberPreference(com.metrolist.music.audiobooks.AudiobookPlaybackSettings.BackKey, 15)
+            val storedAudiobookForward by rememberPreference(com.metrolist.music.audiobooks.AudiobookPlaybackSettings.ForwardKey, 30)
+            val audiobookBack = com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(storedAudiobookBack, 15)
+            val audiobookForward = com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(storedAudiobookForward, 30)
+            val podcastSkip = if (com.metrolist.music.constants.isAudiobookId(mediaMetadata?.id)) {
+                com.metrolist.music.podcasts.PodcastSkipAmounts(
+                    audiobookBack,
+                    audiobookForward,
+                )
+            } else com.metrolist.music.podcasts.rememberPodcastSkip(mediaMetadata)
+            if (com.metrolist.music.constants.isAudiobookId(mediaMetadata?.id) && !isCasting && !isListenTogetherGuest) {
+                IconButton(onClick = {
+                    val p = playerConnection.player
+                    p.seekTo(com.metrolist.music.audiobooks.audiobookSeekPosition(p.currentPosition, -audiobookBack, p.duration))
+                }) {
+                    Box(Modifier.semantics { contentDescription = context.getString(R.string.audiobook_rewind_by, audiobookBack) }) {
+                        com.metrolist.music.podcasts.SkipIcon(false, audiobookBack, androidx.compose.material3.LocalContentColor.current, 26.dp)
+                    }
+                }
+            }
+
             LegacyPlayPauseButton(
                 playbackState = playbackState,
                 isCasting = isCasting,
@@ -866,7 +901,34 @@ private fun LegacyMiniPlayer(
                 listenTogetherManager = listenTogetherManager,
             )
 
-            IconButton(
+            if (podcastSkip != null && !isListenTogetherGuest && !isCasting) {
+                val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .semantics { contentDescription = context.getString(R.string.audiobook_forward_by, podcastSkip.forward) }
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .combinedClickable(
+                            onClick = {
+                                val p = playerConnection.player
+                                val duration = p.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+                                p.seekTo((p.currentPosition + podcastSkip.forward * 1000L).coerceIn(0L, duration))
+                            },
+                            onLongClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                playerConnection.seekToNext()
+                            },
+                        ),
+                ) {
+                    com.metrolist.music.podcasts.SkipIcon(
+                        forward = true,
+                        seconds = podcastSkip.forward,
+                        tint = androidx.compose.material3.LocalContentColor.current,
+                        size = 26.dp,
+                    )
+                }
+            } else IconButton(
                 enabled = canSkipNext && !isListenTogetherGuest,
                 onClick = if (isListenTogetherGuest) ({}) else ({ playerConnection.seekToNext() }),
             ) {
@@ -1104,7 +1166,10 @@ private fun FavoriteButton(
     val librarySong by database.song(songId).collectAsStateWithLifecycle(initialValue = null)
     // For episodes, show saved state (inLibrary); for songs, show liked state
     val isEpisode = librarySong?.song?.isEpisode == true
-    val isLiked = if (isEpisode) librarySong?.song?.inLibrary != null else librarySong?.song?.liked == true
+    val radioHearts by com.metrolist.music.radio.RadioDirectory.starredIds.collectAsStateWithLifecycle()
+    val isLiked = if (com.metrolist.music.constants.isRadioId(songId)) {
+        songId.removePrefix(com.metrolist.music.constants.RADIO_ID_PREFIX) in radioHearts
+    } else if (isEpisode) librarySong?.song?.inLibrary != null else librarySong?.song?.liked == true
 
     Box(
         contentAlignment = Alignment.Center,

@@ -37,6 +37,8 @@ import com.metrolist.music.constants.SpotifyAccessTokenKey
 import com.metrolist.music.utils.SpotifyTokenManager
 import com.metrolist.music.constants.SpotifyTokenExpiryKey
 import com.metrolist.music.constants.UseSpotifyHomeKey
+import com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
+import com.metrolist.music.constants.homeSource
 import com.metrolist.music.constants.WrappedSeenKey
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.Album
@@ -75,6 +77,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -105,8 +108,18 @@ internal fun buildSpeedDialItems(
     home: List<YTItem>,
 ): List<YTItem> =
     (pinned + keepListening + quickPicks + home)
+        // Podcasts and episodes live in the Podcasts tab, so Speed dial leaves them out
+        .filterNot { it.isPodcastLike() }
         .distinctBy { it.id }
         .take(27)
+
+/** Podcast shows, podcast episodes and audiobook chapters (all of which have their own tabs). */
+internal fun YTItem.isPodcastLike(): Boolean =
+    this is com.metrolist.innertube.models.PodcastItem ||
+        this is com.metrolist.innertube.models.EpisodeItem ||
+        (this is SongItem && isEpisode) ||
+        id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) ||
+        id.startsWith(com.metrolist.music.constants.AUDIOBOOK_ID_PREFIX)
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -116,7 +129,14 @@ class HomeViewModel @Inject constructor(
     val wrappedManager: WrappedManager,
     private val wrappedAudioService: WrappedAudioService,
     private val networkConnectivity: NetworkConnectivityObserver,
+    savedStateHandle: androidx.lifecycle.SavedStateHandle,
 ) : ViewModel() {
+    /** True for the side-menu home ("home_alt"), which shows whichever source isn't the default. */
+    private val isAlternateHome: Boolean = savedStateHandle.get<Boolean>("alt") ?: false
+
+    private fun androidx.datastore.preferences.core.Preferences.isSpotifyPage(): Boolean =
+        homeSource(isAlternateHome) == HOME_SOURCE_SPOTIFY
+
     val isRefreshing = MutableStateFlow(false)
     val isLoading = MutableStateFlow(false)
     val isRandomizing = MutableStateFlow(false)
@@ -167,6 +187,7 @@ class HomeViewModel @Inject constructor(
                                     title = item.title,
                                     artists = item.artists.map { Artist(name = it.name, id = it.id) },
                                     thumbnail = item.thumbnailUrl ?: "",
+                                    isEpisode = item.song.isEpisode,
                                 )
 
                             is Album ->
@@ -192,7 +213,7 @@ class HomeViewModel @Inject constructor(
                         }
                     },
                 quickPicks =
-                    quick.orEmpty().map { song ->
+                    quick.orEmpty().filterNot { it.song.isEpisode }.map { song ->
                         SongItem(
                             id = song.id,
                             title = song.title,
@@ -275,19 +296,15 @@ class HomeViewModel @Inject constructor(
 
     // Spotify home sections: populated when UseSpotifyHomeKey is enabled
     val spotifyHomeSections = MutableStateFlow<List<SpotifyHomeSection>?>(null)
+    // The Spotify home page shows only Spotify; the YouTube home page shows no Spotify sections
     val useSpotifyHome: StateFlow<Boolean> = context.dataStore.data.map { prefs ->
         val enabled = prefs[EnableSpotifyKey] ?: false
-        val useForHome = prefs[UseSpotifyHomeKey] ?: false
         val hasToken = (prefs[SpotifyAccessTokenKey] ?: "").isNotEmpty()
-        enabled && useForHome && hasToken
+        enabled && hasToken && prefs.isSpotifyPage()
     }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     val spotifyHomeOnly: StateFlow<Boolean> = context.dataStore.data.map { prefs ->
-        val enabled = prefs[EnableSpotifyKey] ?: false
-        val useForHome = prefs[UseSpotifyHomeKey] ?: false
-        val homeOnly = prefs[SpotifyHomeOnlyKey] ?: false
-        val hasToken = (prefs[SpotifyAccessTokenKey] ?: "").isNotEmpty()
-        enabled && useForHome && homeOnly && hasToken
+        prefs.isSpotifyPage()
     }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     /** Set of speed dial item ids (used to show Pin/Unpin for Spotify playlists in home section). */
@@ -519,18 +536,27 @@ class HomeViewModel @Inject constructor(
         // Read Spotify preferences directly from DataStore to avoid StateFlow race condition
         val prefs = context.dataStore.data.first()
         val spotifyEnabled = prefs[EnableSpotifyKey] ?: false
-        val spotifyUseForHome = prefs[UseSpotifyHomeKey] ?: false
-        val spotifyHomeOnlyPref = prefs[SpotifyHomeOnlyKey] ?: false
+        val spotifyPage = prefs.isSpotifyPage()
         val spotifyHasToken = (prefs[SpotifyAccessTokenKey] ?: "").isNotEmpty()
-        val isSpotifyHome = spotifyEnabled && spotifyUseForHome && spotifyHasToken
-        val isSpotifyOnly = isSpotifyHome && spotifyHomeOnlyPref
+        val isSpotifyHome = spotifyEnabled && spotifyPage && spotifyHasToken
+        val isSpotifyOnly = spotifyPage
 
         // Local play history — always loaded regardless of Spotify mode
-        recentlyPlayed.value = database.events().first()
+        val history = database.events().first()
             .distinctBy { it.song.id }
-            .take(40)
             .map { it.song }
-            .filterVideoSongs(hideVideoSongs)
+        recentlyPlayed.value = if (spotifyPage) {
+            // Spotify page: only songs that were played from Spotify (they have a Spotify match),
+            // not YouTube videos, podcasts or other sources
+            val fromSpotify = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                history.take(300).map { it.id }.chunked(500).flatMap { ids ->
+                    runCatching { database.getSpotifyMatchesByYouTubeIds(ids) }.getOrDefault(emptyList())
+                }.map { it.youtubeId }.toSet()
+            }
+            history.filter { it.id in fromSpotify && !it.song.isEpisode }.take(40)
+        } else {
+            history.take(40)
+        }.filterVideoSongs(hideVideoSongs)
 
         // When Spotify-only mode is active, skip all YouTube-based content
         if (!isSpotifyOnly) {
@@ -674,15 +700,35 @@ class HomeViewModel @Inject constructor(
             // These three sources are independent — fetch them concurrently and then
             // assemble the sections in a fixed display order. Previously they ran
             // strictly sequentially (~1-2.7s of chained round-trips).
+            val myPlaylistsDeferred = viewModelScope.async(Dispatchers.IO) { Spotify.myPlaylists(limit = 20) }
             val (profileTracks, newReleasesResult, homeResult) = coroutineScope {
                 val topTracksDeferred = async { SpotifyProfileCache.getTopTracks(context, database, limit = 20) }
                 val newReleasesDeferred = async { Spotify.newReleases(limit = 20) }
                 val homeDeferred = async { Spotify.home(sectionItemsLimit = 10) }
                 Triple(topTracksDeferred.await(), newReleasesDeferred.await(), homeDeferred.await())
             }
+            // Official Spotify order: Your playlists, Start listening (your top tracks), then
+            // Spotify's own home rows in its order, with New releases after them.
+            myPlaylistsDeferred.await().onSuccess { page ->
+                val mine = page.items.filter { it.id.isNotEmpty() }
+                if (mine.isNotEmpty()) {
+                    sections.add(SpotifyHomeSection(title = "spotify_your_playlists", type = SectionType.PLAYLISTS, playlists = mine))
+                }
+            }.onFailure { e -> Timber.w(e, "spotifyHome: myPlaylists failed") }
+            val feedSections = mutableListOf<SpotifyHomeSection>()
+            var newReleasesSection: SpotifyHomeSection? = null
 
             Timber.d("spotifyHome: top tracks from profile cache = ${profileTracks.size}")
-            val topTracks = if (hideExplicit) profileTracks.filter { !it.explicit } else profileTracks
+            // Start listening is songs only: drop podcast episodes and audiobook chapters, which can come
+            // from Spotify itself or from Wavelength's own play history when Spotify has no data
+            val songsOnly = profileTracks.filterNot { track ->
+                track.uri?.contains(":episode:") == true ||
+                    track.uri?.contains(":show:") == true ||
+                    track.id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) ||
+                    track.id.startsWith(com.metrolist.music.constants.AUDIOBOOK_ID_PREFIX) ||
+                    runCatching { database.getSongById(track.id)?.song?.isEpisode == true }.getOrDefault(false)
+            }
+            val topTracks = if (hideExplicit) songsOnly.filter { !it.explicit } else songsOnly
             if (topTracks.isNotEmpty()) {
                 sections.add(SpotifyHomeSection(
                     title = "spotify_top_tracks",
@@ -697,11 +743,11 @@ class HomeViewModel @Inject constructor(
             newReleasesResult.onSuccess { newReleases ->
                 val albums = newReleases.albums?.items.orEmpty()
                 if (albums.isNotEmpty()) {
-                    sections.add(SpotifyHomeSection(
+                    newReleasesSection = SpotifyHomeSection(
                         title = "spotify_new_releases",
                         type = SectionType.ALBUMS,
                         albums = albums,
-                    ))
+                    )
                     Timber.d("spotifyHome: added pinned section 'New Releases' (${albums.size} albums)")
                 } else {
                     Timber.w("spotifyHome: newReleases returned 0 albums — skipping section")
@@ -717,16 +763,22 @@ class HomeViewModel @Inject constructor(
                 }
                 feed.sections.forEach { raw ->
                     val converted = convertHomeSection(raw)
+                        // Podcasts and audiobooks have their own tabs, so their rows stay off Home
+                        ?.takeUnless { isPodcastOrBookTitle(it.title) }
+                        // "Your playlists" is already first, built from your own playlists
+                        ?.takeUnless { sections.any { s -> s.title == "spotify_your_playlists" } && it.title.equals("Your playlists", ignoreCase = true) }
                     if (converted == null) {
                         Timber.d("spotifyHome: SKIPPED '${raw.title ?: "<no title>"}' (typename=${raw.typename})")
                     } else {
-                        sections.add(converted)
+                        feedSections.add(converted)
                         Timber.d("spotifyHome: ADDED '${converted.title}' type=${converted.type} items=${converted.playlists.size + converted.albums.size + converted.artists.size}")
                     }
                 }
             }.onFailure { e ->
                 Timber.e(e, "spotifyHome: home() FAILED — ${e.javaClass.simpleName}: ${e.message}")
             }
+            sections.addAll(feedSections)
+            newReleasesSection?.let { sections.add(it) }
         } catch (e: Exception) {
             Timber.e(e, "spotifyHome: loadSpotifyHomeSections() threw ${e.javaClass.simpleName}: ${e.message}")
             reportException(e)
@@ -746,6 +798,9 @@ class HomeViewModel @Inject constructor(
      * a section is heterogeneous and filters items to that type — Shorts sections
      * and episode-only sections are skipped (no title / not playable as tracks).
      */
+    private fun isPodcastOrBookTitle(title: String): Boolean =
+        listOf("podcast", "episode", "audiobook", "books", "show").any { title.contains(it, ignoreCase = true) }
+
     private fun convertHomeSection(feedSection: SpotifyHomeFeedSection): SpotifyHomeSection? {
         val title = feedSection.title ?: return null
 
@@ -967,6 +1022,11 @@ class HomeViewModel @Inject constructor(
     }
 
     init {
+        // Reload when the default home switches between YouTube and Spotify
+        viewModelScope.launch {
+            context.dataStore.data.map { it.isSpotifyPage() }.distinctUntilChanged().drop(1).collect { refresh() }
+        }
+
         // Run sync in separate coroutine with cooldown to avoid blocking UI
         viewModelScope.launch(Dispatchers.IO) {
             syncUtils.tryAutoSync()

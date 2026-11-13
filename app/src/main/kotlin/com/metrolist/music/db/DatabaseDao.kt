@@ -39,6 +39,7 @@ import com.metrolist.music.db.entities.LyricsEntity
 import com.metrolist.music.db.entities.PlayCountEntity
 import com.metrolist.music.db.entities.Playlist
 import com.metrolist.music.db.entities.PlaylistEntity
+import com.metrolist.music.db.entities.PlaylistFolderInfo
 import com.metrolist.music.db.entities.PlaylistSong
 import com.metrolist.music.db.entities.PlaylistSongMap
 import com.metrolist.music.db.entities.PodcastEntity
@@ -283,6 +284,20 @@ interface DatabaseDao {
         """,
     )
     fun songsInBookmarkedPlaylists(): Flow<List<Song>>
+
+    @Query(
+        """
+        SELECT DISTINCT playlist.name AS name, playlist.browseId AS browseId
+        FROM playlist
+        JOIN playlist_song_map ON playlist_song_map.playlistId = playlist.id
+        WHERE playlist_song_map.songId = :songId
+        ORDER BY playlist.name
+        """,
+    )
+    fun playlistFoldersForSong(songId: String): List<PlaylistFolderInfo>
+
+    @Query("SELECT COUNT(*) FROM playlist_song_map")
+    fun playlistSongMapCount(): Flow<Int>
 
     @Transaction
     @Query(
@@ -1438,6 +1453,14 @@ interface DatabaseDao {
     @Transaction
     @Query("SELECT * FROM song WHERE isEpisode = 1 AND isDownloaded = 1 ORDER BY totalPlayTime")
     fun downloadedPodcastEpisodesByPlayTimeAsc(): Flow<List<Song>>
+
+    // Wavelength: half-finished podcast episodes, most recently played first (Android Auto Continue listening)
+    @Transaction
+    @Query(
+        "SELECT * FROM song WHERE isEpisode = 1 AND playbackPosition > 0 " +
+            "ORDER BY (SELECT MAX(timestamp) FROM event WHERE event.songId = song.id) DESC LIMIT :limit",
+    )
+    suspend fun inProgressEpisodes(limit: Int = 20): List<Song>
 
     // Saved episodes (in library but not necessarily downloaded)
     @Transaction

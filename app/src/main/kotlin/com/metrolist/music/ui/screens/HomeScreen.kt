@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
@@ -183,6 +184,7 @@ import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.utils.stripSpotifyPrefix
 import com.metrolist.music.viewmodels.CommunityPlaylistItem
 import com.metrolist.music.viewmodels.HomeViewModel
+import com.metrolist.music.viewmodels.isPodcastLike
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -678,22 +680,46 @@ fun HomeScreen(
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val quickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
-    val recentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
-    val forgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
-    val keepListening by viewModel.keepListening.collectAsStateWithLifecycle()
-    val similarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
+    // Podcast episodes played locally are left out of Home too (they're in the Podcasts tab)
+    val rawQuickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
+    val rawRecentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
+    val rawForgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
+    val rawKeepListening by viewModel.keepListening.collectAsStateWithLifecycle()
+    val quickPicks = remember(rawQuickPicks) { rawQuickPicks?.filterNot { it.song.isEpisode } }
+    val recentlyPlayed = remember(rawRecentlyPlayed) { rawRecentlyPlayed?.filterNot { it.song.isEpisode } }
+    val forgottenFavorites = remember(rawForgottenFavorites) { rawForgottenFavorites?.filterNot { it.song.isEpisode } }
+    val keepListening = remember(rawKeepListening) { rawKeepListening?.filterNot { it is Song && it.song.isEpisode } }
+    val rawSimilarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
+    // "Similar to" rows: no podcasts or episodes, and no rows based on an episode
+    val similarRecommendations = remember(rawSimilarRecommendations) {
+        rawSimilarRecommendations?.mapNotNull { rec ->
+            val title = rec.title
+            if (title is Song && title.song.isEpisode) return@mapNotNull null
+            val items = rec.items.filterNot { it.isPodcastLike() }
+            if (items.isEmpty()) null else rec.copy(items = items)
+        }
+    }
     val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
-    val homePage by viewModel.homePage.collectAsStateWithLifecycle()
+    val rawHomePage by viewModel.homePage.collectAsStateWithLifecycle()
+    // Podcasts have their own tab, so Home leaves out the Podcasts chip, podcast rows and episodes
+    val homePage = remember(rawHomePage) { rawHomePage?.withoutPodcasts() }
     val explorePage by viewModel.explorePage.collectAsStateWithLifecycle()
     val dailyDiscover by viewModel.dailyDiscover.collectAsStateWithLifecycle()
     val communityPlaylists by viewModel.communityPlaylists.collectAsStateWithLifecycle()
 
     val allLocalItems by viewModel.allLocalItems.collectAsStateWithLifecycle()
     val allYtItems by viewModel.allYtItems.collectAsStateWithLifecycle()
-    val speedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
+    val rawSpeedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
+    val speedDialItems = remember(rawSpeedDialItems) { rawSpeedDialItems.filterNot { it.isPodcastLike() } }
     val pinnedSpeedDialItems by viewModel.pinnedSpeedDialItems.collectAsStateWithLifecycle()
     val selectedChip by viewModel.selectedChip.collectAsStateWithLifecycle()
+    // A Podcasts chip picked before podcasts left Home can't be seen any more, so switch it off
+    LaunchedEffect(selectedChip) {
+        val chip = selectedChip
+        if (chip != null && (chip.title.contains("podcast", ignoreCase = true) || chip.title.contains("episode", ignoreCase = true))) {
+            viewModel.toggleChip(null)
+        }
+    }
 
     // Official podcast API data
     val savedPodcastShows by viewModel.savedPodcastShows.collectAsStateWithLifecycle()
@@ -1163,23 +1189,26 @@ fun HomeScreen(
                     base + modifier
                 }
             } else {
+                // Same order as the official YouTube Music app: Speed dial, Quick picks, then
+                // YouTube's own rows (Listen again, Mixed for you, New releases…) in the order it sends
+                // them, then Wavelength's extra rows, with Moods and genres last.
                 val defaultOrder =
                     mapOf(
-                        HomeSection.SpeedDial to 100,
-                        HomeSection.QuickPicks to 90,
-                        HomeSection.RecentlyPlayed to 85,
-                        HomeSection.FromTheCommunity to 80,
-                        HomeSection.DailyDiscover to 70,
-                        HomeSection.KeepListening to 60,
-                        HomeSection.AccountPlaylists to 50,
-                        HomeSection.ForgottenFavorites to 40,
-                        HomeSection.MoodAndGenres to 10,
+                        HomeSection.SpeedDial to 10_000,
+                        HomeSection.QuickPicks to 9_000,
+                        HomeSection.KeepListening to 400,
+                        HomeSection.RecentlyPlayed to 390,
+                        HomeSection.AccountPlaylists to 380,
+                        HomeSection.DailyDiscover to 370,
+                        HomeSection.FromTheCommunity to 360,
+                        HomeSection.ForgottenFavorites to 350,
+                        HomeSection.MoodAndGenres to 1,
                     )
 
                 list.sortedByDescending { section ->
                     when (section) {
-                        is HomeSection.SimilarRecommendation -> 30 - section.index
-                        is HomeSection.HomePageSection -> 20 - section.index
+                        is HomeSection.HomePageSection -> 8_000 - section.index
+                        is HomeSection.SimilarRecommendation -> 300 - section.index
                         else -> defaultOrder[section] ?: 0
                     }
                 }
@@ -2614,6 +2643,21 @@ fun HomeScreen(
                     }
                 }
 
+                // Spotify home page without a Spotify sign-in: say how to fix it
+                if (isSpotifyHomeOnly && !isSpotifyHome) {
+                    item(key = "spotify_sign_in_hint") {
+                        Text(
+                            text = stringResource(R.string.home_spotify_sign_in),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { navController.navigate("settings/integrations/spotify") }
+                                .padding(24.dp),
+                        )
+                    }
+                }
+
                 // Spotify Home Sections (shown when Spotify home is active)
                 if (isSpotifyHome && spotifyHomeSections != null) {
                     spotifyHomeSections?.forEachIndexed { index, section ->
@@ -2866,3 +2910,15 @@ fun HomeScreen(
     }
 }
 
+/** Home without podcasts: drops the Podcasts chip, podcast and episode cards, and rows left empty or about podcasts. */
+private fun com.metrolist.innertube.pages.HomePage.withoutPodcasts(): com.metrolist.innertube.pages.HomePage {
+    fun isPodcastTitle(title: String) = title.contains("podcast", ignoreCase = true) || title.contains("episode", ignoreCase = true)
+    return copy(
+        chips = chips?.filterNot { isPodcastTitle(it.title) },
+        sections = sections.mapNotNull { section ->
+            if (isPodcastTitle(section.title)) return@mapNotNull null
+            val items = section.items.filterNot { it is PodcastItem || it is EpisodeItem }
+            if (items.isEmpty()) null else section.copy(items = items)
+        },
+    )
+}

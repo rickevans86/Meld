@@ -72,6 +72,7 @@ import com.metrolist.music.utils.Updater
 import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.viewmodels.AccountSettingsViewModel
 import com.metrolist.music.viewmodels.HomeViewModel
+import com.metrolist.music.utils.UpdateInstaller
 
 @Composable
 fun AccountSettings(
@@ -422,7 +423,7 @@ fun AccountSettings(
                                 description = { Text(latestVersionName) },
                                 icon = painterResource(R.drawable.update),
                                 showBadge = true,
-                                onClick = { uriHandler.openUri(downloadUrl) }
+                                onClick = { UpdateInstaller.start(context, downloadUrl) }
                             )
                         )
                     }

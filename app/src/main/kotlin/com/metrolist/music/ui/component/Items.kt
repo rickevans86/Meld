@@ -911,7 +911,9 @@ fun PlaylistListItem(
 
         Icon.Download(downloadState)
     },
-    trailingContent: @Composable RowScope.() -> Unit = {}
+    trailingContent: @Composable RowScope.() -> Unit = {},
+    /** YouTube or Spotify logo shown between the artwork and the name (null for none). */
+    source: PlaylistSource? = playlistSourceOf(playlist),
 ) = ListItem(
     title = playlist.playlist.name,
     subtitle = if (autoPlaylist) {
@@ -933,6 +935,7 @@ fun PlaylistListItem(
     },
     badges = badges,
     thumbnailContent = {
+        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
         PlaylistThumbnail(
             thumbnails = playlist.thumbnails,
             size = ListThumbnailSize,
@@ -959,6 +962,10 @@ fun PlaylistListItem(
             },
             shape = RoundedCornerShape(ThumbnailCornerRadius)
         )
+        if (source != null) {
+            PlaylistSourceLogo(source, modifier = Modifier.padding(start = 10.dp, end = 2.dp))
+        }
+        }
     },
     trailingContent = trailingContent,
     modifier = modifier
@@ -998,16 +1005,23 @@ fun PlaylistGridItem(
         Icon.Download(downloadState)
     },
     fillMaxWidth: Boolean = false,
+    /** YouTube or Spotify logo shown before the name (null for none). */
+    source: PlaylistSource? = playlistSourceOf(playlist),
 ) = GridItem(
     title = {
-        Text(
-            text = playlist.playlist.name,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.basicMarquee().fillMaxWidth()
-        )
+        androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+            if (source != null) {
+                PlaylistSourceLogo(source, size = 16.dp, modifier = Modifier.padding(end = 6.dp))
+            }
+            Text(
+                text = playlist.playlist.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.basicMarquee().weight(1f)
+            )
+        }
     },
     subtitle = {
         val subtitle = if (autoPlaylist) {

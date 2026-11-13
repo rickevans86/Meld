@@ -94,6 +94,7 @@ import com.metrolist.music.ui.menu.SpotifyPlaylistMenu
 import com.metrolist.music.viewmodels.SpotifyViewModel
 import com.metrolist.spotify.SpotifyMapper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import androidx.compose.ui.Alignment
@@ -139,9 +140,11 @@ fun LibraryPlaylistsScreen(
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     val searchQuery by viewModel.searchQuery.collectAsState()
     val normalizedQuery = remember(searchQuery) { searchQuery.normalizeForSearch() }
-    val filteredPlaylists = remember(playlists, normalizedQuery) {
+    // Playlists pinned to the top of the Library show in the Pins row instead of the list below
+    val pinnedKeys = com.metrolist.music.constants.rememberLibraryPins()
+    val filteredPlaylists = remember(playlists, normalizedQuery, pinnedKeys) {
         if (normalizedQuery.isBlank()) {
-            playlists
+            playlists.filterNot { "playlist:${it.id}" in pinnedKeys }
         } else {
             playlists.filter { playlist ->
                 matchesNormalizedQuery(normalizedQuery, playlist.playlist.name)
@@ -167,6 +170,80 @@ fun LibraryPlaylistsScreen(
             spotifyViewModel.loadAll()
         }
     }
+
+    // ── Pins row (same pins as the main Library view) ──
+    val allSpotifyPlaylists by spotifyViewModel.spotifyPlaylists.collectAsState()
+    val pinContext = androidx.compose.ui.platform.LocalContext.current
+    val pinUnpinned = stringResource(R.string.library_unpinned)
+    val pinPlaylistLabel = stringResource(R.string.library_pin_playlist)
+    val spotifyLikedName = stringResource(R.string.spotify_liked_songs)
+    val likedPinName = stringResource(R.string.liked)
+    // Long-pressing a pin opens the same ⋮ menu as the item has in the list
+    val pinMenuScope = rememberCoroutineScope()
+    fun pinMenu(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        menuState.show(content)
+    }
+    val pinCards = pinnedKeys.mapNotNull { key ->
+        val id = key.substringAfter(':')
+        when (key.substringBefore(':')) {
+            "playlist" -> playlists.firstOrNull { it.id == id }?.let { p ->
+                com.metrolist.music.ui.component.LibraryPinCard(key, p.playlist.name, pinPlaylistLabel, p.thumbnails.firstOrNull(), onLongClick = {
+                    pinMenu { com.metrolist.music.ui.menu.PlaylistMenu(playlist = p, coroutineScope = pinMenuScope, onDismiss = menuState::dismiss) }
+                }) {
+                    if (!p.playlist.isEditable && p.songCount == 0 && p.playlist.browseId != null) {
+                        navController.navigate("online_playlist/${p.playlist.browseId}")
+                    } else {
+                        navController.navigate("local_playlist/${p.id}")
+                    }
+                }
+            }
+            // YouTube Liked songs (pinned from its ⋮ menu)
+            "auto" -> if (id == "liked") {
+                com.metrolist.music.ui.component.LibraryPinCard(key, likedPinName, "YouTube", null, placeholder = R.drawable.favorite) {
+                    navController.navigate("auto_playlist/liked")
+                }
+            } else {
+                null
+            }
+            "spotify" -> if (id == "liked_songs") {
+                com.metrolist.music.ui.component.LibraryPinCard(key, spotifyLikedName, "Spotify", null, placeholder = R.drawable.favorite, onLongClick = {
+                    pinMenu {
+                        com.metrolist.music.ui.menu.SpotifyPlaylistMenu(
+                            spotifyId = "spotify:liked_songs",
+                            title = spotifyLikedName,
+                            onNavigate = { navController.navigate("spotify_liked_songs") },
+                            onDismiss = menuState::dismiss,
+                        )
+                    }
+                }) {
+                    navController.navigate("spotify_liked_songs")
+                }
+            } else {
+                (allSpotifyPlaylists + spotifyPlaylists).firstOrNull { it.id == id }?.let { sp ->
+                    com.metrolist.music.ui.component.LibraryPinCard(key, sp.name, "Spotify", SpotifyMapper.getPlaylistThumbnail(sp), onLongClick = {
+                        pinMenu {
+                            com.metrolist.music.ui.menu.SpotifyPlaylistMenu(
+                                playlist = sp,
+                                onNavigate = { navController.navigate("spotify_playlist/${sp.id}") },
+                                onDismiss = menuState::dismiss,
+                            )
+                        }
+                    }) {
+                        navController.navigate("spotify_playlist/${sp.id}")
+                    }
+                }
+            }
+            else -> null
+        }
+    }
+    val unpin: (com.metrolist.music.ui.component.LibraryPinCard) -> Unit = { pin ->
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        val app = pinContext.applicationContext
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { com.metrolist.music.constants.setLibraryPinned(app, pin.key, false) }
+        android.widget.Toast.makeText(pinContext, pinUnpinned, android.widget.Toast.LENGTH_SHORT).show()
+    }
+    val visibleSpotifyPlaylists = spotifyPlaylists.filterNot { "spotify:${it.id}" in pinnedKeys }
 
     val likedPlaylist =
         Playlist(
@@ -227,7 +304,9 @@ fun LibraryPlaylistsScreen(
     val (showTop) = rememberPreference(ShowTopPlaylistKey, true)
     val (showUploaded) = rememberPreference(ShowUploadedPlaylistKey, true)
     val (showCached) = rememberPreference(ShowCachedPlaylistKey, true)
-    val showLikedPlaylist = showLiked && !hideYtmLiked && matchesNormalizedQuery(normalizedQuery, likedPlaylist.playlist.name)
+    // A pinned Liked songs shows in the Pins row instead
+    val likedPinned = "auto:liked" in com.metrolist.music.constants.rememberLibraryPins()
+    val showLikedPlaylist = showLiked && !hideYtmLiked && !likedPinned && matchesNormalizedQuery(normalizedQuery, likedPlaylist.playlist.name)
     val showDownloadedPlaylist =
         showDownloaded && matchesNormalizedQuery(normalizedQuery, downloadPlaylist.playlist.name)
     val showCachedPlaylists = showCached && matchesNormalizedQuery(normalizedQuery, cachedPlaylist.playlist.name)
@@ -453,6 +532,12 @@ fun LibraryPlaylistsScreen(
                         headerContent()
                     }
 
+                    if (pinCards.isNotEmpty() && normalizedQuery.isBlank()) {
+                        item(key = "library_pins", contentType = CONTENT_TYPE_HEADER) {
+                            com.metrolist.music.ui.component.LibraryPinsRow(pins = pinCards, onUnpin = unpin)
+                        }
+                    }
+
                     if (visibleResults.isEmpty()) {
                         item(key = "empty_placeholder") {
                             if (searchQuery.isNotBlank()) {
@@ -581,7 +666,7 @@ fun LibraryPlaylistsScreen(
                     }
 
                     // Spotify Liked Songs as a special playlist entry
-                    if (isSpotifyActive && spotifyLikedSongsTotal > 0) {
+                    if (isSpotifyActive && spotifyLikedSongsTotal > 0 && "spotify:liked_songs" !in pinnedKeys) {
                         item(key = "spotify_liked_songs") {
                             val likedSongsName = stringResource(R.string.spotify_liked_songs)
                             PlaylistListItem(
@@ -595,6 +680,20 @@ fun LibraryPlaylistsScreen(
                                     songThumbnails = emptyList(),
                                 ),
                                 autoPlaylist = true,
+                                trailingContent = {
+                                    IconButton(onClick = {
+                                        menuState.show {
+                                            SpotifyPlaylistMenu(
+                                                spotifyId = "spotify:liked_songs",
+                                                title = likedSongsName,
+                                                onNavigate = { navController.navigate("spotify_liked_songs") },
+                                                onDismiss = menuState::dismiss,
+                                            )
+                                        }
+                                    }) {
+                                        Icon(painter = painterResource(R.drawable.more_vert), contentDescription = null)
+                                    }
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .combinedClickable(
@@ -645,7 +744,7 @@ fun LibraryPlaylistsScreen(
                     // Spotify playlists rendered as regular playlist items
                     if (isSpotifyActive && spotifyPlaylists.isNotEmpty()) {
                         items(
-                            items = spotifyPlaylists,
+                            items = visibleSpotifyPlaylists,
                             key = { "spotify_${it.id}" },
                             contentType = { CONTENT_TYPE_PLAYLIST },
                         ) { spotifyPlaylist ->
@@ -661,6 +760,19 @@ fun LibraryPlaylistsScreen(
                                     songThumbnails = listOfNotNull(thumbnailUrl),
                                 ),
                                 autoPlaylist = true,
+                                trailingContent = {
+                                    IconButton(onClick = {
+                                        menuState.show {
+                                            SpotifyPlaylistMenu(
+                                                playlist = spotifyPlaylist,
+                                                onNavigate = { navController.navigate("spotify_playlist/${spotifyPlaylist.id}") },
+                                                onDismiss = menuState::dismiss,
+                                            )
+                                        }
+                                    }) {
+                                        Icon(painter = painterResource(R.drawable.more_vert), contentDescription = null)
+                                    }
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .combinedClickable(
@@ -716,6 +828,12 @@ fun LibraryPlaylistsScreen(
                         contentType = CONTENT_TYPE_HEADER,
                     ) {
                         headerContent()
+                    }
+
+                    if (pinCards.isNotEmpty() && normalizedQuery.isBlank()) {
+                        item(key = "library_pins", span = { GridItemSpan(maxLineSpan) }, contentType = CONTENT_TYPE_HEADER) {
+                            com.metrolist.music.ui.component.LibraryPinsRow(pins = pinCards, onUnpin = unpin)
+                        }
                     }
 
                     if (visibleResults.isEmpty()) {
@@ -808,7 +926,7 @@ fun LibraryPlaylistsScreen(
                     }
 
                     // Spotify Liked Songs as a special playlist entry (grid)
-                    if (isSpotifyActive && spotifyLikedSongsTotal > 0) {
+                    if (isSpotifyActive && spotifyLikedSongsTotal > 0 && "spotify:liked_songs" !in pinnedKeys) {
                         item(key = "spotify_liked_songs") {
                             val likedSongsName = stringResource(R.string.spotify_liked_songs)
                             PlaylistGridItem(
@@ -871,7 +989,7 @@ fun LibraryPlaylistsScreen(
                     // Spotify playlists in grid view
                     if (isSpotifyActive && spotifyPlaylists.isNotEmpty()) {
                         items(
-                            items = spotifyPlaylists,
+                            items = visibleSpotifyPlaylists,
                             key = { "spotify_${it.id}" },
                             contentType = { CONTENT_TYPE_PLAYLIST },
                         ) { spotifyPlaylist ->

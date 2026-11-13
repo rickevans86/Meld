@@ -10,11 +10,22 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 val EnableHighRefreshRateKey = booleanPreferencesKey("enableHighRefreshRate")
 val EnableLandscapeScalingKey = booleanPreferencesKey("enableLandscapeScaling")
+val LocalFilesFolderViewKey = booleanPreferencesKey("localFilesFolderView")
+val DownloadExportFolderKey = stringPreferencesKey("downloadExportFolder")
+val DownloadPlaylistFoldersKey = booleanPreferencesKey("downloadPlaylistFolders")
+val AudiobooksFolderKey = stringPreferencesKey("audiobooksFolder")
+val AudiobooksSourceKey = stringPreferencesKey("audiobooksSource")
+val AbsLibraryKey = stringPreferencesKey("audiobookshelfLibrary")
+val NewsSourcesKey = stringPreferencesKey("newsSources")
+val LocalMusicIncludedFoldersKey = stringSetPreferencesKey("localMusicIncludedFolders")
+val LocalMusicExcludedFoldersKey = stringSetPreferencesKey("localMusicExcludedFolders")
+val LocalMusicAddedFoldersKey = stringSetPreferencesKey("localMusicAddedFolders")
 val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
 val SelectedThemeColorKey = intPreferencesKey("selectedThemeColor")
 val DarkModeKey = stringPreferencesKey("darkMode")
@@ -157,6 +168,9 @@ val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")
 val EnableSongCacheKey = booleanPreferencesKey("enableSongCache")
 val PreCacheTracksKey = intPreferencesKey("preCacheTracks")
 val PreCacheOnlyWifiKey = booleanPreferencesKey("preCacheOnlyWifi")
+
+/** Wavelength: only download over Wi-Fi; downloads pause off Wi-Fi and resume when it's back. */
+val DownloadWifiOnlyKey = booleanPreferencesKey("downloadWifiOnly")
 
 val PauseListenHistoryKey = booleanPreferencesKey("pauseListenHistory")
 val PauseSearchHistoryKey = booleanPreferencesKey("pauseSearchHistory")
@@ -359,6 +373,7 @@ enum class PodcastFilter {
     EPISODES,
     CHANNELS,
     DOWNLOADED,
+    DISCOVER,
 }
 
 enum class SongSortType {

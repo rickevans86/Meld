@@ -1,0 +1,141 @@
+name: Build and Release
+
+# Every push to main or the feature branch (or a manual run) builds the app and publishes it as a
+# GitHub release named after its version, which is where the in-app updater looks.
+on:
+  push:
+    branches: [main, feat/local-folders]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      # Updates only install over the app when every build is signed with the same key.
+      # The key comes from the DEBUG_KEYSTORE_BASE64 secret; if that is missing or unreadable,
+      # a key generated on the first run is kept in the Actions cache instead
+      # (GitHub clears the cache after 7 days without a build).
+      - name: Read signing key from secret
+        id: secret-key
+        env:
+          KEYSTORE_SECRET: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p ~/meld-signing
+          if [ -z "$KEYSTORE_SECRET" ]; then
+            echo "usable=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_SECRET" | tr -cd 'A-Za-z0-9+/=' > ~/meld-signing/secret.b64
+          echo "Secret has $(wc -c < ~/meld-signing/secret.b64) base64 characters (expected 3536)."
+          if base64 -d ~/meld-signing/secret.b64 > ~/meld-signing/secret.keystore 2>/dev/null &&
+             keytool -list -keystore ~/meld-signing/secret.keystore -storepass android -alias androiddebugkey > /dev/null 2>&1; then
+            echo "Key from secret OK: $(sha256sum ~/meld-signing/secret.keystore | cut -c1-12)"
+            cp ~/meld-signing/secret.keystore ~/meld-signing/fork.keystore
+            echo "usable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::The DEBUG_KEYSTORE_BASE64 secret isn't a readable key (it may have been cut short when pasted). Using the cached key for now; paste the secret again."
+            echo "usable=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore cached signing key
+        if: steps.secret-key.outputs.usable != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/meld-signing/fork.keystore
+          key: meld-fork-signing-key-v1
+
+      - name: Prepare signing key
+        run: |
+          if [ ! -f ~/meld-signing/fork.keystore ]; then
+            echo "Generating a signing key and caching it."
+            keytool -genkeypair -keystore ~/meld-signing/fork.keystore \
+              -storepass android -keypass android -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Meld fork,O=Meld,C=AU"
+          fi
+          echo "METROLIST_DEBUG_KEYSTORE_PATH=$HOME/meld-signing/fork.keystore" >> "$GITHUB_ENV"
+
+      - name: Work out version
+        run: |
+          base=$(grep -oP 'versionName = "\K[0-9.]+' app/build.gradle.kts | head -1)
+          echo "VERSION=$base.${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "FORK_BUILD_NUMBER=${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      # A proper release build (not a debuggable test build), signed with the fork's key.
+      # The app id stays com.meld.app.debug so it updates the installed app and keeps its data.
+      # Retries once, since a dependency download occasionally fails for a moment
+      - name: Test audiobook playback
+        run: ./gradlew --console=plain :app:testFossDebugUnitTest --tests 'com.metrolist.music.audiobooks.AudiobookPlaybackTest'
+
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --console=plain :app:assembleFossRelease -x lint || {
+            echo "::warning::Build failed; retrying once in case it was a download hiccup."
+            sleep 30
+            ./gradlew --console=plain --refresh-dependencies :app:assembleFossRelease -x lint
+          }
+        env:
+          PULL_REQUEST: "false"
+          METROLIST_APP_NAME: Wavelength
+          METROLIST_APPLICATION_ID: com.meld.app.debug
+
+      - name: Collect APK
+        run: |
+          apk=$(find app/build/outputs/apk -name '*.apk' | grep -i foss | grep -v unsigned | head -1)
+          [ -n "$apk" ] || { echo "No APK produced"; exit 1; }
+          cp "$apk" Wavelength.apk
+
+      - name: Upload APK to the run
+        uses: actions/upload-artifact@v6
+        with:
+          name: wavelength-${{ env.VERSION }}
+          path: Wavelength.apk
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git log -1 --format='%s%n%n%b' > notes.md
+          # Releases are named "Wavelength <version>" with Wavelength.apk. Apps before the first such build
+          # read the version from the release title and only knew Meld.apk, so the first release made by
+          # this step is a bridge: plain number title, plus Meld.apk. (Its updater reads the tag instead.)
+          bridged=$(gh release list --repo "${{ github.repository }}" --limit 30 --json tagName -q '.[].tagName' |
+            while read -r tag; do
+              if gh release view "$tag" --repo "${{ github.repository }}" --json assets -q '.assets[].name' | grep -qx Wavelength.apk; then
+                echo yes
+                break
+              fi
+            done || true)
+          if [ "$bridged" != "yes" ]; then
+            cp Wavelength.apk Meld.apk
+            assets="Wavelength.apk Meld.apk"
+            title="$VERSION"
+          else
+            assets="Wavelength.apk"
+            title="Wavelength $VERSION"
+          fi
+          gh release create "v$VERSION" $assets \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "$title" \
+            --notes-file notes.md

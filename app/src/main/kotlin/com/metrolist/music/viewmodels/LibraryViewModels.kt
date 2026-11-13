@@ -465,7 +465,17 @@ constructor(
     @ApplicationContext context: Context,
     private val database: MusicDatabase,
     private val syncUtils: SyncUtils,
+    private val podcastDirectory: com.metrolist.music.podcasts.PodcastDirectory,
 ) : ViewModel() {
+    // Shows followed from Find podcasts (played from their public feeds)
+    val followedFeeds = podcastDirectory.followed
+
+    fun unfollowFeed(show: com.metrolist.music.podcasts.PodcastShow) = podcastDirectory.setFollowed(show, false)
+
+    /** All playlists, for the ones marked as podcasts. */
+    val allPlaylists = database.playlistsByCreateDateAsc()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Lazily, emptyList())
+
     // Subscribed podcast channels synced from YT Music
     val subscribedChannels = database.subscribedPodcasts()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

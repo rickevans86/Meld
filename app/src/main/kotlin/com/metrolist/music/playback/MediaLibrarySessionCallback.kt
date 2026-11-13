@@ -72,6 +72,7 @@ import kotlinx.coroutines.plus
 import javax.inject.Inject
 import com.metrolist.music.constants.AndroidAutoSearchLocalLimitKey
 import com.metrolist.music.constants.AndroidAutoSectionsOrderKey
+import com.metrolist.music.constants.hiddenAutoSections
 import com.metrolist.music.constants.AndroidAutoYouTubePlaylistsKey
 import com.metrolist.music.constants.AutoRadioQueueKey
 import com.metrolist.music.playback.queues.ListQueue
@@ -88,6 +89,7 @@ constructor(
     @ApplicationContext val context: Context,
     val database: MusicDatabase,
     val downloadUtil: DownloadUtil,
+    private val autoExtras: AutoLibraryExtras,
 ) : MediaLibrarySession.Callback {
     private val scope = CoroutineScope(Dispatchers.Main) + Job()
     lateinit var service: MusicService
@@ -123,6 +125,8 @@ constructor(
                 .add(MediaSessionConstants.CommandToggleShuffle)
                 .add(MediaSessionConstants.CommandToggleRepeatMode)
                 .add(MediaSessionConstants.CommandAddToTargetPlaylist)
+                .add(MediaSessionConstants.CommandSkipBack)
+                .add(MediaSessionConstants.CommandSkipForward)
                 .build(),
             connectionResult.availablePlayerCommands,
         )
@@ -143,6 +147,8 @@ constructor(
 
             MediaSessionConstants.ACTION_TOGGLE_REPEAT_MODE -> session.player.toggleRepeatMode()
             MediaSessionConstants.ACTION_ADD_TO_TARGET_PLAYLIST -> addToTargetPlaylist()
+            MediaSessionConstants.ACTION_SKIP_BACK -> service.podcastSkip(forward = false)
+            MediaSessionConstants.ACTION_SKIP_FORWARD -> service.podcastSkip(forward = true)
         }
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
     }
@@ -174,7 +180,14 @@ constructor(
                             .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
                             .build(),
                     ).build(),
-                params,
+                MediaLibraryService.LibraryParams.Builder()
+                    .setExtras(
+                        Bundle().apply {
+                            params?.extras?.let { putAll(it) }
+                            // Tells Android Auto to show its search button
+                            putBoolean("android.media.browse.SEARCH_SUPPORTED", true)
+                        },
+                    ).build(),
             ),
         )
 
@@ -185,12 +198,40 @@ constructor(
         params: MediaLibraryService.LibraryParams?,
     ): ListenableFuture<LibraryResult<Void>> =
         Futures.immediateFuture(
-            if (isBrowsableMediaId(parentId)) {
+            if (isBrowsableMediaId(parentId) || autoExtras.isBrowsable(parentId)) {
                 LibraryResult.ofVoid(params)
             } else {
                 LibraryResult.ofError(SessionError.ERROR_BAD_VALUE, params)
             },
         )
+
+    /** Saved artists, then artists from downloaded and local songs. */
+    private suspend fun autoArtists(): List<MediaItem> {
+        val saved = database.artistsByCreateDateAsc().first()
+        return saved.map { artist ->
+            browsableMediaItem(
+                "${MusicService.ARTIST}/${artist.id}",
+                ArtistNameAliases.resolve(artist.id, artist.artist.name),
+                context.resources.getQuantityString(R.plurals.n_song, artist.songCount, artist.songCount),
+                artist.artist.thumbnailUrl?.toUri(),
+                MediaMetadata.MEDIA_TYPE_ARTIST,
+            )
+        } + autoExtras.poolArtists(saved.mapTo(HashSet()) { it.id })
+    }
+
+    /** Saved albums, then albums from downloaded and local songs. */
+    private suspend fun autoAlbums(): List<MediaItem> {
+        val saved = database.albumsByCreateDateAsc().first()
+        return saved.map { album ->
+            browsableMediaItem(
+                "${MusicService.ALBUM}/${album.id}",
+                album.album.title,
+                album.artists.joinToString { ArtistNameAliases.resolve(it.id, it.name) },
+                album.album.thumbnailUrl?.toUri(),
+                MediaMetadata.MEDIA_TYPE_ALBUM,
+            )
+        } + autoExtras.poolAlbums(saved.mapTo(HashSet()) { it.album.title.lowercase() })
+    }
 
     override fun onGetChildren(
         session: MediaLibrarySession,
@@ -202,6 +243,10 @@ constructor(
     ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> =
         scope.future(Dispatchers.IO) {
             try {
+                autoExtras.children(parentId)?.let { children ->
+                    return@future LibraryResult.ofItemList(children.paginate(page, pageSize), params)
+                }
+
                 loadLocalChildren(parentId, page, pageSize)?.let { children ->
                     return@future LibraryResult.ofItemList(children, params)
                 }
@@ -217,23 +262,25 @@ constructor(
                         // Android Auto can request ROOT children before App's async init finishes,
                         // which would otherwise hide Spotify sections until reconnect.
                         val spotifyLoggedIn = SpotifyTokenManager.ensureAuthenticated()
+                        // Features switched off in Settings → Features don't show in Android Auto
+                        val hiddenByFeatures = context.dataStore.data.first().hiddenAutoSections()
                         sections
                             .filter { (section, enabled) ->
-                                enabled && when (section) {
-                                    AndroidAutoSection.SPOTIFY_LIKED,
-                                    AndroidAutoSection.SPOTIFY_PLAYLISTS -> spotifyLoggedIn
+                                enabled && section.id !in hiddenByFeatures && when (section) {
+                                    AndroidAutoSection.SPOTIFY -> spotifyLoggedIn
                                     else -> true
                                 }
                             }
-                            .ifEmpty { listOf(AndroidAutoSection.LIKED to true) }
+                            .ifEmpty { listOf(AndroidAutoSection.YOUTUBE to true) }
                             .map { (section, _) ->
                                 when (section) {
-                                    AndroidAutoSection.LIKED -> browsableMediaItem(
-                                        "${MusicService.PLAYLIST}/${PlaylistEntity.LIKED_PLAYLIST_ID}",
-                                        context.getString(R.string.liked_songs),
+                                    // One YouTube page: liked songs pinned first, then playlists
+                                    AndroidAutoSection.YOUTUBE -> browsableMediaItem(
+                                        MusicService.PLAYLIST,
+                                        context.getString(R.string.auto_youtube),
                                         null,
-                                        drawableUri(R.drawable.favorite),
-                                        MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                                        drawableUri(R.drawable.library_music_outlined),
+                                        MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS,
                                     )
                                    AndroidAutoSection.SONGS -> browsableMediaItem(
                                         MusicService.SONG,
@@ -256,77 +303,66 @@ constructor(
                                         drawableUri(R.drawable.album),
                                         MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS,
                                     )
-                                    AndroidAutoSection.PLAYLISTS -> browsableMediaItem(
-                                        MusicService.PLAYLIST,
-                                        context.getString(R.string.playlists),
-                                        null,
-                                        drawableUri(R.drawable.queue_music),
-                                        MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS,
-                                    )
-                                    AndroidAutoSection.SPOTIFY_LIKED -> browsableMediaItem(
-                                        "${MusicService.SPOTIFY_PLAYLIST}/liked_songs",
-                                        context.getString(R.string.spotify_liked_songs),
-                                        null,
-                                        drawableUri(R.drawable.favorite),
-                                        MediaMetadata.MEDIA_TYPE_PLAYLIST,
-                                    )
-                                    AndroidAutoSection.SPOTIFY_PLAYLISTS -> browsableMediaItem(
+                                    // One Spotify page: liked songs pinned first, then Spotify playlists
+                                    AndroidAutoSection.SPOTIFY -> browsableMediaItem(
                                         MusicService.SPOTIFY_PLAYLIST,
-                                        context.getString(R.string.spotify_playlists),
+                                        context.getString(R.string.auto_spotify),
                                         null,
                                         drawableUri(R.drawable.spotify),
                                         MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS,
                                     )
+                                    AndroidAutoSection.LOCAL_FILES -> autoExtras.rootItem(AutoLibraryExtras.LOCAL_FILES)
+                                    AndroidAutoSection.AUDIOBOOKS -> autoExtras.rootItem(AutoLibraryExtras.AUDIOBOOKS)
+                                    AndroidAutoSection.PODCASTS -> autoExtras.rootItem(AutoLibraryExtras.PODCASTS)
+                                    AndroidAutoSection.NEWS -> autoExtras.rootItem(AutoLibraryExtras.NEWS)
+                                    AndroidAutoSection.RADIO -> autoExtras.rootItem(AutoLibraryExtras.RADIO)
+                                    AndroidAutoSection.CONTINUE -> autoExtras.rootItem(AutoLibraryExtras.CONTINUE)
+                                    AndroidAutoSection.SUBSONIC -> autoExtras.rootItem(AutoLibraryExtras.SUBSONIC)
+                                    AndroidAutoSection.MEDIA_SERVER -> autoExtras.rootItem(AutoLibraryExtras.MEDIA_SERVER)
                                 }
                             }
                     }
 
 
-                    MusicService.SONG -> database.songsByCreateDateAsc().first()
+                    MusicService.SONG -> autoExtras.visibleLibrarySongs(database.songsByCreateDateAsc().first())
                         .map { it.toMediaItem(parentId) }
 
-                    MusicService.ARTIST ->
-                        database.artistsByCreateDateAsc().first().map { artist ->
-                            browsableMediaItem(
-                                "${MusicService.ARTIST}/${artist.id}",
-                                artist.artist.name,
-                                context.resources.getQuantityString(
-                                    R.plurals.n_song,
-                                    artist.songCount,
-                                    artist.songCount
-                                ),
-                                artist.artist.thumbnailUrl?.toUri(),
-                                MediaMetadata.MEDIA_TYPE_ARTIST,
-                            )
-                        }
+                    MusicService.ARTIST -> autoArtists()
 
-                    MusicService.ALBUM ->
-                        database.albumsByCreateDateAsc().first().map { album ->
-                            browsableMediaItem(
-                                "${MusicService.ALBUM}/${album.id}",
-                                album.album.title,
-                                album.artists.joinToString {
-                                    it.name
-                                },
-                                album.album.thumbnailUrl?.toUri(),
-                                MediaMetadata.MEDIA_TYPE_ALBUM,
-                            )
-                        }
+                    MusicService.ALBUM -> autoAlbums()
 
                     MusicService.PLAYLIST -> {
                         val likedSongCount = database.likedSongsCount().first()
                         val downloadedSongCount = downloadUtil.downloads.value.size
                         val showYoutubePlaylists = context.dataStore.get(AndroidAutoYouTubePlaylistsKey, false)
 
+                        // Playlists pinned in the Library come right after Liked songs
+                        val pins = libraryPins()
+                        val allPlaylists = database.playlistsByCreateDateAsc().first()
+                        val pinnedPlaylists = pins.mapNotNull { key ->
+                            key.removePrefix("playlist:").takeIf { key.startsWith("playlist:") }
+                                ?.let { id -> allPlaylists.firstOrNull { it.id == id } }
+                        }
                         // Build local playlists immediately
                         val localItems = listOf(
                             browsableMediaItem(
                                 "${MusicService.PLAYLIST}/${PlaylistEntity.LIKED_PLAYLIST_ID}",
                                 context.getString(R.string.liked_songs),
-                                context.resources.getQuantityString(R.plurals.n_song, likedSongCount, likedSongCount),
+                                // Android Auto can't show a logo beside the name, so the source leads the second line
+                                "YouTube · " + context.resources.getQuantityString(R.plurals.n_song, likedSongCount, likedSongCount),
                                 drawableUri(R.drawable.favorite),
                                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
                             ),
+                        ) + pinnedPlaylists.map { playlist ->
+                            browsableMediaItem(
+                                "${MusicService.PLAYLIST}/${playlist.id}",
+                                playlist.playlist.name,
+                                (if (playlist.playlist.browseId != null) "YouTube · " else "") +
+                                    context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
+                                playlist.thumbnails.firstOrNull()?.toUri(),
+                                MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                            )
+                        } + listOf(
                             browsableMediaItem(
                                 "${MusicService.PLAYLIST}/${PlaylistEntity.DOWNLOADED_PLAYLIST_ID}",
                                 context.getString(R.string.downloaded_songs),
@@ -334,21 +370,42 @@ constructor(
                                 drawableUri(R.drawable.download),
                                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
                             ),
-                        ) + database.playlistsByCreateDateAsc().first().map { playlist ->
+                        ) + allPlaylists.filterNot { it in pinnedPlaylists }.map { playlist ->
                             browsableMediaItem(
                                 "${MusicService.PLAYLIST}/${playlist.id}",
                                 playlist.playlist.name,
-                                context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
+                                (if (playlist.playlist.browseId != null) "YouTube · " else "") +
+                                    context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
                                 playlist.thumbnails.firstOrNull()?.toUri(),
                                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
                             )
                         }
 
                         val youtubeItems = if (showYoutubePlaylists) fetchYouTubePlaylistItems() else emptyList()
-                        localItems + youtubeItems + fetchSpotifyPlaylistItems()
+                        // Spotify playlists have their own Spotify page now
+                        localItems + youtubeItems
                     }
 
-                    MusicService.SPOTIFY_PLAYLIST -> fetchSpotifyPlaylistItems()
+                    MusicService.SPOTIFY_PLAYLIST -> {
+                        // Liked songs pinned to the top of the Spotify page
+                        val liked = browsableMediaItem(
+                            "${MusicService.SPOTIFY_PLAYLIST}/liked_songs",
+                            context.getString(R.string.spotify_liked_songs),
+                            "Spotify",
+                            drawableUri(R.drawable.favorite),
+                            MediaMetadata.MEDIA_TYPE_PLAYLIST,
+                        )
+                        if (SpotifyTokenManager.ensureAuthenticated()) {
+                            // Spotify playlists pinned in the Library come right after Liked songs
+                            val pinnedIds = libraryPins().filter { it.startsWith("spotify:") }
+                                .map { "${MusicService.SPOTIFY_PLAYLIST}/${it.removePrefix("spotify:")}" }
+                            val playlists = fetchSpotifyPlaylistItems()
+                            val pinned = pinnedIds.mapNotNull { id -> playlists.firstOrNull { it.mediaId == id } }
+                            listOf(liked) + pinned + playlists.filterNot { it in pinned }
+                        } else {
+                            emptyList()
+                        }
+                    }
 
                     else ->
                         when {
@@ -481,39 +538,18 @@ constructor(
     ): List<MediaItem>? {
         val request = androidAutoPageRequest(page, pageSize)
         return when {
-            parentId == MusicService.ARTIST ->
-                database.artistsByCreateDateAsc(request.limit, request.offset).map { artist ->
-                    browsableMediaItem(
-                        "${MusicService.ARTIST}/${artist.id}",
-                        ArtistNameAliases.resolve(artist.id, artist.artist.name),
-                        context.resources.getQuantityString(
-                            R.plurals.n_song,
-                            artist.songCount,
-                            artist.songCount,
-                        ),
-                        artist.artist.thumbnailUrl?.toUri(),
-                        MediaMetadata.MEDIA_TYPE_ARTIST,
-                    )
-                }
+            // Saved artists/albums plus ones from downloaded and local songs (Wavelength)
+            parentId == MusicService.ARTIST -> autoArtists().drop(request.offset).take(request.limit)
 
-            parentId == MusicService.ALBUM ->
-                database.albumsByCreateDateAsc(request.limit, request.offset).map { album ->
-                    browsableMediaItem(
-                        "${MusicService.ALBUM}/${album.id}",
-                        album.album.title,
-                        album.artists.joinToString {
-                            ArtistNameAliases.resolve(it.id, it.name)
-                        },
-                        album.album.thumbnailUrl?.toUri(),
-                        MediaMetadata.MEDIA_TYPE_ALBUM,
-                    )
-                }
+            parentId == MusicService.ALBUM -> autoAlbums().drop(request.offset).take(request.limit)
 
             parentId == MusicService.PLAYLIST ->
                 loadPlaylistContainers(request)
 
+            // Local files follow the Music folders settings; copies collapse (Wavelength)
             parentId == MusicService.SONG ->
-                database.songsByCreateDateAsc(request.limit, request.offset)
+                autoExtras.visibleLibrarySongs(database.songsByCreateDateAsc().first())
+                    .drop(request.offset).take(request.limit)
                     .map { it.toMediaItem(parentId) }
 
             parentId.startsWith("${MusicService.ARTIST}/") ->
@@ -768,10 +804,14 @@ constructor(
                 mediaItems.firstOrNull()?.mediaId?.split("/")
             } ?: return@future defaultResult
 
+            // Voice: radio stations, podcasts, the news, audiobooks and Navidrome before YouTube
+            if (!voiceQuery.isNullOrBlank()) autoExtras.voicePlay(voiceQuery)?.let { return@future it }
+            autoExtras.playback(path)?.let { return@future it }
+
             when (path.firstOrNull()) {
                 MusicService.SONG -> {
                     val songId = path.getOrNull(1) ?: return@future defaultResult
-                    val allSongs = database.songsByCreateDateAsc().first()
+                    val allSongs = autoExtras.visibleLibrarySongs(database.songsByCreateDateAsc().first())
                     MediaItemsWithStartPosition(
                         allSongs.map { it.toMediaItem() },
                         allSongs.indexOfFirst { it.id == songId }.takeIf { it != -1 } ?: 0,
@@ -1069,7 +1109,7 @@ constructor(
                     browsableMediaItem(
                         "${MusicService.YOUTUBE_PLAYLIST}/${playlist.id}",
                         playlist.title,
-                        playlist.author?.name ?: playlist.songCountText,
+                        "YouTube · " + (playlist.author?.name ?: playlist.songCountText ?: ""),
                         playlist.thumbnail?.toUri(),
                         MediaMetadata.MEDIA_TYPE_PLAYLIST,
                     )
@@ -1083,6 +1123,11 @@ constructor(
 
     // ── Spotify playlist helpers ─────────────────────────────────────────
 
+    /** Library pins (keys like "playlist:<id>" and "spotify:<id>"), newest first. */
+    private suspend fun libraryPins(): List<String> =
+        context.dataStore.data.first()[com.metrolist.music.constants.LibraryPinsKey]
+            ?.split("\n")?.filter { it.isNotBlank() }.orEmpty()
+
     private suspend fun fetchSpotifyPlaylistItems(): List<MediaItem> {
         if (!SpotifyTokenManager.ensureAuthenticated()) return emptyList()
         return try {
@@ -1091,7 +1136,7 @@ constructor(
                 browsableMediaItem(
                     "${MusicService.SPOTIFY_PLAYLIST}/${playlist.id}",
                     playlist.name,
-                    playlist.owner?.displayName ?: "Spotify",
+                    "Spotify" + (playlist.owner?.displayName?.let { " · $it" } ?: ""),
                     SpotifyMapper.getPlaylistThumbnail(playlist)?.toUri(),
                     MediaMetadata.MEDIA_TYPE_PLAYLIST,
                 )

@@ -80,11 +80,17 @@ import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.mkv.MatroskaExtractor
 import androidx.media3.extractor.mp4.FragmentedMp4Extractor
 import androidx.media3.extractor.mp4.Mp4Extractor
+import androidx.media3.extractor.flac.FlacExtractor
+import androidx.media3.extractor.mp3.Mp3Extractor
+import androidx.media3.extractor.ogg.OggExtractor
+import androidx.media3.extractor.ts.AdtsExtractor
+import androidx.media3.extractor.wav.WavExtractor
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
@@ -102,7 +108,12 @@ import com.metrolist.innertubex.extraction.ContentHints
 import com.metrolist.lastfm.LastFM
 import com.metrolist.music.MainActivity
 import com.metrolist.music.R
+import com.metrolist.music.audiobooks.AudiobookRepository
+import com.metrolist.music.audiobooks.abs.AbsRepository
 import com.metrolist.music.constants.AddToPlaylistPosition
+import com.metrolist.music.constants.isAbsTrackId
+import com.metrolist.music.constants.isAudiobookId
+import com.metrolist.music.constants.isOnDeviceMediaId
 import com.metrolist.music.constants.AddToPlaylistPositionKey
 import com.metrolist.music.constants.AndroidAutoTargetPlaylistKey
 import com.metrolist.music.constants.AudioFocusEnabledKey
@@ -256,6 +267,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -316,6 +328,29 @@ class MusicService :
 
     @Inject
     lateinit var downloadUtil: DownloadUtil
+
+    @Inject
+    lateinit var audiobookRepository: AudiobookRepository
+
+    @Inject
+    lateinit var absRepository: AbsRepository
+
+    @Inject
+    lateinit var radioDirectory: com.metrolist.music.radio.RadioDirectory
+
+    @Inject
+    lateinit var subsonicRepository: com.metrolist.music.subsonic.SubsonicRepository
+
+    @Inject
+    lateinit var podcastDirectory: com.metrolist.music.podcasts.PodcastDirectory
+
+    /** What the media session sees: the player plus radio "now playing" titles. */
+    private var sessionPlayer: RadioMetadataPlayer? = null
+
+    /** The speed before a show's own speed was applied, to put back afterwards. */
+    private var speedBeforeShow: Float? = null
+
+    private var subsonicScrobbleJob: Job? = null
 
     @Inject
     lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
@@ -750,9 +785,11 @@ class MusicService :
             toggleLibrary = ::toggleLibrary
             addToTargetPlaylist = ::addToTargetPlaylist
         }
+        val radioAwarePlayer = RadioMetadataPlayer(player, { radioDirectory.nowPlaying.value }, ::podcastSkipAmounts)
+        sessionPlayer = radioAwarePlayer
         mediaSession =
             MediaLibrarySession
-                .Builder(this, player, mediaLibrarySessionCallback)
+                .Builder(this, radioAwarePlayer, mediaLibrarySessionCallback)
                 .setSessionActivity(
                     PendingIntent.getActivity(
                         this,
@@ -1118,7 +1155,9 @@ class MusicService :
                 sleepTimer?.player = newPlayer
 
                 try {
-                    mediaSession?.let { (it as MediaSession).player = newPlayer }
+                    val radioAwarePlayer = RadioMetadataPlayer(newPlayer, { radioDirectory.nowPlaying.value }, ::podcastSkipAmounts)
+                    sessionPlayer = radioAwarePlayer
+                    mediaSession?.let { (it as MediaSession).player = radioAwarePlayer }
                 } catch (e: Exception) {
                     Timber.tag(TAG).e(e, "Failed to swap player in MediaSession")
                 }
@@ -1137,13 +1176,63 @@ class MusicService :
                 Timber.tag("MusicService").i("Player recreated with AudioTrackPlaybackParams: $useAudioTrackParams")
             }
 
+        // Radio "now playing" titles: refresh the notification and Android Auto when they change
+        scope.launch {
+            radioDirectory.nowPlaying.collect { sessionPlayer?.notifyMetadataChanged() }
+        }
+        scope.launch {
+            dataStore.data.map { prefs ->
+                val settings = com.metrolist.music.audiobooks.AudiobookPlaybackSettings
+                settings.seconds(prefs[settings.BackKey] ?: settings.DEFAULT_BACK, settings.DEFAULT_BACK) to
+                    settings.seconds(prefs[settings.ForwardKey] ?: settings.DEFAULT_FORWARD, settings.DEFAULT_FORWARD)
+            }.distinctUntilChanged().collect {
+                audiobookSkipSetting = it
+                withContext(Dispatchers.Main) {
+                    sessionPlayer?.notifyAvailableCommandsChanged()
+                    updateNotification()
+                }
+            }
+        }
+        // Podcast skip buttons setting: keep it at hand and refresh the buttons when it changes
+        scope.launch {
+            dataStore.data.map {
+                Triple(
+                    it[com.metrolist.music.podcasts.PodcastSkip.EnabledKey] ?: false,
+                    it[com.metrolist.music.podcasts.PodcastSkip.BackKey] ?: com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK,
+                    it[com.metrolist.music.podcasts.PodcastSkip.ForwardKey] ?: com.metrolist.music.podcasts.PodcastSkip.DEFAULT_FORWARD,
+                )
+            }.distinctUntilChanged().collect {
+                podcastSkipSetting = it
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    sessionPlayer?.notifyAvailableCommandsChanged()
+                    updateNotification()
+                }
+            }
+        }
+        // Your stations changed (added, removed, hearted): Android Auto re-reads its Radio list
+        scope.launch {
+            radioDirectory.favourites.drop(1).collect {
+                mediaSession?.notifyChildrenChanged(AutoLibraryExtras.RADIO, it.size, null)
+            }
+        }
+        com.metrolist.music.podcasts.PlayedEpisodes.init(this@MusicService)
+        if (podcastDirectory.followed.value.any { it.autoDownload }) {
+            com.metrolist.music.podcasts.PodcastAutoDownload.schedule(this@MusicService)
+            com.metrolist.music.playback.PlaylistAutoDownload.schedule(this@MusicService)
+        }
+
+        // Wavelength: Discord, Last.fm and Listen Together are switched off; clear any saved sign-ins
+        scope.launch(Dispatchers.IO) {
+            com.metrolist.music.constants.RemovedIntegrations.clearSavedState(this@MusicService)
+        }
+
         // Initialize Discord RPC manager (rehydrates token, reconnects gateway)
-        if (!DiscordRpcManager.isInitialized()) {
+        if (!com.metrolist.music.constants.RemovedIntegrations.DISCORD && !DiscordRpcManager.isInitialized()) {
             DiscordRpcManager.init(this@MusicService)
         }
 
         dataStore.data
-            .map { it[EnableDiscordRPCKey] ?: true }
+            .map { !com.metrolist.music.constants.RemovedIntegrations.DISCORD && (it[EnableDiscordRPCKey] ?: true) }
             .debounce(300)
             .distinctUntilChanged()
             .collect(scope) { enabled ->
@@ -1230,7 +1319,7 @@ class MusicService :
         }
 
         dataStore.data
-            .map { it[EnableLastFMScrobblingKey] ?: false }
+            .map { !com.metrolist.music.constants.RemovedIntegrations.LASTFM && (it[EnableLastFMScrobblingKey] ?: false) }
             .debounce(300)
             .distinctUntilChanged()
             .collect(scope) { enabled ->
@@ -1406,7 +1495,7 @@ class MusicService :
                     saveQueueToDisk()
                 }
                 val currentMetadata = player.currentMediaItem?.metadata
-                if (currentMetadata?.isEpisode == true && player.isPlaying && player.currentPosition > 0) {
+                if (currentMetadata != null && currentMetadata.remembersPosition() && player.isPlaying && player.currentPosition > 0) {
                     previousEpisodePosition = player.currentPosition
                     saveEpisodePosition(currentMetadata.id, player.currentPosition)
                 }
@@ -1720,20 +1809,101 @@ class MusicService :
         player.pause()
     }
 
+    /**
+     * Wavelength: which of the car/notification buttons make sense for what's playing.
+     * Live radio: the heart (puts the station at the top of your stations) and the add button (adds the
+     * station's current song to a playlist).
+     * Podcasts, news and audiobooks: only the heart (save for later on episodes).
+     * Navidrome, Jellyfin/Plex and phone files: everything except YouTube radio.
+     */
+    private enum class ButtonSet { MUSIC, OWN_MEDIA, SPOKEN, LIVE_RADIO }
+
+    /** Podcast skip buttons setting (enabled, back seconds, forward seconds), kept up to date. */
+    @Volatile
+    private var podcastSkipSetting = Triple(false, com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK, com.metrolist.music.podcasts.PodcastSkip.DEFAULT_FORWARD)
+
+    @Volatile
+    private var audiobookSkipSetting = com.metrolist.music.audiobooks.AudiobookPlaybackSettings.DEFAULT_BACK to
+        com.metrolist.music.audiobooks.AudiobookPlaybackSettings.DEFAULT_FORWARD
+
+    /** (back, forward) seconds for audiobook or enabled podcast skip controls; null otherwise. */
+    fun podcastSkipAmounts(): Pair<Int, Int>? {
+        val id = player.currentMediaItem?.mediaId ?: return null
+        if (isAudiobookId(id)) return audiobookSkipSetting
+        val (enabled, back, forward) = podcastSkipSetting
+        if (!enabled) return null
+        val isEpisode = player.currentMetadata?.isEpisode == true
+        return if (com.metrolist.music.podcasts.PodcastSkip.isPodcast(id, isEpisode)) back to forward else null
+    }
+
+    /** The skip buttons in Android Auto and the notification. */
+    fun podcastSkip(forward: Boolean) {
+        val (back, fwd) = podcastSkipAmounts() ?: (podcastSkipSetting.second to podcastSkipSetting.third)
+        sessionPlayer?.skipBy(if (forward) fwd else -back)
+    }
+
+    /** Media3's built-in skip icons have 5/10/15/30 seconds on them; other amounts use the plain arrow. */
+    private fun skipIcon(forward: Boolean, seconds: Int): Int = if (forward) {
+        when (seconds) {
+            5 -> CommandButton.ICON_SKIP_FORWARD_5
+            10 -> CommandButton.ICON_SKIP_FORWARD_10
+            15 -> CommandButton.ICON_SKIP_FORWARD_15
+            30 -> CommandButton.ICON_SKIP_FORWARD_30
+            else -> CommandButton.ICON_SKIP_FORWARD
+        }
+    } else {
+        when (seconds) {
+            5 -> CommandButton.ICON_SKIP_BACK_5
+            10 -> CommandButton.ICON_SKIP_BACK_10
+            15 -> CommandButton.ICON_SKIP_BACK_15
+            30 -> CommandButton.ICON_SKIP_BACK_30
+            else -> CommandButton.ICON_SKIP_BACK
+        }
+    }
+
+    private fun buttonSet(): ButtonSet {
+        val id = player.currentMediaItem?.mediaId ?: currentMediaMetadata.value?.id ?: return ButtonSet.MUSIC
+        val isEpisode = currentSong.value?.song?.takeIf { it.id == id }?.isEpisode == true ||
+            player.currentMetadata?.isEpisode == true
+        return when {
+            com.metrolist.music.constants.isRadioId(id) -> ButtonSet.LIVE_RADIO
+            isAudiobookId(id) || isEpisode || id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) -> ButtonSet.SPOKEN
+            com.metrolist.music.constants.isSubsonicId(id) || com.metrolist.music.constants.isMediaServerId(id) ||
+                id.startsWith("local:") -> ButtonSet.OWN_MEDIA
+            else -> ButtonSet.MUSIC
+        }
+    }
+
     private fun updateNotification(isLiked: Boolean? = currentSong.value?.song?.let { if (it.isEpisode) it.inLibrary != null else it.liked }) {
+        val set = buttonSet()
+        val radioId = player.currentMediaItem?.mediaId?.takeIf { set == ButtonSet.LIVE_RADIO }
+        val skip = podcastSkipAmounts()
+        val skipButtons = if (skip == null) emptyList() else listOf(
+            CommandButton.Builder(skipIcon(forward = false, seconds = skip.first))
+                .setDisplayName(getString(R.string.podcast_skip_back_by, skip.first))
+                .setSessionCommand(com.metrolist.music.constants.MediaSessionConstants.CommandSkipBack)
+                .setSlots(CommandButton.SLOT_BACK)
+                .build(),
+            CommandButton.Builder(skipIcon(forward = true, seconds = skip.second))
+                .setDisplayName(getString(R.string.podcast_skip_forward_by, skip.second))
+                .setSessionCommand(com.metrolist.music.constants.MediaSessionConstants.CommandSkipForward)
+                .setSlots(CommandButton.SLOT_FORWARD)
+                .build(),
+        )
+        val liked = if (radioId != null) radioDirectory.isStarred(radioId.removePrefix(com.metrolist.music.constants.RADIO_ID_PREFIX)) else isLiked == true
         mediaSession?.setCustomLayout(
-            listOf(
+            skipButtons + listOfNotNull(
                 CommandButton
                     .Builder()
                     .setDisplayName(
                         getString(
-                            if (isLiked == true) {
+                            if (liked) {
                                 R.string.action_remove_like
                             } else {
                                 R.string.action_like
                             },
                         ),
-                    ).setIconResId(if (isLiked == true) R.drawable.ic_heart else R.drawable.ic_heart_outline)
+                    ).setIconResId(if (liked) R.drawable.ic_heart else R.drawable.ic_heart_outline)
                     .setSessionCommand(CommandToggleLike)
                     // Enable as long as a track is playing, even if it isn't cached in the
                     // local DB yet (e.g. Spotify/YouTube tracks). toggleLike() inserts it on demand.
@@ -1758,27 +1928,33 @@ class MusicService :
                             else -> throw IllegalStateException()
                         },
                     ).setSessionCommand(CommandToggleRepeatMode)
-                    .build(),
+                    .build()
+                    .takeIf { set == ButtonSet.MUSIC || set == ButtonSet.OWN_MEDIA },
                 CommandButton
                     .Builder()
                     .setDisplayName(getString(if (player.shuffleModeEnabled) R.string.action_shuffle_off else R.string.action_shuffle_on))
                     .setIconResId(if (player.shuffleModeEnabled) R.drawable.shuffle_on else R.drawable.shuffle)
                     .setSessionCommand(CommandToggleShuffle)
-                    .build(),
+                    .build()
+                    .takeIf { set == ButtonSet.MUSIC || set == ButtonSet.OWN_MEDIA },
                 CommandButton
                     .Builder()
                     .setDisplayName(getString(R.string.start_radio))
                     .setIconResId(R.drawable.radio)
                     .setSessionCommand(CommandToggleStartRadio)
                     .setEnabled(currentSong.value != null)
-                    .build(),
+                    .build()
+                    .takeIf { set == ButtonSet.MUSIC },
                 CommandButton
                     .Builder()
-                    .setDisplayName(getString(R.string.android_auto_target_playlist))
+                    .setDisplayName(
+                        getString(if (set == ButtonSet.LIVE_RADIO) R.string.radio_song_add else R.string.android_auto_target_playlist),
+                    )
                     .setIconResId(R.drawable.playlist_add)
                     .setSessionCommand(CommandAddToTargetPlaylist)
-                    .setEnabled(currentSong.value != null)
-                    .build(),
+                    .setEnabled(set == ButtonSet.LIVE_RADIO || currentSong.value != null)
+                    .build()
+                    .takeIf { set != ButtonSet.SPOKEN },
             ),
         )
     }
@@ -2401,6 +2577,12 @@ class MusicService :
     }
 
     fun toggleLike() {
+        // Live radio: the heart moves the station to the top of your stations
+        player.currentMediaItem?.mediaId?.takeIf { com.metrolist.music.constants.isRadioId(it) }?.let { id ->
+            radioDirectory.toggleStarred(id)
+            updateNotification()
+            return
+        }
         scope.launch {
             var songToToggle = currentSong.first()
             // The current track may not be cached in the local DB yet (common for
@@ -2439,6 +2621,13 @@ class MusicService :
     }
 
     fun addToTargetPlaylist() {
+        // Live radio: add the song the station says is playing to the radio songs playlist
+        val radioId = player.currentMediaItem?.mediaId
+        if (com.metrolist.music.constants.isRadioId(radioId)) {
+            val title = radioDirectory.nowPlaying.value?.takeIf { it.first == radioId }?.second
+            com.metrolist.music.recognition.RecognisedSongs.addRadioSong(this, title)
+            return
+        }
         scope.launch {
             val currentSong = currentSong.first() ?: return@launch
             val targetPlaylistId = dataStore.get(AndroidAutoTargetPlaylistKey, MediaSessionConstants.TARGET_PLAYLIST_AUTO)
@@ -2713,6 +2902,10 @@ class MusicService :
     private var lastTransitionedMediaId: String? = null
     private var previousEpisodePosition: Long = 0L
 
+    /** Podcast episodes and audiobook chapters resume where the listener stopped. */
+    private fun com.metrolist.music.models.MediaMetadata?.remembersPosition(): Boolean =
+        this != null && (isEpisode || isAudiobookId(id))
+
     /**
      * Save podcast episode playback position to database.
      * Only saves if the item is an episode and position is meaningful (> 3 seconds).
@@ -2722,6 +2915,7 @@ class MusicService :
         positionMs: Long,
     ) {
         if (positionMs < 3000) return // Don't save if less than 3 seconds played
+        if (isAbsTrackId(episodeId)) absRepository.reportPosition(episodeId, positionMs)
         scope.launch(Dispatchers.IO + SilentHandler) {
             database.updatePlaybackPosition(episodeId, positionMs)
             Timber.tag(TAG).d("Saved episode position: $episodeId at ${positionMs}ms")
@@ -2746,10 +2940,90 @@ class MusicService :
         }
     }
 
+    /** Radio stations announce the song they're playing (ICY metadata); show it in the radio screen. */
+    override fun onMetadata(metadata: androidx.media3.common.Metadata) {
+        val id = player.currentMediaItem?.mediaId ?: return
+        if (!com.metrolist.music.constants.isRadioId(id)) return
+        for (i in 0 until metadata.length()) {
+            val entry = metadata.get(i)
+            if (entry is androidx.media3.extractor.metadata.icy.IcyInfo) {
+                radioDirectory.setNowPlaying(id, entry.title)
+            }
+        }
+    }
+
+    /** Radio play counts and Subsonic "now playing" / scrobbles when the track changes. */
+    /** Deletes a finished episode's download (Settings → Features → Podcasts → Delete after finishing). */
+    private fun deleteFinishedEpisode(episodeId: String) {
+        scope.launch {
+            if (!com.metrolist.music.podcasts.EpisodeDownloads.deleteOnFinish(this@MusicService)) return@launch
+            if (downloadUtil.downloads.value[episodeId] == null) return@launch
+            downloadUtil.removeInBackground(episodeId)
+        }
+    }
+
+    private fun onWavelengthTransition(mediaItem: MediaItem?) {
+        val id = mediaItem?.mediaId
+        // A podcast's own playback speed, put back to the earlier speed for anything else
+        val showSpeed = id?.takeIf { it.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) }
+            ?.let { podcastDirectory.speedForEpisode(it, mediaItem.mediaMetadata.albumTitle?.toString()) }
+        if (showSpeed != null) {
+            if (speedBeforeShow == null) speedBeforeShow = player.playbackParameters.speed
+            player.setPlaybackSpeed(showSpeed)
+        } else {
+            speedBeforeShow?.let { player.setPlaybackSpeed(it) }
+            speedBeforeShow = null
+        }
+        radioDirectory.setNowPlaying(id.orEmpty(), null)
+        if (com.metrolist.music.constants.isRadioId(id)) radioDirectory.reportPlay(id!!)
+        // Show the car buttons that fit this kind of track straight away
+        sessionPlayer?.notifyAvailableCommandsChanged()
+        updateNotification()
+        // Podcast episodes download as soon as they start playing (Settings → Features → Podcasts)
+        val episodeMetadata = mediaItem?.metadata
+        // An episode removed from Android Auto's Continue listening comes back once it's played again
+        if (id != null && episodeMetadata?.isEpisode == true) {
+            scope.launch { AutoLibraryExtras.unhideEpisode(this@MusicService, id) }
+        }
+        if (id != null && !isAudiobookId(id) &&
+            (id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) || episodeMetadata?.isEpisode == true)
+        ) {
+            scope.launch {
+                val state = downloadUtil.downloads.value[id]?.state
+                if (episodeMetadata != null && state != androidx.media3.exoplayer.offline.Download.STATE_COMPLETED &&
+                    state != androidx.media3.exoplayer.offline.Download.STATE_QUEUED &&
+                    state != androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING &&
+                    com.metrolist.music.podcasts.EpisodeDownloads.downloadOnPlay(this@MusicService)
+                ) {
+                    downloadUtil.download(episodeMetadata)
+                }
+            }
+        }
+        subsonicScrobbleJob?.cancel()
+        if (id != null && com.metrolist.music.constants.isSubsonicId(id)) {
+            subsonicRepository.scrobble(id, submission = false)
+            // Counts as played after half the song or four minutes of actual listening
+            subsonicScrobbleJob = scope.launch {
+                var listenedMs = 0L
+                while (true) {
+                    delay(5_000)
+                    if (player.currentMediaItem?.mediaId != id) break
+                    if (player.isPlaying) listenedMs += 5_000
+                    val duration = player.duration.takeIf { it > 0 } ?: 480_000L
+                    if (listenedMs >= minOf(duration / 2, 240_000L)) {
+                        subsonicRepository.scrobble(id, submission = true)
+                        break
+                    }
+                }
+            }
+        }
+    }
+
     override fun onMediaItemTransition(
         mediaItem: MediaItem?,
         reason: Int,
     ) {
+        onWavelengthTransition(mediaItem)
         // Only natural completion transitions mark the previous track as fully cached,
         // never a manual skip or seek. Read lastTransitionedMediaId before replacing it.
         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
@@ -2768,7 +3042,15 @@ class MusicService :
         updateInitialBufferRecovery(player.playbackState)
 
         previousEpisodeId?.let { episodeId ->
-            if (previousEpisodePosition > 0) {
+            if (isAudiobookId(episodeId) && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                audiobookRepository.onChapterFinished(episodeId)
+                if (isAbsTrackId(episodeId)) absRepository.onTrackFinished(episodeId)
+            } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                // A podcast episode played to the end: mark it played and start it fresh next time
+                com.metrolist.music.podcasts.PlayedEpisodes.set(this, episodeId, true)
+                scope.launch(Dispatchers.IO) { database.updatePlaybackPosition(episodeId, null) }
+                deleteFinishedEpisode(episodeId)
+            } else if (previousEpisodePosition > 0) {
                 saveEpisodePosition(episodeId, previousEpisodePosition)
             }
         }
@@ -2776,8 +3058,11 @@ class MusicService :
         previousEpisodePosition = 0L
 
         val newMetadata = mediaItem?.metadata
-        if (newMetadata?.isEpisode == true) {
+        if (newMetadata != null && newMetadata.remembersPosition()) {
             previousEpisodeId = newMetadata.id
+            if (isAudiobookId(newMetadata.id)) {
+                audiobookRepository.onChapterStarted(newMetadata.id)
+            }
             scope.launch {
                 delay(100)
                 restoreEpisodePosition(newMetadata.id)
@@ -2861,6 +3146,13 @@ class MusicService :
         updateInitialBufferRecovery(playbackState)
 
         if (playbackState == Player.STATE_ENDED) {
+            // The last episode in the queue finished: mark it played too
+            player.currentMediaItem?.mediaId
+                ?.takeIf { it.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX) || player.currentMetadata?.isEpisode == true }
+                ?.let {
+                    com.metrolist.music.podcasts.PlayedEpisodes.set(this, it, true)
+                    deleteFinishedEpisode(it)
+                }
             player.currentMediaItem?.mediaId?.let { mediaId ->
                 scope.launch(Dispatchers.IO) { markCachedIfFullyDownloaded(mediaId) }
             }
@@ -2943,7 +3235,7 @@ class MusicService :
 
         if (!playWhenReady) {
             val currentMetadata = player.currentMediaItem?.metadata
-            if (currentMetadata?.isEpisode == true && player.currentPosition > 0) {
+            if (currentMetadata != null && currentMetadata.remembersPosition() && player.currentPosition > 0) {
                 saveEpisodePosition(currentMetadata.id, player.currentPosition)
                 previousEpisodePosition = player.currentPosition
             }
@@ -3967,7 +4259,7 @@ class MusicService :
             val mediaId = mediaItem.mediaMetadata.extras?.getString("mediaId")
                 ?: mediaItem.mediaId
             val title = mediaItem.mediaMetadata.title?.toString() ?: "unknown"
-            if (mediaId.startsWith("local:")) {
+            if (isOnDeviceMediaId(mediaId)) {
                 Timber.tag(PRECACHE_TAG).d("[PRECACHE] Skip local track [$i]: $title ($mediaId)")
                 continue
             }
@@ -4480,12 +4772,29 @@ class MusicService :
             val mediaId = stripQobuzCacheKeyPrefix(dataSpec.key ?: error("No media id"))
             val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
 
+            // Navidrome / Subsonic: stream from the server with fresh credentials
+            if (com.metrolist.music.constants.isSubsonicId(mediaId)) {
+                val uri = subsonicRepository.streamUri(mediaId) ?: error("Not signed in to the music server")
+                return@Factory dataSpec.withUri(uri)
+            }
+            // Jellyfin / Plex: stream the original file from the server
+            if (com.metrolist.music.constants.isMediaServerId(mediaId)) {
+                val uri = com.metrolist.music.mediaserver.MediaServerRepository.from(this@MusicService).streamUri(mediaId)
+                    ?: error("Not signed in to Jellyfin or Plex")
+                return@Factory dataSpec.withUri(uri)
+            }
+
             // Handle local audio files — resolve to content URI and bypass YouTube fetch
-            if (mediaId.startsWith("local:")) {
+            if (isOnDeviceMediaId(mediaId)) {
                 val localPath = runBlocking(Dispatchers.IO) {
                     database.getSongById(mediaId)?.song?.localPath
                 }
                 if (localPath != null) {
+                    if (isAbsTrackId(mediaId)) {
+                        absRepository.offlineUri(mediaId)?.let { return@Factory dataSpec.withUri(it) }
+                        return@Factory dataSpec.withUri(localPath.toUri())
+                            .withAdditionalHeaders(absRepository.streamHeaders())
+                    }
                     return@Factory dataSpec.withUri(localPath.toUri())
                 }
                 // fallback: URI already set to localPath in MediaItem
@@ -4860,11 +5169,82 @@ class MusicService :
     private fun createMediaSourceFactory(
         normalizationProcessor: VolumeNormalizationAudioProcessor,
         playerProvider: () -> ExoPlayer?,
+    ): MediaSource.Factory = RadioAwareMediaSourceFactory(
+        main = createMainMediaSourceFactory(normalizationProcessor, playerProvider),
+        // Live radio skips the caches entirely: a never-ending stream would fill them, and a
+        // cached copy would replay old audio. Default extractors cover ICY, AAC, MP3, Ogg and HLS.
+        live = DefaultMediaSourceFactory(
+            // TuneIn and playlist (.pls / .m3u) links are turned into the real stream while loading
+            ResolvingDataSource.Factory(
+                DefaultDataSource.Factory(
+                    this,
+                    OkHttpDataSource.Factory(OkHttpClient.Builder().build()).setUserAgent("Wavelength"),
+                ),
+            ) { spec ->
+                val url = spec.uri.toString()
+                if (radioDirectory.needsResolving(url)) {
+                    runCatching { radioDirectory.resolveStream(url) }.getOrNull()?.let { spec.withUri(it.toUri()) } ?: spec
+                } else {
+                    spec
+                }
+            },
+        ),
+        streamFor = { id -> radioDirectory.stream(id) },
+    )
+
+    /** Sends radio stations to [live] with their real stream address, and everything else to [main]. */
+    private class RadioAwareMediaSourceFactory(
+        private val main: MediaSource.Factory,
+        private val live: MediaSource.Factory,
+        private val streamFor: (String) -> Pair<String, Boolean>?,
+    ) : MediaSource.Factory {
+        override fun setDrmSessionManagerProvider(provider: androidx.media3.exoplayer.drm.DrmSessionManagerProvider): MediaSource.Factory {
+            main.setDrmSessionManagerProvider(provider)
+            live.setDrmSessionManagerProvider(provider)
+            return this
+        }
+
+        override fun setLoadErrorHandlingPolicy(policy: androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy): MediaSource.Factory {
+            main.setLoadErrorHandlingPolicy(policy)
+            live.setLoadErrorHandlingPolicy(policy)
+            return this
+        }
+
+        override fun getSupportedTypes(): IntArray = (main.supportedTypes + live.supportedTypes).distinct().toIntArray()
+
+        override fun createMediaSource(mediaItem: MediaItem): MediaSource {
+            if (com.metrolist.music.constants.isRadioId(mediaItem.mediaId)) {
+                streamFor(mediaItem.mediaId)?.let { (url, hls) ->
+                    val streamItem = mediaItem.buildUpon()
+                        .setUri(url)
+                        .setCustomCacheKey(null)
+                        .setMimeType(if (hls && !url.contains(".m3u8", ignoreCase = true)) androidx.media3.common.MimeTypes.APPLICATION_M3U8 else null)
+                        .build()
+                    return live.createMediaSource(streamItem)
+                }
+            }
+            return main.createMediaSource(mediaItem)
+        }
+    }
+
+    private fun createMainMediaSourceFactory(
+        normalizationProcessor: VolumeNormalizationAudioProcessor,
+        playerProvider: () -> ExoPlayer?,
     ) =
         DefaultMediaSourceFactory(
             createDataSourceFactory(normalizationProcessor, playerProvider),
             ExtractorsFactory {
-                arrayOf(MatroskaExtractor(), FragmentedMp4Extractor(), Mp4Extractor())
+                // YouTube's containers first; the rest cover podcasts, audiobooks and local files
+                arrayOf(
+                    MatroskaExtractor(),
+                    FragmentedMp4Extractor(),
+                    Mp4Extractor(),
+                    Mp3Extractor(),
+                    AdtsExtractor(),
+                    OggExtractor(),
+                    FlacExtractor(),
+                    WavExtractor(),
+                )
             },
         )
 
@@ -5166,9 +5546,11 @@ class MusicService :
         }
 
         val currentMetadata = player.currentMediaItem?.metadata
-        if (currentMetadata?.isEpisode == true && player.currentPosition > 0) {
+        // Read the position here on the main thread; the player can't be touched from the IO thread
+        val stopPosition = player.currentPosition
+        if (currentMetadata != null && currentMetadata.remembersPosition() && stopPosition > 0) {
             runBlocking(Dispatchers.IO) {
-                database.updatePlaybackPosition(currentMetadata.id, player.currentPosition)
+                database.updatePlaybackPosition(currentMetadata.id, stopPosition)
             }
         }
 
@@ -5828,7 +6210,7 @@ class MusicService :
 
         val mediaId = player.currentMediaItem?.mediaId ?: return
         // Episodes (podcasts) are not on YouTube proper and aren't on SponsorBlock.
-        if (player.currentMediaItem?.metadata?.isEpisode == true) return
+        if (player.currentMediaItem?.metadata?.let { it.isEpisode || isAudiobookId(it.id) } == true) return
 
         val showToast = dataStore.get(SponsorBlockShowToastKey, false)
 

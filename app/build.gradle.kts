@@ -16,6 +16,8 @@ val buildCommit =
         ?.takeIf { it.matches(Regex("[0-9a-fA-F]{7,40}")) }
         ?.take(7)
         ?.lowercase()
+// Set by the fork's release workflow so every build has a higher version than the last
+val forkBuildNumber = System.getenv("FORK_BUILD_NUMBER")?.toIntOrNull()
 val debugKeystorePathOverride = System.getenv("METROLIST_DEBUG_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
 val debugKeystorePassword = System.getenv("METROLIST_DEBUG_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "android"
 val debugKeyAlias = System.getenv("METROLIST_DEBUG_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "androiddebugkey"
@@ -42,6 +44,10 @@ android {
         targetSdk = 36
         versionCode = 28
         versionName = "0.9.2"
+        forkBuildNumber?.let { build ->
+            versionCode = requireNotNull(versionCode) * 10_000 + build
+            versionName = "$versionName.$build"
+        }
         val baseVersionName = requireNotNull(versionName)
         buildConfigField("String", "BASE_VERSION_NAME", "\"$baseVersionName\"")
         buildCommit?.let { versionName = "$baseVersionName+$it" }
@@ -132,6 +138,11 @@ android {
             isShrinkResources = true
             isCrunchPngs = false
             isDebuggable = false
+            // Wavelength: CI signs release builds with the fork's own key (same key as earlier
+            // builds), so they install as updates over the app already on the phone
+            if (workflowDebugKeystoreFile != null) {
+                signingConfig = signingConfigs.getByName("workflowDebug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -302,6 +313,8 @@ dependencies {
     implementation(libs.media3)
     implementation(libs.media3.session)
     implementation(libs.media3.okhttp)
+    implementation(libs.media3.hls)
+    implementation(libs.work.runtime)
 
     // Google Cast - only included in GMS flavor (not available in F-Droid/FOSS builds)
     "gmsImplementation"(libs.media3.cast)

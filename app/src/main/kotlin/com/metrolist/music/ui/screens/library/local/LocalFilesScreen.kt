@@ -8,9 +8,11 @@ package com.metrolist.music.ui.screens.library.local
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,10 +22,13 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,18 +37,22 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -53,13 +62,17 @@ import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
 import com.metrolist.music.constants.CONTENT_TYPE_HEADER
 import com.metrolist.music.constants.CONTENT_TYPE_SONG
+import com.metrolist.music.constants.ListThumbnailSize
+import com.metrolist.music.constants.LocalFilesFolderViewKey
 import com.metrolist.music.constants.SongSortDescendingKey
 import com.metrolist.music.constants.SongSortType
 import com.metrolist.music.constants.SongSortTypeKey
+import com.metrolist.music.constants.ThumbnailCornerRadius
 import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.playback.queues.ListQueue
 import com.metrolist.music.ui.component.DraggableScrollbar
 import com.metrolist.music.ui.component.HideOnScrollFAB
+import com.metrolist.music.ui.component.ListItem
 import com.metrolist.music.ui.component.LocalMenuState
 import com.metrolist.music.ui.component.SongListItem
 import com.metrolist.music.ui.component.SortHeader
@@ -67,6 +80,7 @@ import com.metrolist.music.ui.menu.SongMenu
 import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.viewmodels.LocalFilesViewModel
+import com.metrolist.music.viewmodels.LocalFolder
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +95,8 @@ fun LocalFilesScreen(
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
 
-    val songs by viewModel.songs.collectAsState()
+    // One copy per song in the all-songs list; folder view still shows every file
+    val songs by viewModel.uniqueSongs.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
 
     val (sortType, onSortTypeChange) = rememberEnumPreference(SongSortTypeKey, SongSortType.CREATE_DATE)
@@ -107,6 +122,28 @@ fun LocalFilesScreen(
     }
 
     val lazyListState = rememberLazyListState()
+
+    val folders by viewModel.folders.collectAsState()
+    var folderView by rememberPreference(LocalFilesFolderViewKey, false)
+    var openFolderPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val openFolder = if (folderView) folders.find { it.path == openFolderPath } else null
+    // Typed in the top-bar search on the Local files tab: shows matching songs from every folder
+    val query = com.metrolist.music.ui.component.rememberPageSearchQuery("local_files")
+    val searching = query.isNotBlank()
+    val showFolderList = folderView && openFolder == null && !searching
+    val visibleSongs = if (searching) {
+        songs.filter { song ->
+            com.metrolist.music.ui.component.matchesSearch(
+                query,
+                song.song.title,
+                song.artists.joinToString { it.name },
+                song.album?.title,
+            )
+        }
+    } else {
+        openFolder?.songs ?: songs
+    }
+    val queueTitle = openFolder?.let { folderDisplayName(it) } ?: stringResource(R.string.local_files)
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (!hasPermission) {
@@ -141,6 +178,10 @@ fun LocalFilesScreen(
                 }
             }
         } else {
+            LaunchedEffect(Unit) { viewModel.loadFolders() }
+            LaunchedEffect(folderView, openFolderPath) { lazyListState.scrollToItem(0) }
+            BackHandler(enabled = folderView && openFolderPath != null) { openFolderPath = null }
+
             LazyColumn(
                 state = lazyListState,
                 contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
@@ -148,7 +189,12 @@ fun LocalFilesScreen(
                 item(key = "filter", contentType = CONTENT_TYPE_HEADER) { filterContent() }
 
                 item(key = "local_header", contentType = CONTENT_TYPE_HEADER) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 4.dp),
+                    ) {
                         Spacer(Modifier.width(12.dp))
                         if (isScanning) {
                             CircularProgressIndicator(
@@ -169,6 +215,61 @@ fun LocalFilesScreen(
                                 )
                             }
                         }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { navController.navigate("settings/local_folders") }) {
+                            Icon(
+                                painter = painterResource(R.drawable.tune),
+                                contentDescription = stringResource(R.string.music_folders),
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                folderView = !folderView
+                                openFolderPath = null
+                            },
+                        ) {
+                            Icon(
+                                painter = painterResource(if (folderView) R.drawable.list else R.drawable.folder),
+                                contentDescription = stringResource(
+                                    if (folderView) R.string.local_files_show_songs else R.string.local_files_show_folders
+                                ),
+                            )
+                        }
+                    }
+                }
+
+                if (openFolder != null) {
+                    item(key = "folder_title", contentType = CONTENT_TYPE_HEADER) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
+                        ) {
+                            IconButton(onClick = { openFolderPath = null }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.arrow_back),
+                                    contentDescription = stringResource(R.string.local_files_back_to_folders),
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = folderDisplayName(openFolder),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                if (openFolder.path.contains('/')) {
+                                    Text(
+                                        text = openFolder.path,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -177,23 +278,29 @@ fun LocalFilesScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(horizontal = 16.dp),
                     ) {
-                        SortHeader(
-                            sortType = sortType,
-                            sortDescending = sortDescending,
-                            onSortTypeChange = onSortTypeChange,
-                            onSortDescendingChange = onSortDescendingChange,
-                            sortTypeText = { type ->
-                                when (type) {
-                                    SongSortType.CREATE_DATE -> R.string.sort_by_create_date
-                                    SongSortType.NAME -> R.string.sort_by_name
-                                    SongSortType.ARTIST -> R.string.sort_by_artist
-                                    SongSortType.PLAY_TIME -> R.string.sort_by_play_time
-                                }
-                            },
-                        )
+                        if (!showFolderList) {
+                            SortHeader(
+                                sortType = sortType,
+                                sortDescending = sortDescending,
+                                onSortTypeChange = onSortTypeChange,
+                                onSortDescendingChange = onSortDescendingChange,
+                                sortTypeText = { type ->
+                                    when (type) {
+                                        SongSortType.CREATE_DATE -> R.string.sort_by_create_date
+                                        SongSortType.NAME -> R.string.sort_by_name
+                                        SongSortType.ARTIST -> R.string.sort_by_artist
+                                        SongSortType.PLAY_TIME -> R.string.sort_by_play_time
+                                    }
+                                },
+                            )
+                        }
                         Spacer(Modifier.weight(1f))
                         Text(
-                            text = pluralStringResource(R.plurals.n_local_file, songs.size, songs.size),
+                            text = if (showFolderList) {
+                                pluralStringResource(R.plurals.n_local_folder, folders.size, folders.size)
+                            } else {
+                                pluralStringResource(R.plurals.n_local_file, visibleSongs.size, visibleSongs.size)
+                            },
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.secondary,
                         )
@@ -218,50 +325,90 @@ fun LocalFilesScreen(
                     }
                 }
 
-                itemsIndexed(
-                    items = songs,
-                    key = { _, item -> item.song.id },
-                    contentType = { _, _ -> CONTENT_TYPE_SONG },
-                ) { index, song ->
-                    SongListItem(
-                        song = song,
-                        isActive = song.id == mediaMetadata?.id,
-                        isPlaying = isPlaying,
-                        showLikedIcon = true,
-                        trailingContent = {
-                            IconButton(
-                                onClick = {
-                                    menuState.show {
-                                        SongMenu(
-                                            originalSong = song,
-                                            onDismiss = menuState::dismiss,
-                                        )
-                                    }
-                                },
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.more_vert),
-                                    contentDescription = null,
-                                )
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                if (song.id == mediaMetadata?.id) {
-                                    playerConnection.togglePlayPause()
-                                } else {
-                                    playerConnection.playQueue(
-                                        ListQueue(
-                                            title = context.getString(R.string.local_files),
-                                            items = songs.map { it.toMediaItem() },
-                                            startIndex = index,
-                                        ),
+                if (showFolderList) {
+                    items(
+                        items = folders,
+                        key = { "folder:${it.path}" },
+                    ) { folder ->
+                        val parent = folder.path.substringBeforeLast('/', "")
+                        val count = pluralStringResource(R.plurals.n_local_file, folder.songs.size, folder.songs.size)
+                        ListItem(
+                            title = folderDisplayName(folder),
+                            subtitle = if (parent.isEmpty()) count else "$count • $parent",
+                            thumbnailContent = {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .size(ListThumbnailSize)
+                                        .clip(RoundedCornerShape(ThumbnailCornerRadius))
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.folder),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                            }
-                            .animateItem(),
-                    )
+                            },
+                            trailingContent = {
+                                Icon(
+                                    painter = painterResource(R.drawable.navigate_next),
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(end = 12.dp),
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { openFolderPath = folder.path }
+                                .animateItem(),
+                        )
+                    }
+                } else {
+                    itemsIndexed(
+                        items = visibleSongs,
+                        key = { _, item -> item.song.id },
+                        contentType = { _, _ -> CONTENT_TYPE_SONG },
+                    ) { index, song ->
+                        SongListItem(
+                            song = song,
+                            isActive = song.id == mediaMetadata?.id,
+                            isPlaying = isPlaying,
+                            showLikedIcon = true,
+                            trailingContent = {
+                                IconButton(
+                                    onClick = {
+                                        menuState.show {
+                                            SongMenu(
+                                                originalSong = song,
+                                                onDismiss = menuState::dismiss,
+                                            )
+                                        }
+                                    },
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.more_vert),
+                                        contentDescription = null,
+                                    )
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (song.id == mediaMetadata?.id) {
+                                        playerConnection.togglePlayPause()
+                                    } else {
+                                        playerConnection.playQueue(
+                                            ListQueue(
+                                                title = queueTitle,
+                                                items = visibleSongs.map { it.toMediaItem() },
+                                                startIndex = index,
+                                            ),
+                                        )
+                                    }
+                                }
+                                .animateItem(),
+                        )
+                    }
                 }
             }
 
@@ -270,18 +417,18 @@ fun LocalFilesScreen(
                     .padding(LocalPlayerAwareWindowInsets.current.asPaddingValues())
                     .align(Alignment.CenterEnd),
                 scrollState = lazyListState,
-                headerItems = 3,
+                headerItems = if (openFolder != null) 4 else 3,
             )
 
             HideOnScrollFAB(
-                visible = songs.isNotEmpty(),
+                visible = !showFolderList && visibleSongs.isNotEmpty(),
                 lazyListState = lazyListState,
                 icon = R.drawable.shuffle,
                 onClick = {
                     playerConnection.playQueue(
                         ListQueue(
-                            title = context.getString(R.string.local_files),
-                            items = songs.shuffled().map { it.toMediaItem() },
+                            title = queueTitle,
+                            items = visibleSongs.shuffled().map { it.toMediaItem() },
                         ),
                     )
                 },
@@ -289,3 +436,7 @@ fun LocalFilesScreen(
         }
     }
 }
+
+@Composable
+private fun folderDisplayName(folder: LocalFolder): String =
+    folder.name.ifEmpty { stringResource(R.string.local_files_storage_root) }

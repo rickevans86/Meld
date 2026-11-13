@@ -5,6 +5,12 @@
 
 package com.metrolist.music.ui.screens.settings
 
+import android.content.Context
+import android.content.Intent
+import android.provider.DocumentsContract
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -41,6 +47,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
+import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
 import coil3.SingletonImageLoader
 import coil3.annotation.DelicateCoilApi
@@ -50,6 +58,8 @@ import com.metrolist.music.LocalDatabase
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
+import com.metrolist.music.constants.DownloadExportFolderKey
+import com.metrolist.music.constants.DownloadPlaylistFoldersKey
 import com.metrolist.music.constants.EnableSongCacheKey
 import com.metrolist.music.constants.MaxImageCacheSizeKey
 import com.metrolist.music.constants.MaxSongCacheSizeKey
@@ -106,6 +116,43 @@ fun StorageSettings(
         key = PreCacheOnlyWifiKey,
         defaultValue = true
     )
+
+    val downloadUtil = LocalPlayerConnection.current?.service?.downloadUtil
+    val (downloadFolder, onDownloadFolderChange) = rememberPreference(
+        key = DownloadExportFolderKey,
+        defaultValue = ""
+    )
+    var savingDownloads by remember { mutableStateOf(false) }
+    val (playlistFolders, onPlaylistFoldersChange) = rememberPreference(
+        key = DownloadPlaylistFoldersKey,
+        defaultValue = true
+    )
+    val (downloadWifiOnly, onDownloadWifiOnlyChange) = rememberPreference(
+        key = com.metrolist.music.constants.DownloadWifiOnlyKey,
+        defaultValue = false
+    )
+    val folderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        val granted = runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, flags)
+        }.isSuccess
+        if (!granted) {
+            Toast.makeText(context, R.string.download_folder_failed, Toast.LENGTH_LONG).show()
+            return@rememberLauncherForActivityResult
+        }
+        if (downloadFolder.isNotBlank() && downloadFolder != uri.toString()) {
+            runCatching { context.contentResolver.releasePersistableUriPermission(downloadFolder.toUri(), flags) }
+        }
+        onDownloadFolderChange(uri.toString())
+        Toast.makeText(
+            context,
+            context.getString(R.string.download_folder_set, downloadFolderLabel(context, uri.toString())),
+            Toast.LENGTH_LONG,
+        ).show()
+    }
 
     var clearDownloads by remember { mutableStateOf(false) }
     var clearCacheDialog by remember { mutableStateOf(false) }
@@ -307,9 +354,30 @@ fun StorageSettings(
             ),
         )
         Material3SettingsGroup(
-            title = stringResource(R.string.storage),
+            title = stringResource(R.string.storage_and_downloads),
             items =
                 listOf(
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.wifi_proxy),
+                        title = { Text(stringResource(R.string.download_wifi_only)) },
+                        description = { Text(stringResource(R.string.download_wifi_only_desc)) },
+                        trailingContent = {
+                            Switch(
+                                checked = downloadWifiOnly,
+                                onCheckedChange = onDownloadWifiOnlyChange,
+                                thumbContent = {
+                                    Icon(
+                                        painter = painterResource(
+                                            id = if (downloadWifiOnly) R.drawable.check else R.drawable.close
+                                        ),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        },
+                        onClick = { onDownloadWifiOnlyChange(!downloadWifiOnly) }
+                    ),
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.storage),
                         title = { Text(stringResource(R.string.downloaded_songs)) },
@@ -325,6 +393,97 @@ fun StorageSettings(
                         },
                     ),
                 ),
+        )
+
+        Material3SettingsGroup(
+            title = stringResource(R.string.local_files),
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.folder),
+                    title = { Text(stringResource(R.string.music_folders)) },
+                    description = { Text(stringResource(R.string.music_folders_desc)) },
+                    onClick = { navController.navigate("settings/local_folders") },
+                ),
+            ),
+        )
+
+        Material3SettingsGroup(
+            title = stringResource(R.string.download_folder_section),
+            items = listOfNotNull(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.folder),
+                    title = { Text(stringResource(R.string.download_folder)) },
+                    description = {
+                        Text(
+                            if (downloadFolder.isBlank()) {
+                                stringResource(R.string.download_folder_off)
+                            } else {
+                                downloadFolderLabel(context, downloadFolder)
+                            }
+                        )
+                    },
+                    onClick = { folderPicker.launch(null) },
+                ),
+                if (downloadFolder.isNotBlank()) {
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.queue_music),
+                        title = { Text(stringResource(R.string.download_folder_by_playlist)) },
+                        description = { Text(stringResource(R.string.download_folder_by_playlist_desc)) },
+                        trailingContent = {
+                            Switch(
+                                checked = playlistFolders,
+                                onCheckedChange = onPlaylistFoldersChange,
+                            )
+                        },
+                        onClick = { onPlaylistFoldersChange(!playlistFolders) },
+                    )
+                } else null,
+                if (downloadFolder.isNotBlank() && downloadUtil != null) {
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.download),
+                        title = {
+                            Text(
+                                stringResource(
+                                    if (savingDownloads) R.string.download_folder_saving
+                                    else R.string.download_folder_save_existing
+                                )
+                            )
+                        },
+                        enabled = !savingDownloads,
+                        onClick = {
+                            savingDownloads = true
+                            coroutineScope.launch {
+                                val ids = downloadUtil.downloads.value
+                                    .filterValues { it.state == Download.STATE_COMPLETED }
+                                    .keys
+                                val saved = downloadUtil.exporter.exportAll(ids)
+                                savingDownloads = false
+                                Toast.makeText(
+                                    context,
+                                    context.resources.getQuantityString(R.plurals.download_folder_saved, saved, saved),
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
+                        },
+                    )
+                } else null,
+                if (downloadFolder.isNotBlank()) {
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.close),
+                        title = { Text(stringResource(R.string.download_folder_stop)) },
+                        description = { Text(stringResource(R.string.download_folder_stop_desc)) },
+                        onClick = {
+                            runCatching {
+                                context.contentResolver.releasePersistableUriPermission(
+                                    downloadFolder.toUri(),
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                                )
+                            }
+                            onDownloadFolderChange("")
+                        },
+                    )
+                } else null,
+            ),
         )
 
         Material3SettingsGroup(
@@ -545,7 +704,7 @@ fun StorageSettings(
     }
 
     TopAppBar(
-        title = { Text(stringResource(R.string.storage)) },
+        title = { Text(stringResource(R.string.storage_and_downloads)) },
         navigationIcon = {
             IconButton(
                 onClick = navController::navigateUp,
@@ -559,3 +718,15 @@ fun StorageSettings(
         },
     )
 }
+
+private fun downloadFolderLabel(context: Context, uriString: String): String =
+    runCatching {
+        val documentId = DocumentsContract.getTreeDocumentId(uriString.toUri())
+        val path = documentId.substringAfter(':', "")
+        val volume = documentId.substringBefore(':')
+        when {
+            path.isNotEmpty() -> path
+            volume == "primary" -> context.getString(R.string.local_files_storage_root)
+            else -> volume
+        }
+    }.getOrDefault(uriString)

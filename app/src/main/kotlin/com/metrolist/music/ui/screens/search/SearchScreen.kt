@@ -77,6 +77,8 @@ import androidx.navigation.NavController
 fun SearchScreen(
     pureBlack: Boolean,
     savedStateHandle: SavedStateHandle,
+    /** Wavelength: "youtube", "spotify" or "library" when opened from that tab's top-bar search. */
+    scope: String? = null,
 ) {
     val navController = LocalNavController.current
     val database = LocalDatabase.current
@@ -125,7 +127,14 @@ fun SearchScreen(
         }
     }
 
-    var searchSource by rememberEnumPreference(SearchSourceKey, SearchSource.ONLINE)
+    var savedSearchSource by rememberEnumPreference(SearchSourceKey, SearchSource.ONLINE)
+    // A tab's own search always searches that tab, without changing the Search tab's choice
+    val forcedSearchSource = when (scope) {
+        "library" -> SearchSource.LOCAL
+        "youtube", "spotify" -> SearchSource.ONLINE
+        else -> null
+    }
+    val searchSource = forcedSearchSource ?: savedSearchSource
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue())
     }
@@ -160,7 +169,7 @@ fun SearchScreen(
             }
 
             null -> {
-                navController.navigate(SearchRoutes.resultRoute(searchQuery))
+                navController.navigate(SearchRoutes.resultRoute(searchQuery, scope?.takeIf { it == "youtube" || it == "spotify" }))
             }
         }
 
@@ -204,9 +213,10 @@ fun SearchScreen(
                                     Text(
                                         text =
                                             stringResource(
-                                                when (searchSource) {
-                                                    SearchSource.LOCAL -> R.string.search_library
-                                                    SearchSource.ONLINE -> R.string.search_yt_music
+                                                when {
+                                                    scope == "spotify" -> R.string.search_spotify_hint
+                                                    searchSource == SearchSource.LOCAL -> R.string.search_library
+                                                    else -> R.string.search_yt_music
                                                 },
                                             ),
                                         style =
@@ -238,9 +248,9 @@ fun SearchScreen(
                                     )
                                 }
                             }
-                            IconButton(
+                            if (forcedSearchSource == null) IconButton(
                                 onClick = {
-                                    searchSource =
+                                    savedSearchSource =
                                         if (searchSource == SearchSource.ONLINE) {
                                             SearchSource.LOCAL
                                         } else {

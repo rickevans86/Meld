@@ -39,6 +39,7 @@ import com.metrolist.music.ui.component.ReleaseNotesCard
 import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.utils.Updater
 import androidx.compose.runtime.remember
+import com.metrolist.music.utils.UpdateInstaller
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -142,13 +143,28 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Wavelength features that can be switched off
+        Material3SettingsGroup(
+            title = stringResource(R.string.app_name),
+            items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.tune),
+                    title = { Text(stringResource(R.string.features)) },
+                    description = { Text(stringResource(R.string.features_entry_desc)) },
+                    onClick = { navController.navigate("settings/features") }
+                )
+            )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Storage & Data Section
         Material3SettingsGroup(
             title = stringResource(R.string.settings_section_storage),
             items = listOf(
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.storage),
-                    title = { Text(stringResource(R.string.storage)) },
+                    title = { Text(stringResource(R.string.storage_and_downloads)) },
                     onClick = { navController.navigate("settings/storage") }
                 ),
                 Material3SettingsItem(
@@ -254,7 +270,7 @@ fun SettingsScreen(
                                     )
                                 },
                                 showBadge = true,
-                                onClick = { uriHandler.openUri(downloadUrl) }
+                                onClick = { UpdateInstaller.start(context, downloadUrl) }
                             )
                         )
                     }

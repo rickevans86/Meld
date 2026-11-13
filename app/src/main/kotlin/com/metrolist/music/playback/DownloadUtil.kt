@@ -28,6 +28,7 @@ import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertubex.extraction.ContentHints
 import com.metrolist.music.constants.AudioQuality
 import com.metrolist.music.constants.AudioQualityKey
+import com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.AlbumEntity
 import com.metrolist.music.db.entities.FormatEntity
@@ -38,10 +39,16 @@ import com.metrolist.music.di.PlayerCache
 import com.metrolist.music.models.MediaMetadata
 import com.metrolist.music.models.toMediaMetadata
 import com.metrolist.music.utils.InnerTubeXPlayer
+import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.enumPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.SupervisorJob
@@ -51,6 +58,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -93,6 +101,8 @@ constructor(
 
     val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
 
+    val exporter = DownloadExporter(context, database, downloadCache)
+
     private val dataSourceFactory =
         ResolvingDataSource.Factory(
             CacheDataSource
@@ -105,6 +115,27 @@ constructor(
         ) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
             val length = if (dataSpec.length >= 0) dataSpec.length else 1
+
+            // Podcast-feed episodes download straight from the feed's audio URL
+            if (mediaId.startsWith(PODCAST_EPISODE_ID_PREFIX)) {
+                val audioUrl = runBlocking(Dispatchers.IO) { database.getSongById(mediaId)?.song?.localPath }
+                    ?: error("No audio URL for $mediaId")
+                return@Factory dataSpec.withUri(audioUrl.toUri())
+            }
+
+            // Navidrome / Subsonic songs download the original file from the server
+            if (com.metrolist.music.constants.isSubsonicId(mediaId)) {
+                val uri = com.metrolist.music.subsonic.SubsonicRepository.from(context).streamUri(mediaId, original = true)
+                    ?: error("Not signed in to the music server")
+                return@Factory dataSpec.withUri(uri)
+            }
+            // Jellyfin / Plex songs download the original file from the server
+            if (com.metrolist.music.constants.isMediaServerId(mediaId)) {
+                val uri = com.metrolist.music.mediaserver.MediaServerRepository.from(context).streamUri(mediaId)
+                    ?: error("Not signed in to Jellyfin or Plex")
+                return@Factory dataSpec.withUri(uri)
+            }
+            if (com.metrolist.music.constants.isRadioId(mediaId)) error("Live radio can't be downloaded")
 
             if (playerCache.isCached(mediaId, dataSpec.position, length)) {
                 return@Factory dataSpec
@@ -258,6 +289,7 @@ constructor(
                                 Download.STATE_COMPLETED -> {
                                     removeFromPlayerCache(download.request.id)
                                     database.updateDownloadedInfo(download.request.id, true, LocalDateTime.now())
+                                    exporter.export(download.request.id)
                                 }
                                 Download.STATE_FAILED,
                                 Download.STATE_STOPPED,
@@ -295,6 +327,22 @@ constructor(
         }
 
     init {
+        // Wi-Fi only: the download manager pauses downloads off unmetered networks and resumes them on Wi-Fi
+        CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+            context.dataStore.data
+                .map { it[com.metrolist.music.constants.DownloadWifiOnlyKey] ?: false }
+                .distinctUntilChanged()
+                .collect { wifiOnly ->
+                    downloadManager.requirements = androidx.media3.exoplayer.scheduler.Requirements(
+                        if (wifiOnly) {
+                            androidx.media3.exoplayer.scheduler.Requirements.NETWORK_UNMETERED
+                        } else {
+                            androidx.media3.exoplayer.scheduler.Requirements.NETWORK
+                        },
+                    )
+                }
+        }
+
         val result = mutableMapOf<String, Download>()
         downloadManager.downloadIndex.getDownloads().use { cursor ->
             while (cursor.moveToNext()) {
@@ -306,6 +354,20 @@ constructor(
             result.values
                 .filter { it.state == Download.STATE_COMPLETED }
                 .forEach { removeFromPlayerCache(it.request.id) }
+        }
+        // When downloaded songs are added to playlists or liked, copy them into the matching folders
+        scope.launch {
+            @OptIn(FlowPreview::class)
+            combine(database.playlistSongMapCount(), database.likedSongsCount()) { playlists, liked -> playlists to liked }
+                .distinctUntilChanged()
+                .drop(1)
+                .debounce(15_000)
+                .collect {
+                    if (exporter.folderUri() != null && exporter.sortsByPlaylist()) {
+                        val completed = downloads.value.filterValues { it.state == Download.STATE_COMPLETED }.keys
+                        exporter.exportAll(completed)
+                    }
+                }
         }
     }
 
@@ -379,6 +441,24 @@ constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Downloads without starting the download service (which Android blocks from the background),
+     * for scheduled auto-downloads. The download runs while the app's process is alive.
+     */
+    suspend fun downloadInBackground(song: Song) {
+        val metadata = song.toMediaMetadata()
+        val request = DownloadRequest
+            .Builder(metadata.id, metadata.id.toUri())
+            .setCustomCacheKey(metadata.id)
+            .setData(metadata.title.toByteArray())
+            .build()
+        withContext(Dispatchers.Main) { downloadManager.addDownload(request) }
+    }
+
+    suspend fun removeInBackground(songId: String) {
+        withContext(Dispatchers.Main) { downloadManager.removeDownload(songId) }
     }
 
     fun download(songId: String) {

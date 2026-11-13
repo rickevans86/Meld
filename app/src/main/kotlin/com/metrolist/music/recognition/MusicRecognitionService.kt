@@ -133,6 +133,8 @@ object MusicRecognitionService {
                 onSuccess = { recognitionResult ->
                     Timber.tag(TAG).i("Recognition successful: '%s' by %s", recognitionResult.title, recognitionResult.artist)
                     _recognitionStatus.value = RecognitionStatus.Success(recognitionResult)
+                    // Add it to the playlist chosen in Settings → Features → Song recognition (if set)
+                    RecognisedSongs.onRecognised(context, recognitionResult)
                 },
                 onFailure = { error ->
                     val message = error.message ?: "Unknown error"

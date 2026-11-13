@@ -5,6 +5,7 @@
 
 package com.metrolist.music.ui.menu
 
+import com.metrolist.music.constants.libraryPinMenuItem
 import android.content.Intent
 import android.content.res.Configuration
 import android.widget.Toast
@@ -472,9 +473,30 @@ fun PlaylistMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
+            // Pins this playlist to the top of the Library
+            val libraryPin = libraryPinMenuItem("playlist:${playlist.id}", onDismiss)
+            // Auto-download new songs (checked every few hours; switching on downloads what's there now)
+            val autoDownloadIds = com.metrolist.music.playback.PlaylistAutoDownload.rememberEnabledIds()
+            val autoDownloadOn = playlist.id in autoDownloadIds
+            val autoDownloadContext = androidx.compose.ui.platform.LocalContext.current
+            val autoDownloadItem = Material3MenuItemData(
+                title = {
+                    Text(stringResource(if (autoDownloadOn) R.string.playlist_auto_download_off else R.string.playlist_auto_download_on))
+                },
+                icon = { Icon(painter = painterResource(R.drawable.download), contentDescription = null) },
+                onClick = {
+                    val app = autoDownloadContext.applicationContext
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        com.metrolist.music.playback.PlaylistAutoDownload.setEnabled(app, playlist.id, !autoDownloadOn)
+                    }
+                    onDismiss()
+                },
+            )
             Material3MenuGroup(
                 items =
                     buildList {
+                        add(libraryPin)
+                        if (autoPlaylist != true) add(autoDownloadItem)
                         if (editable && autoPlaylist != true && !isGuest) {
                             add(
                                 Material3MenuItemData(

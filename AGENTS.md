@@ -274,3 +274,15 @@ git checkout -b rebase-attempt backup-my-work  # start over
 - **If a single cherry-pick produces more than 5 conflicts in custom files**: stop, report it, and wait for instructions before proceeding.
 - **Progress log**: maintain a `rebase_progress.log` file recording each applied commit, its status (SAFE/RESOLVED/SKIPPED), and any relevant notes.
 - Speed is never the goal. It is better to spend 10 hours and produce a perfect result than to risk losing even a single line of custom code.
+
+## Shared AI collaboration protocol
+
+Read all relevant `.ai/` records at session start; identify as ChatGPT, Claude or Codex. Refresh remote refs, open Issues, PRs and recent commits before selecting work. GitHub Issues own assignments/status; commits and PRs own implementation history. `.ai/` files summarize these and must never invent progress.
+
+Check for overlapping work, claim an unclaimed GitHub Issue and verify the update before implementation. If Issues are disabled, report the blocker and record a clearly temporary local task; do not imply a remote claim succeeded. Preserve other agents' changes. Track planned edits in `.ai/FILE_OWNERSHIP.md`.
+
+Use small feature branches, relevant tests and reviewed diffs. Commit/push/open PRs only with authorization; do not merge to main without authorization or force-push shared branches. Attribute reports/commits to the AI that did the work, including task reference, files, tests, commit/PR and outstanding issues.
+
+Maintain PROJECT_STATE, TASK_BOARD, AI_ACTIVITY_LOG, HANDOFF, DECISIONS and FILE_OWNERSHIP under `.ai/`. Handoffs record agent, completed/in-progress work, branch/PR, tests, blockers, next action, shared-record updates and remote synchronization. Without repository access, provide an unapplied handoff and clearly state verification limits.
+
+The user explicitly requested these coordination documents and authorized publishing the audiobook phone-player work to main and releasing it. Preserve existing instructions and project history.

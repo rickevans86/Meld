@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -124,6 +125,11 @@ fun SongMenu(
     val songState = database.song(originalSong.id).collectAsStateWithLifecycle(initialValue = originalSong)
     val song = songState.value ?: originalSong
     val downloadUtil = LocalDownloadUtil.current
+    // Podcast-feed episodes, audiobooks and local files aren't YouTube songs: hide YouTube-only actions
+    val isFromYouTube = !com.metrolist.music.constants.isOnDeviceMediaId(originalSong.id)
+    // Live radio can't be downloaded; Subsonic songs star on the server when liked
+    val isRadio = com.metrolist.music.constants.isRadioId(originalSong.id)
+    val isSubsonic = com.metrolist.music.constants.isSubsonicId(originalSong.id)
     val download by downloadUtil
         .getDownload(originalSong.id)
         .collectAsStateWithLifecycle(initialValue = null)
@@ -494,7 +500,7 @@ fun SongMenu(
                                 ),
                             )
                         }
-                        coroutineScope.launch(Dispatchers.IO) {
+                        if (isFromYouTube) coroutineScope.launch(Dispatchers.IO) {
                             if (isCurrentlySaved) {
                                 val setVideoIdEntity = database.getSetVideoId(song.id)
                                 val setVideoId = setVideoIdEntity?.setVideoId
@@ -529,7 +535,11 @@ fun SongMenu(
                         database.query {
                             update(s)
                         }
-                        syncUtils.likeSong(s)
+                        if (isFromYouTube) {
+                            syncUtils.likeSong(s)
+                        } else if (isSubsonic) {
+                            com.metrolist.music.subsonic.SubsonicRepository.from(context).starLater(s.id, s.liked)
+                        }
                     }
                 },
             ) {
@@ -612,12 +622,19 @@ fun SongMenu(
                                     Intent().apply {
                                         action = Intent.ACTION_SEND
                                         type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/watch?v=${song.id}")
+                                        putExtra(
+                                            Intent.EXTRA_TEXT,
+                                            if (isFromYouTube) {
+                                                "https://music.youtube.com/watch?v=${song.id}"
+                                            } else {
+                                                song.song.localPath ?: song.song.title
+                                            },
+                                        )
                                     }
                                 context.startActivity(Intent.createChooser(intent, null))
                             },
                         ),
-                    ) + if (com.metrolist.spotify.Spotify.isAuthenticated()) {
+                    ) + if (isFromYouTube && com.metrolist.spotify.Spotify.isAuthenticated()) {
                         listOf(
                             NewAction(
                                 icon = {
@@ -670,7 +687,7 @@ fun SongMenu(
                         } else {
                             null
                         },
-                        if (!isGuest) {
+                        if (!isGuest && isFromYouTube) {
                             Material3MenuItemData(
                                 title = { Text(text = stringResource(R.string.start_radio)) },
                                 description = { Text(text = stringResource(R.string.start_radio_desc)) },
@@ -817,9 +834,11 @@ fun SongMenu(
                                                 )
                                             }
 
-                                            // Sync with YouTube (handles login check internally)
-                                            val setVideoId = if (isEpisodeSaved) database.getSetVideoId(song.id)?.setVideoId else null
-                                            syncUtils.saveEpisode(song.id, shouldBeSaved, setVideoId)
+                                            // Sync with YouTube (handles login check internally); podcast-feed episodes stay local
+                                            if (isFromYouTube) {
+                                                val setVideoId = if (isEpisodeSaved) database.getSetVideoId(song.id)?.setVideoId else null
+                                                syncUtils.saveEpisode(song.id, shouldBeSaved, setVideoId)
+                                            }
                                         }
                                         onDismiss()
                                     },
@@ -966,9 +985,37 @@ fun SongMenu(
             )
         }
 
+        // Podcast episodes: mark played / unplayed (Wavelength)
+        if (song.song.isEpisode || song.id.startsWith(com.metrolist.music.constants.PODCAST_EPISODE_ID_PREFIX)) {
+            item { Spacer(modifier = Modifier.height(12.dp)) }
+            item {
+                com.metrolist.music.podcasts.PlayedEpisodes.init(context)
+                val playedSet by com.metrolist.music.podcasts.PlayedEpisodes.played.collectAsState()
+                val isPlayed = song.id in playedSet
+                Material3MenuGroup(
+                    items = listOf(
+                        Material3MenuItemData(
+                            title = { Text(stringResource(if (isPlayed) R.string.mark_unplayed else R.string.mark_played)) },
+                            icon = {
+                                Icon(
+                                    painter = painterResource(if (isPlayed) R.drawable.radio_button_unchecked else R.drawable.check_circle),
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                com.metrolist.music.podcasts.PlayedEpisodes.set(context, song.id, !isPlayed)
+                                coroutineScope.launch(Dispatchers.IO) { database.updatePlaybackPosition(song.id, null) }
+                                onDismiss()
+                            },
+                        ),
+                    ),
+                )
+            }
+        }
+
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
-        item {
+        if (!isRadio) item {
             Material3MenuGroup(
                 items =
                     listOf(

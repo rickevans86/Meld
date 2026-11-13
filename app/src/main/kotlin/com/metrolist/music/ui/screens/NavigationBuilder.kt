@@ -58,6 +58,7 @@ import com.metrolist.music.ui.screens.settings.SponsorBlockSettings
 import com.metrolist.music.ui.screens.settings.PrivacySettings
 import com.metrolist.music.ui.screens.settings.RomanizationSettings
 import com.metrolist.music.ui.screens.settings.SettingsScreen
+import com.metrolist.music.ui.screens.settings.LocalMusicFoldersSettings
 import com.metrolist.music.ui.screens.settings.StorageSettings
 import com.metrolist.music.ui.screens.settings.ThemeScreen
 import com.metrolist.music.ui.screens.settings.UpdaterScreen
@@ -103,6 +104,79 @@ fun NavGraphBuilder.navigationBuilder(
 
     composable(Screens.Library.route) {
         LibraryScreen()
+    }
+
+    // Top-bar search on the home and library tabs: searches only that tab's source
+    // (youtube, spotify or library), in the same layout as the Search tab
+    composable(
+        route = "page_search/{scope}",
+        arguments = listOf(navArgument("scope") { type = NavType.StringType }),
+    ) { backStackEntry ->
+        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
+        val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
+        val isSystemInDarkTheme = isSystemInDarkTheme()
+        val useDarkTheme = if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
+        SearchScreen(
+            pureBlack = pureBlackEnabled && useDarkTheme,
+            savedStateHandle = backStackEntry.savedStateHandle,
+            scope = backStackEntry.arguments?.getString("scope"),
+        )
+    }
+
+    // The home that isn't the default one (YouTube or Spotify), opened from the side menu
+    composable(
+        route = "home_alt",
+        arguments = listOf(navArgument("alt") { type = NavType.BoolType; defaultValue = true }),
+    ) {
+        HomeScreen(snackbarHostState = snackbarHostState)
+    }
+
+    composable(Screens.Podcasts.route) {
+        com.metrolist.music.ui.screens.library.LibraryPodcastsScreen(navController, onDeselect = null)
+    }
+
+    composable(Screens.News.route) {
+        com.metrolist.music.ui.screens.podcast.NewsScreen(navController)
+    }
+
+    composable("new_episodes") {
+        com.metrolist.music.ui.screens.podcast.NewEpisodesScreen(navController)
+    }
+
+    composable("local_files") {
+        com.metrolist.music.ui.screens.library.local.LocalFilesScreen(navController, filterContent = {})
+    }
+
+    composable("radio") {
+        com.metrolist.music.ui.screens.radio.RadioScreen(navController)
+    }
+
+    composable(
+        route = "radio_web?url={url}",
+        arguments = listOf(
+            navArgument("url") {
+                type = NavType.StringType
+                defaultValue = "https://streamurl.link/"
+            },
+        ),
+    ) { backStackEntry ->
+        com.metrolist.music.ui.screens.radio.RadioWebScreen(
+            navController,
+            startUrl = backStackEntry.arguments?.getString("url") ?: "https://streamurl.link/",
+        )
+    }
+
+    composable("subsonic") {
+        com.metrolist.music.ui.screens.subsonic.SubsonicScreen(navController)
+    }
+
+    // Jellyfin / Plex music
+    composable("media_server") {
+        com.metrolist.music.ui.screens.mediaserver.MediaServerScreen(navController)
+    }
+
+    composable(Screens.Audiobooks.route) {
+        com.metrolist.music.ui.screens.library.audiobooks.AudiobooksScreen(navController, filterContent = {})
     }
 
     composable(Screens.ListenTogether.route) {
@@ -155,11 +229,16 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     composable(
-        route = "search/{query}",
+        route = com.metrolist.music.utils.SearchRoutes.ROUTE,
         arguments =
             listOf(
                 navArgument("query") {
                     type = NavType.StringType
+                },
+                navArgument("source") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 },
             ),
         enterTransition = {
@@ -392,8 +471,36 @@ fun NavGraphBuilder.navigationBuilder(
         SponsorBlockSettings(navController)
     }
 
+    composable("settings/features") {
+        com.metrolist.music.ui.screens.settings.FeaturesSettings(navController)
+    }
+
     composable("settings/storage") {
         StorageSettings(navController)
+    }
+
+    composable("settings/local_folders") {
+        LocalMusicFoldersSettings(navController)
+    }
+
+    composable("news_sources") {
+        com.metrolist.music.ui.screens.podcast.NewsSourcesScreen(navController)
+    }
+
+    composable(
+        route = "podcast_directory?feed={feed}",
+        arguments = listOf(
+            navArgument("feed") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+        ),
+    ) { backStackEntry ->
+        com.metrolist.music.ui.screens.podcast.PodcastDirectoryScreen(
+            navController = navController,
+            initialFeedUrl = backStackEntry.arguments?.getString("feed"),
+        )
     }
 
     composable("settings/privacy") {

@@ -133,6 +133,10 @@ class App :
         InnerTubeXPlayer.initialize(this)
 
         // Pre-read Coil cache size on background to avoid runBlocking in newImageLoader
+        // Wavelength: new installs start with only YouTube and Library switched on
+        applicationScope.launch(Dispatchers.IO) {
+            runCatching { com.metrolist.music.constants.settleFeatureDefaults(this@App) }
+        }
         applicationScope.launch(Dispatchers.IO) {
             cachedCoilCacheSize = dataStore.data.map { it[MaxImageCacheSizeKey] ?: 512 }.first()
         }

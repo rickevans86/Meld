@@ -5,6 +5,8 @@
 
 package com.metrolist.music.ui.screens.settings
 
+import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -62,24 +64,38 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlin.math.roundToInt
 
 enum class AndroidAutoSection(val id: String) {
-    SPOTIFY_LIKED("spotify_liked"),
-    SPOTIFY_PLAYLISTS("spotify_playlists"),
-    LIKED("liked"),
+    CONTINUE("continue"),
+    /** Spotify: liked songs pinned first, then Spotify playlists (was two pages). */
+    SPOTIFY("spotify"),
+    /** YouTube: liked songs pinned first, then downloads and YouTube playlists (was two pages). */
+    YOUTUBE("youtube"),
     SONGS("songs"),
     ARTISTS("artists"),
     ALBUMS("albums"),
-    PLAYLISTS("playlists"),
+    LOCAL_FILES("local_files"),
+    AUDIOBOOKS("audiobooks"),
+    PODCASTS("podcasts"),
+    NEWS("news"),
+    RADIO("radio"),
+    SUBSONIC("subsonic"),
+    MEDIA_SERVER("media_server"),
 }
 
 @Composable
 fun AndroidAutoSection.label(): String = when (this) {
-    AndroidAutoSection.LIKED -> stringResource(R.string.liked_songs)
+    AndroidAutoSection.YOUTUBE -> stringResource(R.string.auto_youtube)
     AndroidAutoSection.SONGS -> stringResource(R.string.songs)
     AndroidAutoSection.ARTISTS -> stringResource(R.string.artists)
     AndroidAutoSection.ALBUMS -> stringResource(R.string.albums)
-    AndroidAutoSection.PLAYLISTS -> stringResource(R.string.playlists)
-    AndroidAutoSection.SPOTIFY_LIKED -> stringResource(R.string.spotify_liked_songs)
-    AndroidAutoSection.SPOTIFY_PLAYLISTS -> stringResource(R.string.spotify_playlists)
+    AndroidAutoSection.SPOTIFY -> stringResource(R.string.auto_spotify)
+    AndroidAutoSection.LOCAL_FILES -> stringResource(R.string.local_files)
+    AndroidAutoSection.AUDIOBOOKS -> stringResource(R.string.filter_audiobooks)
+    AndroidAutoSection.PODCASTS -> stringResource(R.string.filter_podcasts)
+    AndroidAutoSection.NEWS -> stringResource(R.string.news_briefing)
+    AndroidAutoSection.RADIO -> stringResource(R.string.radio_tab)
+    AndroidAutoSection.CONTINUE -> stringResource(R.string.auto_continue_listening)
+    AndroidAutoSection.SUBSONIC -> stringResource(R.string.subsonic_tab)
+    AndroidAutoSection.MEDIA_SERVER -> stringResource(R.string.media_server_tab)
 }
 
 fun serializeSections(sections: List<Pair<AndroidAutoSection, Boolean>>): String =
@@ -87,19 +103,27 @@ fun serializeSections(sections: List<Pair<AndroidAutoSection, Boolean>>): String
 
 fun deserializeSections(raw: String): List<Pair<AndroidAutoSection, Boolean>> {
     if (raw.isBlank()) return AndroidAutoSection.values().map { it to true }
-    val parsed = raw.split(",").mapNotNull { token ->
+    // Liked songs + Playlists became one YouTube page, and the two Spotify pages one Spotify page.
+    // The merged page takes the place of whichever old page came first and is on if either was on.
+    val merged = mapOf("liked" to "youtube", "playlists" to "youtube", "spotify_liked" to "spotify", "spotify_playlists" to "spotify")
+    val tokens = raw.split(",").mapNotNull { token ->
         val parts = token.split(":")
         if (parts.size != 2) return@mapNotNull null
-        val section = AndroidAutoSection.values().find { it.id == parts[0] } ?: return@mapNotNull null
-        val enabled = parts[1].toBooleanStrictOrNull() ?: true
-        section to enabled
+        (merged[parts[0]] ?: parts[0]) to (parts[1].toBooleanStrictOrNull() ?: true)
+    }
+    val anyOn = tokens.groupBy({ it.first }, { it.second }).mapValues { (_, flags) -> flags.any { it } }
+    val parsed = tokens.map { it.first }.distinct().mapNotNull { id ->
+        val section = AndroidAutoSection.values().find { it.id == id } ?: return@mapNotNull null
+        section to (anyOn[id] ?: true)
     }
     // Append any new enum values not yet in the user's saved preferences
     val known = parsed.map { it.first }.toSet()
     val newSections = AndroidAutoSection.values()
         .filter { it !in known }
         .map { it to true }
-    return parsed + newSections
+    // Continue listening goes first when it's new to someone's list; other new sections go last
+    return newSections.filter { it.first == AndroidAutoSection.CONTINUE } + parsed +
+        newSections.filter { it.first != AndroidAutoSection.CONTINUE }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -146,7 +170,7 @@ fun AndroidAutoSettings(
     val visibleSections = remember(sections, spotifyLoggedIn) {
         if (spotifyLoggedIn) sections
         else sections.filterNot { (s, _) ->
-            s == AndroidAutoSection.SPOTIFY_LIKED || s == AndroidAutoSection.SPOTIFY_PLAYLISTS
+            s == AndroidAutoSection.SPOTIFY
         }
     }
 
@@ -156,7 +180,7 @@ fun AndroidAutoSettings(
         val toReal = to.index
         val visible = if (spotifyLoggedIn) sections
             else sections.filterNot { (s, _) ->
-                s == AndroidAutoSection.SPOTIFY_LIKED || s == AndroidAutoSection.SPOTIFY_PLAYLISTS
+                s == AndroidAutoSection.SPOTIFY
             }
         if (fromReal in visible.indices && toReal in visible.indices) {
             val movedVisible = visible.toMutableList().apply { add(toReal, removeAt(fromReal)) }
@@ -211,13 +235,19 @@ fun AndroidAutoSettings(
                             Material3SettingsItem(
                                 icon = painterResource(
                                     when (section) {
-                                        AndroidAutoSection.LIKED -> R.drawable.favorite
+                                        AndroidAutoSection.YOUTUBE -> R.drawable.library_music_outlined
                                         AndroidAutoSection.SONGS -> R.drawable.music_note
                                         AndroidAutoSection.ARTISTS -> R.drawable.artist
                                         AndroidAutoSection.ALBUMS -> R.drawable.album
-                                        AndroidAutoSection.PLAYLISTS -> R.drawable.queue_music
-                                        AndroidAutoSection.SPOTIFY_LIKED -> R.drawable.favorite
-                                        AndroidAutoSection.SPOTIFY_PLAYLISTS -> R.drawable.spotify
+                                        AndroidAutoSection.SPOTIFY -> R.drawable.spotify
+                                        AndroidAutoSection.LOCAL_FILES -> R.drawable.folder
+                                        AndroidAutoSection.AUDIOBOOKS -> R.drawable.audiobook
+                                        AndroidAutoSection.PODCASTS -> R.drawable.mic
+                                        AndroidAutoSection.NEWS -> R.drawable.newspaper
+                                        AndroidAutoSection.RADIO -> R.drawable.radio
+                                        AndroidAutoSection.CONTINUE -> R.drawable.history
+                                        AndroidAutoSection.SUBSONIC -> R.drawable.dns
+                                        AndroidAutoSection.MEDIA_SERVER -> R.drawable.dns
                                     }
                                 ),
                                 title = { Text(section.label()) },
@@ -395,6 +425,8 @@ fun AndroidAutoSettings(
         )
 
         Spacer(Modifier.height(27.dp))
+        ContinueListeningManager()
+        Spacer(Modifier.height(27.dp))
     }
 
     TopAppBar(
@@ -411,4 +443,113 @@ fun AndroidAutoSettings(
             }
         },
     )
+}
+
+/**
+ * Settings → Android Auto → Continue listening: shows what Android Auto's Continue listening lists, with
+ * a button to remove each one, and a way to bring removed items back. A removed episode also comes back
+ * by itself once it's played again.
+ */
+@Composable
+private fun ContinueListeningManager() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var open by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var items by remember { androidx.compose.runtime.mutableStateOf<List<com.metrolist.music.playback.AutoLibraryExtras.ContinueItem>?>(null) }
+    val extras = remember(context) {
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            com.metrolist.music.playback.AutoLibraryExtras.Companion.Access::class.java,
+        ).autoLibraryExtras()
+    }
+    fun reload() {
+        scope.launch {
+            items = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { extras.continueItems() }.getOrDefault(emptyList())
+            }
+        }
+    }
+
+    Material3SettingsGroup(
+        title = stringResource(R.string.auto_continue_listening),
+        items = listOf(
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.history),
+                title = { Text(stringResource(R.string.continue_manage)) },
+                description = { Text(stringResource(R.string.continue_manage_desc)) },
+                onClick = {
+                    open = true
+                    items = null
+                    reload()
+                },
+            ),
+        ),
+    )
+
+    if (open) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.auto_continue_listening)) },
+            text = {
+                val list = items
+                when {
+                    list == null -> androidx.compose.material3.CircularProgressIndicator()
+                    list.isEmpty() -> Text(stringResource(R.string.continue_empty))
+                    else -> androidx.compose.foundation.lazy.LazyColumn(Modifier.height(360.dp)) {
+                        items(list.size, key = { list[it].key }) { index ->
+                            val item = list[index]
+                            Row(
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            ) {
+                                coil3.compose.AsyncImage(
+                                    model = item.artwork,
+                                    contentDescription = null,
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
+                                )
+                                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                    Text(item.title, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                    item.subtitle?.let {
+                                        Text(
+                                            it,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
+                                androidx.compose.material3.IconButton(
+                                    onClick = {
+                                        scope.launch {
+                                            com.metrolist.music.playback.AutoLibraryExtras.hideFromContinue(context, item.key)
+                                            items = items?.filterNot { it.key == item.key }
+                                        }
+                                    },
+                                ) {
+                                    Icon(painterResource(R.drawable.close), contentDescription = stringResource(R.string.continue_remove))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { open = false }) { Text(stringResource(R.string.podcast_playlists_done)) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        scope.launch {
+                            com.metrolist.music.playback.AutoLibraryExtras.restoreContinue(context)
+                            reload()
+                        }
+                    },
+                ) { Text(stringResource(R.string.continue_restore)) }
+            },
+        )
+    }
 }

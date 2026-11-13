@@ -520,6 +520,7 @@ fun AutoPlaylistScreen(
                                 onShowRemoveDownloadDialog = { showRemoveDownloadDialog = true },
                                 menuState = menuState,
                                 modifier = Modifier.animateItem(),
+                                playlistId = playlistId,
                             )
                         }
                     }
@@ -817,6 +818,7 @@ private fun AutoPlaylistHeader(
     onShowRemoveDownloadDialog: () -> Unit,
     menuState: com.metrolist.music.ui.component.MenuState,
     modifier: Modifier = Modifier,
+    playlistId: String? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val context = LocalContext.current
@@ -980,6 +982,7 @@ private fun AutoPlaylistHeader(
                             onDismiss = { menuState.dismiss() },
                             songs = songs,
                             playlistName = name,
+                            autoPlaylistId = playlistId,
                         )
                     }
                 },
