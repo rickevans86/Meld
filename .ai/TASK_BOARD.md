@@ -26,3 +26,5 @@ Next unclaimed follow-up: CI-NIGHTLY-SIGNING (proposed temporary ID).
 No open PRs or current Issue claims were found at audit start. Physical-device validation of the audiobook release is another outstanding owner-assisted follow-up. No additional remote work by ChatGPT or Claude was observed on the available branches since the recorded commits.
 
 The user selected AUTO-AUDIOBOOKS after the audit; CI-NIGHTLY-SIGNING remains an unassigned, blocked follow-up. PR #3 changes application code; PR #2 owns these root coordination-record updates, avoiding file conflicts.
+
+PHONE-AUDIOBOOK-TABS — Claude — merged and released as [Wavelength 0.9.2.83](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.83) (owner-authorized) from [PR #4](https://github.com/rickevans86/Meld/pull/4), merge e6e32e0c. Delivers phone Library / Downloaded / Listening tabs under the source switch, plus tab order and library sort settings. PR CI run 43411817378 and release run 43413832192 passed. Phone testing is outstanding. Task record: .ai/tasks/PHONE-AUDIOBOOK-TABS.md on main.

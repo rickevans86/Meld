@@ -26,3 +26,5 @@ Branch feat/auto-audiobook-sections, code 11965b3f. Implemented files: AutoAudio
 Root .ai coordination files are updated through this documentation PR #2, not the code PR, so the two PRs do not edit the same files. No signing workflow or credential file is reserved by this feature.
 
 Pagination follow-up (Claude, PR #3, completed; review reservation only): playback/AutoBrowsePaging.kt (new), playback/AutoAudiobookLibrary.kt, playback/AutoLibraryExtras.kt (Downloaded paging), app/src/test/.../playback/AutoBrowsePagingTest.kt (new), .ai/tasks/AUTO-AUDIOBOOKS.md and one WAVELENGTH_CHANGES.md line on the feature branch.
+
+PHONE-AUDIOBOOK-TABS (Claude, PR #4, completed and released; no active lock): audiobooks/AudiobookTabs.kt (new), ui/screens/library/audiobooks/AudiobookTabsUi.kt (new), AudiobooksScreen.kt, AudiobookshelfContent.kt, ui/screens/settings/AudiobookTabSettings.kt (new), FeaturesSettings.kt, AudiobooksViewModel.kt, AudiobookshelfViewModel.kt, AbsClient.kt/AbsRepository.kt (optional sort), default English strings, AudiobookTabsTest, README, WAVELENGTH_CHANGES and the task record.

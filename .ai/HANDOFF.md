@@ -28,7 +28,12 @@ Next action: owner verifies the intended GMS nightly credentials in repository s
 Shared records updated: on this documentation branch, pending review.
 Remote synchronization: confirmed against main 4b1e9295 and all three current remote branch heads. No new remote work by other agents was found at audit start.
 
-## Latest handoff — AUTO-AUDIOBOOKS released (Claude, 2026-11-13)
+## Latest handoff — PHONE-AUDIOBOOK-TABS released (Claude, 2026-11-13)
+
+Released Wavelength 0.9.2.83 (PR #4, merge e6e32e0c, release run 43413832192). The APK was verified as an update: same certificate, version code 280083.
+Next action: the owner updates via Settings → Updater and checks the phone tabs, Sort (including the Audiobookshelf server sort), Continue listening resume and the tab-order setting, plus the 0.9.2.82 car pages. Open items: PR #2 (records) awaits review, and CI-NIGHTLY-SIGNING is unassigned.
+
+## Handoff — AUTO-AUDIOBOOKS released (Claude, 2026-11-13)
 
 Released: Wavelength 0.9.2.82 (https://github.com/rickevans86/Meld/releases/tag/v0.9.2.82). The owner authorized the release. PR #3 was merged into main as 5e6a7b47, and the release run 43408784962 succeeded. The APK was verified as an update to 0.9.2.81: same certificate, com.meld.app.debug, version code 280082. Main is now cc955f6c ([skip ci] records).
 Next action: the owner updates via Settings → Updater and tests the Audiobooks and Downloaded tabs, including the More pages, in the car with Audiobookshelf. PR #2, this records PR, is still open for review. CI-NIGHTLY-SIGNING remains unassigned.

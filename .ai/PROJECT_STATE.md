@@ -37,3 +37,9 @@ The owner instructed "Publish to release". Claude merged PR #3 into main as 5e6a
 Claude downloaded the public APK and checked it: application ID com.meld.app.debug, version code 280082 (previous 280081), and the same signing certificate as 0.9.2.81. Main is now cc955f6c, a release-record commit marked [skip ci].
 
 This is the latest released baseline. Still outstanding: physical Android Auto testing, live Audiobookshelf testing, and CI-NIGHTLY-SIGNING.
+
+## Release 0.9.2.83 — 2026-11-13, Claude
+
+The phone Audiobooks screen now has Library / Downloaded / Listening tabs (Continue listening card, cover grid, Sort) under the On this phone / Audiobookshelf switch. Tab order and library sort are in Settings → Features.
+
+PR #4 was merged into main as e6e32e0c, and release run 43413832192 published Wavelength 0.9.2.83. The APK was verified: com.meld.app.debug, version code 280083, same certificate as before. This is the latest released baseline. Physical phone and car testing of 0.9.2.82–0.9.2.83 are still outstanding.
