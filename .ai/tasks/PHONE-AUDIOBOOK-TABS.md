@@ -20,4 +20,8 @@ Tests: AudiobookTabsTest (6). It covers default and round-trip order, malformed 
 
 Limits: books on the phone have no added date, so the phone source offers Title and Author only (a saved Recently added choice sorts them by title). The concept's in-page search box was not added; the existing top-bar search filters both sources. Physical-device testing has not been done.
 
-Verification: see the "Verification" section below once CI has run.
+Verification:
+- AudiobookTabsTest (6 tests) passed locally. This workspace has no Android SDK, so the tests ran with a standalone Kotlin 2.1.21 compiler and stand-ins for R, DataStore and JUnit. absSortParams was copied verbatim from AbsClient.kt.
+- Every R.string/R.drawable/R.plurals reference in the changed files resolves, and metrolist_strings.xml parses.
+- PR #4 (https://github.com/rickevans86/Meld/pull/4), CI run 43411817378 on 26a1cdfa, passed: full :app:testFossDebugUnitTest and :innertube:test, assembleFossDebug, review APK upload, and :app:lintFossDebug.
+- Not done: physical phone testing and a live Audiobookshelf check of the server sort orders.
