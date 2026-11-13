@@ -14,6 +14,13 @@ fun isAbsTrackId(mediaId: String?): Boolean = mediaId?.startsWith(ABS_TRACK_ID_P
 
 fun isAudiobookId(mediaId: String?): Boolean = mediaId?.startsWith(AUDIOBOOK_ID_PREFIX) == true
 
+/**
+ * Spoken-word media that has its own tab (Podcasts or Audiobooks) and so is kept off the music Home
+ * rows. Audiobook chapters aren't flagged as episodes, so filtering on isEpisode alone misses them.
+ */
+fun isSpokenWordId(mediaId: String?): Boolean =
+    mediaId?.startsWith(AUDIOBOOK_ID_PREFIX) == true || mediaId?.startsWith(PODCAST_EPISODE_ID_PREFIX) == true
+
 /** Podcast episodes played from their public feed: "podcast:<episode hash>". */
 const val PODCAST_EPISODE_ID_PREFIX = "podcast:"
 
