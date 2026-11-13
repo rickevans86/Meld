@@ -81,7 +81,8 @@ jobs:
           echo "FORK_BUILD_NUMBER=${{ github.run_number }}" >> "$GITHUB_ENV"
 
       # A proper release build (not a debuggable test build), signed with the fork's key.
-      # The app id stays com.meld.app.debug so it updates the installed app and keeps its data.
+      # Wavelength has its own app id (from 0.9.2.85). The old id com.meld.app.debug was also Meld's
+      # developer-build id, which made Play Protect warn on install.
       # Retries once, since a dependency download occasionally fails for a moment
       - name: Test audiobook playback
         run: ./gradlew --console=plain :app:testFossDebugUnitTest --tests 'com.metrolist.music.audiobooks.AudiobookPlaybackTest'
@@ -97,7 +98,7 @@ jobs:
         env:
           PULL_REQUEST: "false"
           METROLIST_APP_NAME: Wavelength
-          METROLIST_APPLICATION_ID: com.meld.app.debug
+          METROLIST_APPLICATION_ID: com.rickevans86.wavelength
 
       - name: Collect APK
         run: |

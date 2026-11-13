@@ -13,3 +13,7 @@ Plan (owner approved):
 Not carried over: server sign-ins (encrypted stores), downloaded files, and folder permissions. The FileProvider authority uses ${applicationId}, so both apps can be installed together. Same signing key.
 
 Tests: WavelengthBackupFilesTest (3) covers entry round-trip, that the key files are included, and rejection of other names and path tricks.
+
+Step 1 done: PR #5 passed CI (run 43509729500) and was merged as 27d718ca, publishing 0.9.2.84 with the old ID.
+Step 2 (branch feat/wavelength-new-id): build_local_folders.yml sets METROLIST_APPLICATION_ID to com.rickevans86.wavelength. Held until the owner confirms he has made a backup in 0.9.2.84.
+

@@ -113,6 +113,7 @@ import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
 import com.metrolist.music.constants.AutoRadioQueueKey
+import com.metrolist.music.constants.isYouTubeMediaId
 import com.metrolist.music.constants.GridItemSize
 import com.metrolist.music.constants.GridItemsSizeKey
 import com.metrolist.music.constants.GridThumbnailHeight
@@ -685,10 +686,12 @@ fun HomeScreen(
     val rawRecentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
     val rawForgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
     val rawKeepListening by viewModel.keepListening.collectAsStateWithLifecycle()
-    val quickPicks = remember(rawQuickPicks) { rawQuickPicks?.filterNot { it.song.isEpisode } }
-    val recentlyPlayed = remember(rawRecentlyPlayed) { rawRecentlyPlayed?.filterNot { it.song.isEpisode } }
-    val forgottenFavorites = remember(rawForgottenFavorites) { rawForgottenFavorites?.filterNot { it.song.isEpisode } }
-    val keepListening = remember(rawKeepListening) { rawKeepListening?.filterNot { it is Song && it.song.isEpisode } }
+    // The YouTube home shows only YouTube items; played podcasts, audiobooks, radio, local files,
+    // Subsonic/media-server songs and Spotify items have their own tabs and stay off these rows.
+    val quickPicks = remember(rawQuickPicks) { rawQuickPicks?.filter { isYouTubeMediaId(it.id) && !it.song.isEpisode } }
+    val recentlyPlayed = remember(rawRecentlyPlayed) { rawRecentlyPlayed?.filter { isYouTubeMediaId(it.id) && !it.song.isEpisode } }
+    val forgottenFavorites = remember(rawForgottenFavorites) { rawForgottenFavorites?.filter { isYouTubeMediaId(it.id) && !it.song.isEpisode } }
+    val keepListening = remember(rawKeepListening) { rawKeepListening?.filter { isYouTubeMediaId(it.id) && !(it is Song && it.song.isEpisode) } }
     val rawSimilarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
     // "Similar to" rows: no podcasts or episodes, and no rows based on an episode
     val similarRecommendations = remember(rawSimilarRecommendations) {
@@ -1125,7 +1128,8 @@ fun HomeScreen(
             val list = mutableListOf<HomeSection>()
             val chipActive = selectedChip != null
 
-            if (recentlyPlayed?.isNotEmpty() == true) list.add(HomeSection.RecentlyPlayed)
+            // Recently Played is YouTube history, so it stays off the Spotify-only home
+            if (!isSpotifyHomeOnly && recentlyPlayed?.isNotEmpty() == true) list.add(HomeSection.RecentlyPlayed)
 
             // Show speed dial when we have pinned items (including when Spotify-only home is on)
             if (speedDialItems.isNotEmpty()) list.add(HomeSection.SpeedDial)
