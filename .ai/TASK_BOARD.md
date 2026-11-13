@@ -28,3 +28,6 @@ No open PRs or current Issue claims were found at audit start. Physical-device v
 The user selected AUTO-AUDIOBOOKS after the audit; CI-NIGHTLY-SIGNING remains an unassigned, blocked follow-up. PR #3 changes application code; PR #2 owns these root coordination-record updates, avoiding file conflicts.
 
 PHONE-AUDIOBOOK-TABS — Claude — merged and released as [Wavelength 0.9.2.83](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.83) (owner-authorized) from [PR #4](https://github.com/rickevans86/Meld/pull/4), merge e6e32e0c. Delivers phone Library / Downloaded / Listening tabs under the source switch, plus tab order and library sort settings. PR CI run 43411817378 and release run 43413832192 passed. Phone testing is outstanding. Task record: .ai/tasks/PHONE-AUDIOBOOK-TABS.md on main.
+
+WAVELENGTH-APP-ID — Claude — done, released in 0.9.2.85. Wavelength now builds as com.rickevans86.wavelength (was com.meld.app.debug, which tripped Play Protect). Two steps: 0.9.2.84 added backup coverage + a move guide under the old id; 0.9.2.85 (merge 0a221b60) switched the id and folded in HOME-AUDIOBOOK-FILTER. Installs as a second app; migration guide in-app. Owner still to migrate on-device.
+HOME-AUDIOBOOK-FILTER — Claude — done, released in 0.9.2.85 (folded into PR #6; PR #7 closed). YouTube home rows now show only YouTube items.

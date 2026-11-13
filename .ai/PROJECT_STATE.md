@@ -43,3 +43,11 @@ This is the latest released baseline. Still outstanding: physical Android Auto t
 The phone Audiobooks screen now has Library / Downloaded / Listening tabs (Continue listening card, cover grid, Sort) under the On this phone / Audiobookshelf switch. Tab order and library sort are in Settings → Features.
 
 PR #4 was merged into main as e6e32e0c, and release run 43413832192 published Wavelength 0.9.2.83. The APK was verified: com.meld.app.debug, version code 280083, same certificate as before. This is the latest released baseline. Physical phone and car testing of 0.9.2.82–0.9.2.83 are still outstanding.
+
+## Release 0.9.2.85 — 2026-11-14, Claude
+
+Two changes shipped together as one new-app-ID build (owner backed up first):
+1. WAVELENGTH-APP-ID: application id is now com.rickevans86.wavelength (was com.meld.app.debug, shared with Meld's developer builds → Play Protect warning). 0.9.2.84 first added backup coverage (podcast follows, My stations, starred, played episodes, podcast speeds) and an in-app move guide under the old id; 0.9.2.85 made the id switch. It installs as a SECOND app beside the old one — not an in-place update — so the user restores the backup, signs in to servers again, re-downloads offline media, then removes the old app (the new app guides this).
+2. HOME-AUDIOBOOK-FILTER: the YouTube home's play-history rows (Recently Played, Quick picks, Keep listening, Forgotten favourites) now show only YouTube items. PR #7 was folded into PR #6 and closed.
+
+Merge 0a221b60; release run 43522774134; APK verified id com.rickevans86.wavelength, version code 280085, same signing cert. Main head is the [skip ci] records commit. This is the latest released baseline. Outstanding: the owner's on-device migration, plus physical car/phone testing from earlier releases.
