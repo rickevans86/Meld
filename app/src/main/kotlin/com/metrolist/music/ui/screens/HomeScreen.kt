@@ -681,17 +681,23 @@ fun HomeScreen(
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
+    val spotifyHomeSections by viewModel.spotifyHomeSections.collectAsStateWithLifecycle()
+    val isSpotifyHome by viewModel.useSpotifyHome.collectAsStateWithLifecycle()
+    val isSpotifyHomeOnly by viewModel.spotifyHomeOnly.collectAsStateWithLifecycle()
+    // Each home shows only its own source: YouTube items on the YouTube home, Spotify items on the Spotify home
+    val isCurrentSourceId = { id: String -> if (isSpotifyHome) id.startsWith("spotify:") else isYouTubeMediaId(id) }
+
     // Podcast episodes played locally are left out of Home too (they're in the Podcasts tab)
     val rawQuickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
     val rawRecentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
     val rawForgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
     val rawKeepListening by viewModel.keepListening.collectAsStateWithLifecycle()
-    // The YouTube home shows only YouTube items; played podcasts, audiobooks, radio, local files,
-    // Subsonic/media-server songs and Spotify items have their own tabs and stay off these rows.
-    val quickPicks = remember(rawQuickPicks) { rawQuickPicks?.filter { isYouTubeMediaId(it.id) && !it.song.isEpisode } }
-    val recentlyPlayed = remember(rawRecentlyPlayed) { rawRecentlyPlayed?.filter { isYouTubeMediaId(it.id) && !it.song.isEpisode } }
-    val forgottenFavorites = remember(rawForgottenFavorites) { rawForgottenFavorites?.filter { isYouTubeMediaId(it.id) && !it.song.isEpisode } }
-    val keepListening = remember(rawKeepListening) { rawKeepListening?.filter { isYouTubeMediaId(it.id) && !(it is Song && it.song.isEpisode) } }
+    // Each home keeps only its own source's items (and never podcast episodes); the YouTube play-history
+    // rows are empty on the Spotify home, so they drop out there.
+    val quickPicks = remember(rawQuickPicks, isSpotifyHome) { rawQuickPicks?.filter { isCurrentSourceId(it.id) && !it.song.isEpisode } }
+    val recentlyPlayed = remember(rawRecentlyPlayed, isSpotifyHome) { rawRecentlyPlayed?.filter { isCurrentSourceId(it.id) && !it.song.isEpisode } }
+    val forgottenFavorites = remember(rawForgottenFavorites, isSpotifyHome) { rawForgottenFavorites?.filter { isCurrentSourceId(it.id) && !it.song.isEpisode } }
+    val keepListening = remember(rawKeepListening, isSpotifyHome) { rawKeepListening?.filter { isCurrentSourceId(it.id) && !(it is Song && it.song.isEpisode) } }
     val rawSimilarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
     // "Similar to" rows: no podcasts or episodes, and no rows based on an episode
     val similarRecommendations = remember(rawSimilarRecommendations) {
@@ -713,7 +719,9 @@ fun HomeScreen(
     val allLocalItems by viewModel.allLocalItems.collectAsStateWithLifecycle()
     val allYtItems by viewModel.allYtItems.collectAsStateWithLifecycle()
     val rawSpeedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
-    val speedDialItems = remember(rawSpeedDialItems) { rawSpeedDialItems.filterNot { it.isPodcastLike() } }
+    val speedDialItems = remember(rawSpeedDialItems, isSpotifyHome) {
+        rawSpeedDialItems.filterNot { it.isPodcastLike() }.filter { isCurrentSourceId(it.id) }
+    }
     val pinnedSpeedDialItems by viewModel.pinnedSpeedDialItems.collectAsStateWithLifecycle()
     val selectedChip by viewModel.selectedChip.collectAsStateWithLifecycle()
     // A Podcasts chip picked before podcasts left Home can't be seen any more, so switch it off
@@ -728,9 +736,6 @@ fun HomeScreen(
     val savedPodcastShows by viewModel.savedPodcastShows.collectAsStateWithLifecycle()
     val episodesForLater by viewModel.episodesForLater.collectAsStateWithLifecycle()
 
-    val spotifyHomeSections by viewModel.spotifyHomeSections.collectAsStateWithLifecycle()
-    val isSpotifyHome by viewModel.useSpotifyHome.collectAsStateWithLifecycle()
-    val isSpotifyHomeOnly by viewModel.spotifyHomeOnly.collectAsStateWithLifecycle()
     val pinnedSpeedDialIds by viewModel.pinnedSpeedDialIds.collectAsStateWithLifecycle()
     val spotifyMapper = remember { SpotifyYouTubeMapper(database) }
 
@@ -1113,6 +1118,7 @@ fun HomeScreen(
             randomSeed,
             selectedChip,
             isSpotifyHomeOnly,
+            isSpotifyHome,
             speedDialItems,
             quickPicks,
             recentlyPlayed,
@@ -1128,13 +1134,13 @@ fun HomeScreen(
             val list = mutableListOf<HomeSection>()
             val chipActive = selectedChip != null
 
-            // Recently Played is YouTube history, so it stays off the Spotify-only home
-            if (!isSpotifyHomeOnly && recentlyPlayed?.isNotEmpty() == true) list.add(HomeSection.RecentlyPlayed)
+            // Recently Played is play history, so the Spotify home (its own source only) leaves it out
+            if (!isSpotifyHome && recentlyPlayed?.isNotEmpty() == true) list.add(HomeSection.RecentlyPlayed)
 
-            // Show speed dial when we have pinned items (including when Spotify-only home is on)
+            // Speed dial shows the current source's pins (Spotify pins on the Spotify home)
             if (speedDialItems.isNotEmpty()) list.add(HomeSection.SpeedDial)
 
-            if (!isSpotifyHomeOnly && !chipActive) {
+            if (!isSpotifyHome && !chipActive) {
                 if (quickPicks?.isNotEmpty() == true) list.add(HomeSection.QuickPicks)
                 if (communityPlaylists?.isNotEmpty() == true) list.add(HomeSection.FromTheCommunity)
                 if (dailyDiscover?.isNotEmpty() == true) list.add(HomeSection.DailyDiscover)
@@ -1151,7 +1157,7 @@ fun HomeScreen(
                 list.add(HomeSection.HomePageSection(i))
             }
 
-            if (!isSpotifyHomeOnly && explorePage?.moodAndGenres != null) list.add(HomeSection.MoodAndGenres)
+            if (!isSpotifyHome && explorePage?.moodAndGenres != null) list.add(HomeSection.MoodAndGenres)
 
             if (randomizeHomeOrder) {
                 list.sortedByDescending { section ->
