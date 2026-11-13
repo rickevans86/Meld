@@ -6,6 +6,8 @@ GitHub Issues are authoritative when enabled; currently disabled (HTTP 410). Git
 | --- | --- | --- | --- | --- |
 | AUDIOBOOK-PHONE (temporary ID) | Codex | Completed and released | main / [PR #1](https://github.com/rickevans86/Meld/pull/1) | d3b6df1e, v0.9.2.81; PR checks and signed release workflow passed |
 
+AUTO-AUDIOBOOKS — Codex — implemented, review pending in [PR #3](https://github.com/rickevans86/Meld/pull/3), branch feat/auto-audiobook-sections, code commit 11965b3f. Eight focused tests and local FOSS debug build passed. Dedicated task/acceptance record: [.ai/tasks/AUTO-AUDIOBOOKS.md](https://github.com/rickevans86/Meld/blob/feat/auto-audiobook-sections/.ai/tasks/AUTO-AUDIOBOOKS.md). Issue claim unavailable (Issues disabled). Physical head-unit/live-server verification remains outstanding.
+
 Acceptance met: separate phone chapter controls; configurable 15/30-second default skips; chapters, bookmarks, speed and sleep access; preserved progress/schema; shared coordination records; authorized publication to main and release. Hardware validation remains a manual follow-up.
 
 ## Coordination audit — 2026-11-13
@@ -22,3 +24,5 @@ Next unclaimed follow-up: CI-NIGHTLY-SIGNING (proposed temporary ID).
 - Dependencies: owner verifies/configures the appropriate signing credentials and enables Issues if Issue-based claims are required.
 
 No open PRs or current Issue claims were found at audit start. Physical-device validation of the audiobook release is another outstanding owner-assisted follow-up. No additional remote work by ChatGPT or Claude was observed on the available branches since the recorded commits.
+
+The user selected AUTO-AUDIOBOOKS after the audit; CI-NIGHTLY-SIGNING remains an unassigned, blocked follow-up. PR #3 changes application code; PR #2 owns these root coordination-record updates, avoiding file conflicts.

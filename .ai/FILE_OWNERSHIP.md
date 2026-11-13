@@ -18,3 +18,9 @@ Other agents may work on these files after checking current main and active PRs.
 Task COORDINATION-AUDIT-2026-11-13; branch chore/ai-coordination-audit. Completed file scope: .ai/PROJECT_STATE.md, TASK_BOARD.md, AI_ACTIVITY_LOG.md, HANDOFF.md and FILE_OWNERSHIP.md. Documentation review pending; no application/workflow files reserved.
 
 Proposed CI-NIGHTLY-SIGNING follow-up: .github/workflows/build.yml only after access/ownership is established. No AI currently claims that implementation. The working FOSS release workflow is outside the proposed change scope.
+
+## Active review reservation — AUTO-AUDIOBOOKS, Codex, PR #3
+
+Branch feat/auto-audiobook-sections, code 11965b3f. Implemented files: AutoAudiobookLibrary, AutoLibraryExtras, MediaLibrarySessionCallback, MusicService; AutoAudiobookSections and AutoAudiobookSectionSettings; AndroidAutoSettings; AbsClient/AbsRepository; default English strings, four auto_audiobook_* drawables, three focused tests and .ai/tasks/AUTO-AUDIOBOOKS.md. Keep these changes intact while the feature PR is reviewed. GitHub PRs remain authoritative; no Issue claim succeeded.
+
+Root .ai coordination files are updated through this documentation PR #2, not the code PR, so the two PRs do not edit the same files. No signing workflow or credential file is reserved by this feature.

@@ -27,3 +27,16 @@ Blockers: Issues disabled; signing-secret metadata returned HTTP 403, so current
 Next action: owner verifies the intended GMS nightly credentials in repository settings; then an agent claims CI-NIGHTLY-SIGNING, preserves signing identity, and validates that optional pipeline. Do not ask for secret values in chat. Audiobook device testing remains outstanding.
 Shared records updated: on this documentation branch, pending review.
 Remote synchronization: confirmed against main 4b1e9295 and all three current remote branch heads. No new remote work by other agents was found at audit start.
+
+## Latest feature handoff — AUTO-AUDIOBOOKS
+
+Agent: Codex
+Completed: one flat Android Auto Audiobooks page with grouped grid rows (Continue Listening, Recently Added, Browse, Continue Series); Library/Series/Collections/Playlists tiles; separate Downloaded root for books/podcasts; saved section order/visibility in phone Android Auto settings; real Audiobookshelf browsing, app audiobook playlists, pagination and refresh notifications. Existing resume/playback code is reused.
+In progress: feature PR review and CI verification; no main merge/release authorized for this new feature.
+Branch/PR: feat/auto-audiobook-sections / https://github.com/rickevans86/Meld/pull/3; implementation 11965b3f.
+Files: see FILE_OWNERSHIP.md and the feature's dedicated .ai/tasks/AUTO-AUDIOBOOKS.md record.
+Tests: eight focused tests and local :app:assembleFossDebug passed; diff and edited XML validation passed. PR checks run separately. Car hardware and live-server validation remain outstanding.
+Blockers: Issues disabled, so this task is identified by temporary ID/PR rather than a successful Issue claim. No coding blocker remains. Server-driven shelves require Audiobookshelf; empty/unavailable rows are omitted, and Android Auto owns the final geometry.
+Next action: review/test PR #3 on a car display and connected Audiobookshelf instance; authorize merge/release when ready. PR #2 separately carries these shared-record updates. The optional nightly signing issue remains a separate follow-up.
+Shared records updated: yes, through documentation PR #2; dedicated implementation task record is in PR #3.
+Remote synchronization: main was 4b1e9295; release 0.9.2.81 remains the published baseline. No source work from another AI was overwritten.

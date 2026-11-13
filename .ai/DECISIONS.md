@@ -6,3 +6,5 @@
 - Store bookmarks in app Preferences DataStore. They are device-local.
 - GitHub Issues disabled: explicitly record temporary task identity instead of claiming a successful remote assignment.
 - Publish from main using the existing Wavelength FOSS signing workflow and automatic run-number versioning; preserve app ID/signing certificate. Verified on downloaded release 0.9.2.81, tagged at d3b6df1e. Legacy optional GMS nightly credentials remain a separate follow-up.
+
+- AUTO-AUDIOBOOKS (Codex, PR #3): implement a single Android Auto media-browser child list with standard content-style grid and group-title extras, not a custom car UI. Rows use stable shelf-specific IDs normalized to existing resume routes. Audiobookshelf personalized/category metadata drives server shelves; local-only sources omit unsupported/empty rows. Store row order/visibility in Preferences DataStore; preserve the database schema. Keep root coordination changes in documentation PR #2 and the feature task file in PR #3 to avoid overlapping edits.
