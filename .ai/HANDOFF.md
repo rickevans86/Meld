@@ -28,7 +28,13 @@ Next action: owner verifies the intended GMS nightly credentials in repository s
 Shared records updated: on this documentation branch, pending review.
 Remote synchronization: confirmed against main 4b1e9295 and all three current remote branch heads. No new remote work by other agents was found at audit start.
 
-## Latest handoff — PHONE-AUDIOBOOK-TABS released (Claude, 2026-11-13)
+## Latest handoff — new app ID + YouTube-only home released (Claude, 2026-11-14)
+
+Released Wavelength 0.9.2.85 (merge 0a221b60, run 43522774134): app id com.rickevans86.wavelength and YouTube-only home rows. APK verified — new id, version code 280085, same signing cert. Main head is a [skip ci] records commit.
+On-device migration (owner): install 0.9.2.85 (it is a SECOND app, not an update) -> restore the backup made in 0.9.2.84 -> sign in to Audiobookshelf/media servers and reselect folders -> re-download offline media -> remove the old app (new app guides this). Updates after that are in-place.
+Open items: PR #2 (records) still open for review; CI-NIGHTLY-SIGNING (old GMS "Build APKs") still fails at signing and is unassigned; physical car/phone testing of recent releases not yet done by the owner.
+
+## Earlier handoff — PHONE-AUDIOBOOK-TABS released (Claude, 2026-11-13)
 
 Released Wavelength 0.9.2.83 (PR #4, merge e6e32e0c, release run 43413832192). The APK was verified as an update: same certificate, version code 280083.
 Next action: the owner updates via Settings → Updater and checks the phone tabs, Sort (including the Audiobookshelf server sort), Continue listening resume and the tab-order setting, plus the 0.9.2.82 car pages. Open items: PR #2 (records) awaits review, and CI-NIGHTLY-SIGNING is unassigned.
