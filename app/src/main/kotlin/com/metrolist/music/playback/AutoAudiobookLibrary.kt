@@ -105,7 +105,7 @@ class AutoAudiobookLibrary @Inject constructor(
     }
 
     /** Page [page] of [items], with a More folder opening `[base]/[page + 1]` when items remain. */
-    fun withMore(page: AutoPage<MediaItem>, base: String, number: Int): List<MediaItem> =
+    internal fun withMore(page: AutoPage<MediaItem>, base: String, number: Int): List<MediaItem> =
         if (page.hasMore) page.items + folder("$base/${number + 1}", R.string.auto_audiobook_more, R.drawable.audiobook) else page.items
 
     suspend fun downloaded(): List<MediaItem> = local.books.value.map { bookItem(it) } +
