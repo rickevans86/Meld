@@ -72,6 +72,31 @@ data class AbsProgress(
 
 data class AbsPage(val books: List<AbsBookSummary>, val total: Int)
 
+enum class AbsBrowseKind(val path: String) { SERIES("series"), COLLECTIONS("collections"), PLAYLISTS("playlists") }
+data class AbsBookGroup(val id: String, val name: String, val books: List<AbsBookSummary>)
+data class AbsGroupPage(val groups: List<AbsBookGroup>, val total: Int)
+
+internal fun parseAbsShelves(value: JsonElement): Map<String, List<AbsBookSummary>> =
+    (value as? JsonArray).orEmpty().mapNotNull { element ->
+        val shelf = element.obj ?: return@mapNotNull null
+        if (shelf.string("type") != "book") return@mapNotNull null
+        val id = shelf.string("id") ?: return@mapNotNull null
+        id to shelf.array("entities").orEmpty().mapNotNull { it.obj?.toSummary() }.distinctBy { it.id }
+    }.toMap()
+
+internal fun parseAbsGroups(value: JsonElement, kind: AbsBrowseKind): AbsGroupPage {
+    val root = value.obj
+    val groups = root?.array("results").orEmpty().mapNotNull { element ->
+        val group = element.obj ?: return@mapNotNull null
+        val id = group.string("id")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        val books = if (kind == AbsBrowseKind.PLAYLISTS) {
+            group.array("items").orEmpty().mapNotNull { it.obj?.obj("libraryItem")?.toSummary() }
+        } else group.array("books").orEmpty().mapNotNull { it.obj?.toSummary() }
+        AbsBookGroup(id, group.string("name").orEmpty(), books.distinctBy { it.id })
+    }
+    return AbsGroupPage(groups, root?.get("total")?.primitive?.intOrNull ?: groups.size)
+}
+
 class AbsHttpException(val code: Int, message: String) : IOException(message)
 
 /** Thin client for the Audiobookshelf REST API. All calls run on the IO dispatcher. */
@@ -133,6 +158,12 @@ internal class AbsClient {
         )
     }
 
+    suspend fun shelves(server: String, token: String, libraryId: String) =
+        parseAbsShelves(get(server, token, "api/libraries/$libraryId/personalized"))
+
+    suspend fun groups(server: String, token: String, libraryId: String, kind: AbsBrowseKind, page: Int, limit: Int) =
+        parseAbsGroups(get(server, token, "api/libraries/$libraryId/${kind.path}", "page" to page.toString(), "limit" to limit.toString(), "minified" to "1"), kind)
+
     suspend fun search(server: String, token: String, libraryId: String, query: String): List<AbsBookSummary> =
         get(server, token, "api/libraries/$libraryId/search", "q" to query, "limit" to "30").obj
             ?.array("book").orEmpty()
@@ -164,7 +195,8 @@ internal class AbsClient {
         return AbsBook(
             id = itemId,
             title = metadata?.string("title").orEmpty().ifBlank { "Untitled" },
-            author = metadata?.string("authorName")?.takeIf { it.isNotBlank() },
+            author = metadata?.string("authorName")?.takeIf { it.isNotBlank() }
+                ?: metadata?.array("authors")?.mapNotNull { it.obj?.string("name") }?.joinToString(", ")?.takeIf { it.isNotBlank() },
             narrator = metadata?.string("narratorName")?.takeIf { it.isNotBlank() },
             durationSec = media?.double("duration") ?: 0.0,
             tracks = media?.array("tracks").orEmpty().mapIndexedNotNull { position, element ->
@@ -285,17 +317,6 @@ internal class AbsClient {
         )
     }
 
-    private fun JsonObject.toSummary(): AbsBookSummary? {
-        val media = obj("media")
-        val metadata = media?.obj("metadata")
-        return AbsBookSummary(
-            id = string("id") ?: return null,
-            title = metadata?.string("title").orEmpty().ifBlank { "Untitled" },
-            author = metadata?.string("authorName")?.takeIf { it.isNotBlank() },
-            durationSec = media?.double("duration") ?: 0.0,
-        )
-    }
-
     private fun JsonObject.toProgress(): AbsProgress? = AbsProgress(
         libraryItemId = string("libraryItemId") ?: return null,
         currentTimeSec = double("currentTime") ?: 0.0,
@@ -313,3 +334,16 @@ private fun JsonObject.array(key: String): JsonArray? = get(key) as? JsonArray
 private fun JsonObject.string(key: String): String? =
     (get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content
 private fun JsonObject.double(key: String): Double? = (get(key) as? JsonPrimitive)?.doubleOrNull
+
+private fun JsonObject.toSummary(): AbsBookSummary? {
+    if (string("mediaType")?.let { it != "book" } == true) return null
+    val media = obj("media")
+    val metadata = media?.obj("metadata")
+    return AbsBookSummary(
+        id = string("id")?.takeIf { it.isNotBlank() } ?: return null,
+        title = metadata?.string("title").orEmpty().ifBlank { "Untitled" },
+        author = metadata?.string("authorName")?.takeIf { it.isNotBlank() }
+            ?: metadata?.array("authors")?.mapNotNull { it.obj?.string("name") }?.joinToString(", ")?.takeIf { it.isNotBlank() },
+        durationSec = media?.double("duration") ?: 0.0,
+    )
+}

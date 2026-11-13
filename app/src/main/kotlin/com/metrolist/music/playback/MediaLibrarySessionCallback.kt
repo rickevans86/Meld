@@ -314,6 +314,7 @@ constructor(
                                     AndroidAutoSection.LOCAL_FILES -> autoExtras.rootItem(AutoLibraryExtras.LOCAL_FILES)
                                     AndroidAutoSection.AUDIOBOOKS -> autoExtras.rootItem(AutoLibraryExtras.AUDIOBOOKS)
                                     AndroidAutoSection.PODCASTS -> autoExtras.rootItem(AutoLibraryExtras.PODCASTS)
+                                    AndroidAutoSection.DOWNLOADED -> autoExtras.rootItem(AutoLibraryExtras.DOWNLOADED)
                                     AndroidAutoSection.NEWS -> autoExtras.rootItem(AutoLibraryExtras.NEWS)
                                     AndroidAutoSection.RADIO -> autoExtras.rootItem(AutoLibraryExtras.RADIO)
                                     AndroidAutoSection.CONTINUE -> autoExtras.rootItem(AutoLibraryExtras.CONTINUE)

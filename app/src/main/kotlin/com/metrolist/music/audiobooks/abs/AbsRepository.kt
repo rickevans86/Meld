@@ -158,6 +158,11 @@ constructor(
     suspend fun search(libraryId: String, query: String) =
         authed { s -> client.search(s.serverUrl, s.accessToken, libraryId, query) }
 
+    suspend fun shelves(libraryId: String) = authed { s -> client.shelves(s.serverUrl, s.accessToken, libraryId) }
+
+    suspend fun groups(libraryId: String, kind: AbsBrowseKind, page: Int, limit: Int) =
+        authed { s -> client.groups(s.serverUrl, s.accessToken, libraryId, kind, page, limit) }
+
     suspend fun inProgress() = authed { s -> client.inProgress(s.serverUrl, s.accessToken) }
 
     suspend fun allProgress() = authed { s -> client.allProgress(s.serverUrl, s.accessToken) }

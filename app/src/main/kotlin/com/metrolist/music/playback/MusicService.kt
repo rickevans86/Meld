@@ -1209,6 +1209,42 @@ class MusicService :
                 }
             }
         }
+        scope.launch {
+            dataStore.data.map { it[com.metrolist.music.audiobooks.AutoAudiobookSections.Key].orEmpty() }
+                .distinctUntilChanged().drop(1).collect {
+                    mediaSession?.notifyChildrenChanged(AutoLibraryExtras.AUDIOBOOKS, Int.MAX_VALUE, null)
+                }
+        }
+        scope.launch {
+            absRepository.downloads.map { entries -> entries.filterValues { it.done }.keys }
+                .distinctUntilChanged().drop(1).collect {
+                mediaSession?.notifyChildrenChanged(AutoLibraryExtras.DOWNLOADED, Int.MAX_VALUE, null)
+            }
+        }
+        scope.launch {
+            audiobookRepository.books.drop(1).collect {
+                mediaSession?.notifyChildrenChanged(AutoLibraryExtras.AUDIOBOOKS, Int.MAX_VALUE, null)
+                mediaSession?.notifyChildrenChanged(AutoLibraryExtras.DOWNLOADED, Int.MAX_VALUE, null)
+            }
+        }
+        scope.launch {
+            downloadUtil.downloads.map { entries -> entries.filterValues { it.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED }.keys }
+                .distinctUntilChanged().drop(1).collect {
+                    mediaSession?.notifyChildrenChanged(AutoLibraryExtras.DOWNLOADED, Int.MAX_VALUE, null)
+                }
+        }
+        scope.launch {
+            audiobookRepository.progress.drop(1).collect {
+                mediaSession?.notifyChildrenChanged(AutoLibraryExtras.AUDIOBOOKS, Int.MAX_VALUE, null)
+            }
+        }
+        scope.launch {
+            absRepository.session.map { session -> session?.let { it.serverUrl to it.username } }
+                .distinctUntilChanged().drop(1).collect {
+                    mediaSession?.notifyChildrenChanged(AutoLibraryExtras.AUDIOBOOKS, Int.MAX_VALUE, null)
+                    mediaSession?.notifyChildrenChanged(AutoLibraryExtras.DOWNLOADED, Int.MAX_VALUE, null)
+                }
+        }
         // Your stations changed (added, removed, hearted): Android Auto re-reads its Radio list
         scope.launch {
             radioDirectory.favourites.drop(1).collect {
