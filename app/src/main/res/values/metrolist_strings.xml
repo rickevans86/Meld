@@ -1601,4 +1601,19 @@
     <string name="auto_audiobook_series">Series</string>
     <string name="auto_audiobook_collections">Collections</string>
     <string name="auto_audiobook_more">More…</string>
+    <!-- Wavelength: phone Audiobooks tabs -->
+    <string name="audiobook_tab_library">Library</string>
+    <string name="audiobook_tab_downloaded">Downloaded</string>
+    <string name="audiobook_tab_listening">Listening</string>
+    <string name="audiobook_your_library">Your library</string>
+    <string name="audiobook_sort">Sort</string>
+    <string name="audiobook_library_sort">Library sort</string>
+    <string name="audiobook_sort_title">Title A–Z</string>
+    <string name="audiobook_sort_author">Author A–Z</string>
+    <string name="audiobook_sort_added">Recently added</string>
+    <string name="audiobook_tab_order">Audiobook tabs</string>
+    <string name="audiobook_tab_order_desc">Hold and drag to reorder the tabs on the Audiobooks screen. Your order is saved automatically.</string>
+    <string name="audiobook_none_downloaded">No downloaded audiobooks yet. Open a book and tap Download to listen offline.</string>
+    <string name="audiobook_none_listening">Nothing in progress. Books you start and haven\'t finished show here.</string>
+    <string name="audiobook_all_on_phone">Every book in your phone folder plays offline.</string>
 </resources>

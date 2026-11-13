@@ -5,6 +5,7 @@
 
 package com.metrolist.music.audiobooks.abs
 
+import com.metrolist.music.audiobooks.AudiobookSort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -97,6 +98,13 @@ internal fun parseAbsGroups(value: JsonElement, kind: AbsBrowseKind): AbsGroupPa
     return AbsGroupPage(groups, root?.get("total")?.primitive?.intOrNull ?: groups.size)
 }
 
+/** Audiobookshelf's library item sort field, and whether it runs newest first. */
+internal fun absSortParams(sort: AudiobookSort): Pair<String, Boolean> = when (sort) {
+    AudiobookSort.TITLE -> "media.metadata.title" to false
+    AudiobookSort.AUTHOR -> "media.metadata.authorName" to false
+    AudiobookSort.ADDED -> "addedAt" to true
+}
+
 class AbsHttpException(val code: Int, message: String) : IOException(message)
 
 /** Thin client for the Audiobookshelf REST API. All calls run on the IO dispatcher. */
@@ -144,12 +152,17 @@ internal class AbsClient {
                 AbsLibrary(lib.string("id") ?: return@mapNotNull null, lib.string("name").orEmpty())
             }
 
-    suspend fun books(server: String, token: String, libraryId: String, page: Int, limit: Int): AbsPage {
+    suspend fun books(
+        server: String, token: String, libraryId: String, page: Int, limit: Int,
+        sort: AudiobookSort = AudiobookSort.TITLE,
+    ): AbsPage {
+        val (sortField, descending) = absSortParams(sort)
         val result = get(
             server, token, "api/libraries/$libraryId/items",
             "limit" to limit.toString(),
             "page" to page.toString(),
-            "sort" to "media.metadata.title",
+            "sort" to sortField,
+            "desc" to if (descending) "1" else "0",
             "minified" to "1",
         ).obj
         return AbsPage(

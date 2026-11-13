@@ -40,6 +40,9 @@ constructor(
     private val _libraryId = MutableStateFlow(repository.selectedLibraryId())
     val libraryId = _libraryId.asStateFlow()
 
+    // Declared before init so the first load can read it
+    private var sort = com.metrolist.music.audiobooks.AudiobookSort.TITLE
+
     private val _inProgress = MutableStateFlow<List<AbsBookSummary>>(emptyList())
     val inProgress = _inProgress.asStateFlow()
 
@@ -145,13 +148,25 @@ constructor(
         }
     }
 
+    /** Reloads the book list in the new order; does nothing when the order is unchanged. */
+    fun setSort(value: com.metrolist.music.audiobooks.AudiobookSort) {
+        if (value == sort) return
+        sort = value
+        if (_libraryId.value == null) return
+        viewModelScope.launch {
+            _loading.value = true
+            runCatching { loadFirstPage() }.onFailure { _error.value = describe(it) }
+            _loading.value = false
+        }
+    }
+
     fun loadMore() {
         val library = _libraryId.value ?: return
         if (_loading.value || _books.value.size >= _totalBooks.value) return
         viewModelScope.launch {
             _loading.value = true
             runCatching {
-                val next = repository.books(library, page + 1, PAGE_SIZE)
+                val next = repository.books(library, page + 1, PAGE_SIZE, sort)
                 page += 1
                 _books.value = _books.value + next.books
             }.onFailure { _error.value = describe(it) }
@@ -239,7 +254,7 @@ constructor(
 
     private suspend fun loadFirstPage() {
         val library = _libraryId.value ?: return
-        val first = repository.books(library, 0, PAGE_SIZE)
+        val first = repository.books(library, 0, PAGE_SIZE, sort)
         page = 0
         _books.value = first.books
         _totalBooks.value = first.total

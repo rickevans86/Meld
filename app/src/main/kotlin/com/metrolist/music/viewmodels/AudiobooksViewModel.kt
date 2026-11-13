@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class AudiobookSummary(
@@ -84,6 +85,14 @@ constructor(
     }
 
     fun currentFolder(): Uri? = repository.folderUri()
+
+    /** Loads a book's chapters off the main thread, for playing it straight from a list. */
+    fun chapters(book: Audiobook, onReady: (List<Song>) -> Unit) {
+        viewModelScope.launch {
+            val chapters = withContext(Dispatchers.IO) { repository.chapters(book) }
+            onReady(chapters)
+        }
+    }
 
     private fun summarize(book: Audiobook, progress: AudiobookProgress?, chapters: List<Song>): AudiobookSummary {
         val current = progress?.let { book.chapterIds.indexOf(it.chapterId) }?.takeIf { it >= 0 }

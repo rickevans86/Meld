@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +61,9 @@ import coil3.compose.AsyncImage
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
+import com.metrolist.music.audiobooks.AudiobookSort
+import com.metrolist.music.audiobooks.AudiobookTab
+import com.metrolist.music.audiobooks.AudiobookTabs
 import com.metrolist.music.constants.AudiobooksSourceKey
 import com.metrolist.music.constants.CONTENT_TYPE_HEADER
 import com.metrolist.music.db.entities.Song
@@ -143,6 +146,26 @@ private fun DeviceAudiobooks(
     LaunchedEffect(openBookId) { lazyListState.scrollToItem(0) }
     BackHandler(enabled = openBookId != null) { viewModel.openBookId.value = null }
 
+    val tabs = rememberAudiobookTabState()
+
+    /** Continue card: pause or resume the playing book, otherwise start it where it was left. */
+    fun resume(summary: AudiobookSummary) {
+        if (mediaMetadata?.id in summary.book.chapterIds) {
+            playerConnection.togglePlayPause()
+            return
+        }
+        viewModel.chapters(summary.book) { chapters ->
+            if (chapters.isEmpty()) return@chapters
+            playerConnection.playQueue(
+                ListQueue(
+                    title = summary.book.title,
+                    items = chapters.map { it.toMediaItem() },
+                    startIndex = summary.resumeIndex.coerceIn(0, chapters.lastIndex),
+                ),
+            )
+        }
+    }
+
     fun play(detail: AudiobookDetail, index: Int) {
         if (detail.chapters.isEmpty()) return
         val chapterId = detail.chapters.getOrNull(index)?.id
@@ -196,64 +219,84 @@ private fun DeviceAudiobooks(
             return@LazyColumn
         }
 
-        item(key = "header", contentType = CONTENT_TYPE_HEADER) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 4.dp),
-            ) {
-                Text(
-                    text = pluralStringResource(R.plurals.n_audiobook, summaries.size, summaries.size),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.weight(1f),
-                )
-                if (isScanning) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(14.dp))
-                } else {
-                    IconButton(onClick = viewModel::rescan) {
-                        Icon(
-                            painter = painterResource(R.drawable.refresh),
-                            contentDescription = stringResource(R.string.audiobooks_rescan),
+        item(key = "tabs") { AudiobookTabBar(tabs.order, tabs.selected, tabs.select) }
+
+        val visible = summaries.filter { com.metrolist.music.ui.component.matchesSearch(query, it.book.title, it.book.author) }
+        if (summaries.isEmpty() && !isScanning) {
+            item(key = "empty") { TabMessage(stringResource(R.string.audiobooks_none_found)) }
+        }
+        when (tabs.selected) {
+            AudiobookTab.LIBRARY -> {
+                val current = visible.filter { it.started && !it.finished }.maxByOrNull { it.progress?.updatedAt ?: 0L }
+                if (current != null && query.isBlank()) {
+                    item(key = "continue") {
+                        ContinueCard(
+                            coverUrl = current.book.coverUri,
+                            title = current.book.title,
+                            author = current.book.author,
+                            fraction = current.fractionListened,
+                            detail = statusText(current),
+                            isPlaying = isPlaying && mediaMetadata?.id in current.book.chapterIds,
+                            onOpen = { viewModel.openBookId.value = current.book.id },
+                            onPlay = { resume(current) },
                         )
                     }
                 }
-                IconButton(onClick = { folderPicker.launch(null) }) {
-                    Icon(
-                        painter = painterResource(R.drawable.folder),
-                        contentDescription = stringResource(R.string.audiobooks_change_folder),
-                    )
+                item(key = "library_header", contentType = CONTENT_TYPE_HEADER) {
+                    LibraryHeader(
+                        count = pluralStringResource(R.plurals.n_audiobook, visible.size, visible.size),
+                        sort = tabs.sort,
+                        sortOptions = listOf(AudiobookSort.TITLE, AudiobookSort.AUTHOR),
+                        onSort = tabs.setSort,
+                    ) {
+                        if (isScanning) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(14.dp))
+                        } else {
+                            IconButton(onClick = viewModel::rescan) {
+                                Icon(painterResource(R.drawable.refresh), contentDescription = stringResource(R.string.audiobooks_rescan))
+                            }
+                        }
+                        IconButton(onClick = { folderPicker.launch(null) }) {
+                            Icon(painterResource(R.drawable.folder), contentDescription = stringResource(R.string.audiobooks_change_folder))
+                        }
+                    }
+                }
+                deviceGrid(AudiobookTabs.sortLocal(visible, tabs.sort, { it.book.title }, { it.book.author })) {
+                    viewModel.openBookId.value = it.book.id
                 }
             }
-        }
-
-        if (summaries.isEmpty() && !isScanning) {
-            item(key = "empty") {
-                Text(
-                    text = stringResource(R.string.audiobooks_none_found),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                )
+            AudiobookTab.DOWNLOADED -> {
+                if (summaries.isNotEmpty()) item(key = "on_phone") { TabMessage(stringResource(R.string.audiobook_all_on_phone)) }
+                deviceGrid(AudiobookTabs.sortLocal(visible, tabs.sort, { it.book.title }, { it.book.author })) {
+                    viewModel.openBookId.value = it.book.id
+                }
             }
-        }
-
-        items(
-            summaries.filter { com.metrolist.music.ui.component.matchesSearch(query, it.book.title, it.book.author) },
-            key = { it.book.id },
-        ) { summary ->
-            BookRow(
-                summary = summary,
-                onClick = { viewModel.openBookId.value = summary.book.id },
-            )
+            AudiobookTab.LISTENING -> {
+                val listening = visible.filter { it.started && !it.finished }.sortedByDescending { it.progress?.updatedAt ?: 0L }
+                if (listening.isEmpty() && summaries.isNotEmpty()) {
+                    item(key = "none_listening") { TabMessage(stringResource(R.string.audiobook_none_listening)) }
+                }
+                deviceGrid(listening) { viewModel.openBookId.value = it.book.id }
+            }
         }
     }
 }
+
+private fun LazyListScope.deviceGrid(books: List<AudiobookSummary>, onOpen: (AudiobookSummary) -> Unit) =
+    bookGrid(books, key = { it.book.id }) { summary ->
+        GridBook(
+            coverUrl = summary.book.coverUri,
+            title = summary.book.title,
+            author = summary.book.author,
+            badge = when {
+                summary.finished -> GridBadge.Finished
+                summary.started -> GridBadge.Progress((summary.fractionListened * 100).roundToInt())
+                else -> null
+            },
+            onClick = { onOpen(summary) },
+        )
+    }
 
 @Composable
 private fun SetupPrompt(onChooseFolder: () -> Unit) {
@@ -325,53 +368,6 @@ private fun statusText(summary: AudiobookSummary): String {
             (summary.fractionListened * 100).roundToInt(),
         )
         else -> pluralStringResource(R.plurals.n_audiobook_chapter, count, count)
-    }
-}
-
-@Composable
-private fun BookRow(summary: AudiobookSummary, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        BookCover(summary.book.coverUri, 64.dp)
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = summary.book.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            summary.book.author?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Text(
-                text = statusText(summary),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-            if (summary.started && !summary.finished) {
-                Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { summary.fractionListened },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp),
-                )
-            }
-        }
     }
 }
 

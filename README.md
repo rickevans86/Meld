@@ -109,7 +109,7 @@ Every push to this fork builds and publishes a new release automatically. Releas
   tree that matches the folders on the server, with breadcrumbs and a back button.
 - **Jellyfin and Plex.** One Media server tab where you pick which server to use. Jellyfin signs in with
   your username and password; Plex signs in through plex.tv. Browse, search, play and download.
-- **Audiobooks** from your device and servers.
+- **Audiobooks** from your device and servers, in Library, Downloaded and Listening tabs (Continue listening card, cover grid, sort by title, author or recently added). Reorder the tabs and choose the sort in Settings → Features.
 - **Local files.** A tab for music stored on the phone.
 
 ### Song recognition

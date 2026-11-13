@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -65,6 +66,8 @@ import coil3.compose.AsyncImage
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
+import com.metrolist.music.audiobooks.AudiobookSort
+import com.metrolist.music.audiobooks.AudiobookTab
 import com.metrolist.music.audiobooks.abs.AbsBook
 import com.metrolist.music.audiobooks.abs.AbsBookSummary
 import com.metrolist.music.audiobooks.abs.AbsDownloadState
@@ -109,6 +112,8 @@ fun AudiobookshelfContent(
     com.metrolist.music.ui.component.PageSearchEffect(pageQuery) { if (onAudiobooksTab) viewModel.search(it) }
     val query = if (onAudiobooksTab) pageQuery else inlineQuery
     val listState = rememberLazyListState()
+    val tabs = rememberAudiobookTabState()
+    LaunchedEffect(tabs.sort) { viewModel.setSort(tabs.sort) }
 
     val playingItemId = mediaMetadata?.id?.takeIf(::isAbsTrackId)?.removePrefix("audiobook:abs:")?.substringBeforeLast(':')
 
@@ -282,41 +287,72 @@ fun AudiobookshelfContent(
             return@LazyColumn
         }
 
-        if (downloadedBooks.isNotEmpty()) {
-            item(key = "downloaded_title") { SectionTitle(stringResource(R.string.abs_downloaded)) }
-            items(downloadedBooks, key = { "downloaded:${it.id}" }) { summary ->
-                AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id), true) { viewModel.open(summary.id) }
-            }
-        }
+        item(key = "tabs") { AudiobookTabBar(tabs.order, tabs.selected, tabs.select) }
 
-        if (inProgress.isNotEmpty()) {
-            item(key = "continue_title") { SectionTitle(stringResource(R.string.abs_continue_listening)) }
-            items(inProgress, key = { "continue:${it.id}" }) { summary ->
-                AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id), downloads[summary.id]?.done == true) { viewModel.open(summary.id) }
-            }
-        }
-
-        item(key = "all_title") {
-            SectionTitle(
-                if (totalBooks > 0) stringResource(R.string.abs_all_books_count, totalBooks)
-                else stringResource(R.string.abs_all_books)
+        fun LazyListScope.grid(list: List<AbsBookSummary>, prefix: String) = bookGrid(list, key = { "$prefix:${it.id}" }) { summary ->
+            val bookProgress = progress[summary.id]
+            GridBook(
+                coverUrl = viewModel.coverUrl(summary.id),
+                title = summary.title,
+                author = summary.author,
+                badge = when {
+                    bookProgress?.isFinished == true -> GridBadge.Finished
+                    bookProgress != null && bookProgress.progress > 0 -> GridBadge.Progress((bookProgress.progress * 100).roundToInt())
+                    downloads[summary.id]?.done == true -> GridBadge.Downloaded
+                    else -> null
+                },
+                onClick = { viewModel.open(summary.id) },
             )
         }
-        if (books.isEmpty() && !loading) {
-            item(key = "no_books") {
-                EmptyText(stringResource(if (libraries.isEmpty()) R.string.abs_no_libraries else R.string.abs_no_books))
-            }
-        }
-        items(books, key = { "book:${it.id}" }) { summary ->
-            AbsBookRow(summary, progress[summary.id], viewModel.coverUrl(summary.id), downloads[summary.id]?.done == true) { viewModel.open(summary.id) }
-        }
-        if (books.size < totalBooks) {
-            item(key = "more") {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    OutlinedButton(onClick = viewModel::loadMore, enabled = !loading) {
-                        Text(stringResource(R.string.abs_load_more))
+
+        when (tabs.selected) {
+            AudiobookTab.LIBRARY -> {
+                inProgress.firstOrNull()?.let { current ->
+                    item(key = "continue") {
+                        val currentProgress = progress[current.id]
+                        ContinueCard(
+                            coverUrl = viewModel.coverUrl(current.id),
+                            title = current.title,
+                            author = current.author,
+                            fraction = currentProgress?.progress?.toFloat(),
+                            detail = progressText(currentProgress, current.durationSec),
+                            isPlaying = isPlaying && playingItemId == current.id,
+                            onOpen = { viewModel.open(current.id) },
+                            onPlay = { play(current.id, null) },
+                        )
                     }
                 }
+                item(key = "library_header") {
+                    LibraryHeader(
+                        count = if (totalBooks > 0) pluralStringResource(R.plurals.n_audiobook, totalBooks, totalBooks) else null,
+                        sort = tabs.sort,
+                        sortOptions = AudiobookSort.entries,
+                        onSort = tabs.setSort,
+                    )
+                }
+                if (books.isEmpty() && !loading) {
+                    item(key = "no_books") {
+                        EmptyText(stringResource(if (libraries.isEmpty()) R.string.abs_no_libraries else R.string.abs_no_books))
+                    }
+                }
+                grid(books, "book")
+                if (books.size < totalBooks) {
+                    item(key = "more") {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                            OutlinedButton(onClick = viewModel::loadMore, enabled = !loading) {
+                                Text(stringResource(R.string.abs_load_more))
+                            }
+                        }
+                    }
+                }
+            }
+            AudiobookTab.DOWNLOADED -> {
+                if (downloadedBooks.isEmpty()) item(key = "none_downloaded") { TabMessage(stringResource(R.string.audiobook_none_downloaded)) }
+                grid(downloadedBooks, "downloaded")
+            }
+            AudiobookTab.LISTENING -> {
+                if (inProgress.isEmpty() && !loading) item(key = "none_listening") { TabMessage(stringResource(R.string.audiobook_none_listening)) }
+                grid(inProgress, "listening")
             }
         }
     }

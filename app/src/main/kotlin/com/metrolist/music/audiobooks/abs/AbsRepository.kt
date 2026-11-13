@@ -152,8 +152,10 @@ constructor(
 
     suspend fun libraries() = authed { s -> client.libraries(s.serverUrl, s.accessToken) }
 
-    suspend fun books(libraryId: String, page: Int, limit: Int) =
-        authed { s -> client.books(s.serverUrl, s.accessToken, libraryId, page, limit) }
+    suspend fun books(
+        libraryId: String, page: Int, limit: Int,
+        sort: com.metrolist.music.audiobooks.AudiobookSort = com.metrolist.music.audiobooks.AudiobookSort.TITLE,
+    ) = authed { s -> client.books(s.serverUrl, s.accessToken, libraryId, page, limit, sort) }
 
     suspend fun search(libraryId: String, query: String) =
         authed { s -> client.search(s.serverUrl, s.accessToken, libraryId, query) }
