@@ -11,3 +11,4 @@
 
 - Codex, COORDINATION-AUDIT-2026-11-13: read AGENTS.md and all six .ai files, refreshed remote refs, reviewed branches, recent commits, open PRs, latest release and workflow results. Main remained 4b1e9295; release v0.9.2.81 remained latest. No open PRs or newer remote agent commits were found.
 - Codex: confirmed Issues are still disabled. Attempt to read signing-secret metadata returned HTTP 403 (integration access denied); no secret values were requested. Identified the unclaimed CI-NIGHTLY-SIGNING follow-up and recorded its acceptance criteria and access dependency. Updated collaboration records only, on chore/ai-coordination-audit; app behavior, signing settings and release assets were not changed in this audit.
+- Codex: published the audit record updates in documentation PR #2 (https://github.com/rickevans86/Meld/pull/2), pending review. No new main merge or release was performed for this audit.

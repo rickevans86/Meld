@@ -10,7 +10,7 @@ Acceptance met: separate phone chapter controls; configurable 15/30-second defau
 
 ## Coordination audit — 2026-11-13
 
-Temporary audit ID: COORDINATION-AUDIT-2026-11-13. Responsible AI: Codex. Status: audit complete, documentation review pending. Branch: chore/ai-coordination-audit. GitHub Issue claim unavailable because Issues remain disabled; this is not a successful remote Issue assignment.
+Temporary audit ID: COORDINATION-AUDIT-2026-11-13. Responsible AI: Codex. Status: audit complete, documentation review pending. Branch: chore/ai-coordination-audit; [documentation PR #2](https://github.com/rickevans86/Meld/pull/2). GitHub Issue claim unavailable because Issues remain disabled; this is not a successful remote Issue assignment.
 
 Next unclaimed follow-up: CI-NIGHTLY-SIGNING (proposed temporary ID).
 - Scope: repair the optional Google Cast nightly signing configuration in .github/workflows/build.yml.
