@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
 
     steps:
       - uses: actions/checkout@v6
@@ -88,8 +88,8 @@ jobs:
             innertube/build/test-results/
           if-no-files-found: ignore
 
-      - name: Build and Lint FOSS Debug APK
-        run: ./gradlew --console=plain assembleFossDebug :app:lintFossDebug --warning-mode summary
+      - name: Build FOSS Debug APK
+        run: ./gradlew --console=plain assembleFossDebug --warning-mode summary
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           METROLIST_APPLICATION_ID: com.meld.app.pr.p${{ github.event.number }}
@@ -103,4 +103,15 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: app-universal-debug-pr-${{ github.event.number }}
-          path: app/build/outputs/apk/gms/debug/*.apk
+          path: app/build/outputs/apk/foss/debug/*.apk
+
+      - name: Lint FOSS Debug APK
+        run: ./gradlew --console=plain :app:lintFossDebug --warning-mode summary
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          METROLIST_APPLICATION_ID: com.meld.app.pr.p${{ github.event.number }}
+          METROLIST_APP_NAME: Meld PR ${{ github.event.number }}
+          METROLIST_DEBUG_KEYSTORE_PATH: pr-debug.keystore
+          PULL_REQUEST: "true"
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}

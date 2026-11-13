@@ -55,9 +55,13 @@ constructor(
     private val downloadUtil: DownloadUtil,
     private val subsonic: com.metrolist.music.subsonic.SubsonicRepository,
     private val mediaServer: com.metrolist.music.mediaserver.MediaServerRepository,
+    private val autoAudiobooks: AutoAudiobookLibrary,
 ) {
     fun isBrowsable(mediaId: String): Boolean =
-        mediaId == LOCAL_FILES ||
+        autoAudiobooks.isBrowsable(mediaId) ||
+            mediaId == DOWNLOADED ||
+            (mediaId.startsWith("$DOWNLOADED/") && autoPageNumber(mediaId.substringAfter('/')) != null) ||
+            mediaId == LOCAL_FILES ||
             (mediaId.startsWith("$LOCAL_FOLDER/") && mediaId.count { it == '/' } == 2) ||
             (mediaId.startsWith("$LIB_ALBUM/") && mediaId.count { it == '/' } == 1) ||
             (mediaId.startsWith("$LIB_ARTIST/") && mediaId.count { it == '/' } == 1) ||
@@ -79,8 +83,6 @@ constructor(
             mediaId == MS_ARTISTS ||
             ((mediaId.startsWith("$MS_ALBUM/") || mediaId.startsWith("$MS_PLAYLIST/") || mediaId.startsWith("$MS_ARTIST/")) &&
                 mediaId.count { it == '/' } == 2) ||
-            mediaId == AUDIOBOOKS ||
-            mediaId == ABS_ALL ||
             mediaId == PODCASTS ||
             mediaId == SAVED_EPISODES ||
             mediaId == DOWNLOADED_EPISODES ||
@@ -94,7 +96,8 @@ constructor(
         CONTINUE -> folder(CONTINUE, context.getString(R.string.auto_continue_listening), null, icon(R.drawable.history), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         SUBSONIC -> folder(SUBSONIC, context.getString(R.string.subsonic_tab), null, icon(R.drawable.dns), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
         MEDIA_SERVER -> folder(MEDIA_SERVER, context.getString(R.string.media_server_tab), null, icon(R.drawable.dns), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
-        AUDIOBOOKS -> folder(AUDIOBOOKS, context.getString(R.string.filter_audiobooks), null, icon(R.drawable.audiobook), MediaMetadata.MEDIA_TYPE_FOLDER_AUDIO_BOOKS)
+        AUDIOBOOKS -> autoAudiobooks.rootItem()
+        DOWNLOADED -> autoGridItem(folder(DOWNLOADED, context.getString(R.string.abs_downloaded), null, icon(R.drawable.download)))
         else -> folder(PODCASTS, context.getString(R.string.filter_podcasts), null, icon(R.drawable.mic), MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
     }
 
@@ -178,8 +181,13 @@ constructor(
         }
         parentId.startsWith("$SUB_ALBUM/") -> serverSongsWithShuffle(parentId) { subsonic.albumSongs(parentId.substringAfterLast('/')) }
         parentId.startsWith("$SUB_PLAYLIST/") -> serverSongsWithShuffle(parentId) { subsonic.playlistSongs(parentId.substringAfterLast('/')) }
-        parentId == AUDIOBOOKS -> audiobookItems()
-        parentId == ABS_ALL -> absAllBooks()
+        autoAudiobooks.isBrowsable(parentId) -> autoAudiobooks.children(parentId)
+        parentId == DOWNLOADED || parentId.startsWith("$DOWNLOADED/") -> {
+            val page = autoPageNumber(parentId.substringAfter('/', "0")) ?: 0
+            val items = autoAudiobooks.downloaded().map { autoGridItem(it, context.getString(R.string.filter_audiobooks)) } +
+                downloadedEpisodes().map { autoGridItem(it.toAutoItem(DOWNLOADED_EPISODES), context.getString(R.string.filter_podcasts)) }
+            autoAudiobooks.withMore(autoPage(items, page), DOWNLOADED, page)
+        }
         parentId == PODCASTS -> podcastFolders()
         parentId == SAVED_EPISODES -> savedEpisodes().map { it.toAutoItem(SAVED_EPISODES) }
         parentId == DOWNLOADED_EPISODES -> downloadedEpisodes().map { it.toAutoItem(DOWNLOADED_EPISODES) }
@@ -220,7 +228,7 @@ constructor(
         }
         SUBSONIC -> playSubsonic(path)
         MEDIA_SERVER -> playMediaServer(path)
-        AUDIOBOOKS -> playAudiobook(path)
+        AUDIOBOOKS -> autoAudiobookPlaybackPath(path)?.let { playAudiobook(it) }
         PODCASTS -> playPodcast(path)
         else -> null
     }
@@ -638,49 +646,6 @@ constructor(
         return MediaItemsWithStartPosition(bulletins.map { it.toMediaItem() }, 0, C.TIME_UNSET)
     }
 
-    private suspend fun audiobookItems(): List<MediaItem> {
-        val items = mutableListOf<MediaItem>()
-        val seen = HashSet<String>()
-
-        if (audiobookshelf.session.value != null) {
-            val inProgress = withTimeoutOrNull(NETWORK_TIMEOUT_MS) {
-                runCatching { audiobookshelf.inProgress() }.getOrNull()
-            }.orEmpty()
-            inProgress.forEach { book ->
-                if (seen.add(book.id)) {
-                    items += playable("$AUDIOBOOKS/abs/${book.id}", book.title, book.author, audiobookshelf.coverUrl(book.id)?.toUri())
-                }
-            }
-            audiobookshelf.downloadedBooks().forEach { book ->
-                if (seen.add(book.id)) {
-                    items += playable("$AUDIOBOOKS/abs/${book.id}", book.title, book.author, audiobookshelf.coverUrl(book.id)?.toUri())
-                }
-            }
-        }
-
-        val progress = audiobooks.progress.value
-        audiobooks.books.value
-            .sortedByDescending { progress[it.id]?.updatedAt ?: 0L }
-            .forEach { book ->
-                items += playable("$AUDIOBOOKS/device/${book.id}", book.title, book.author, book.coverUri?.toUri())
-            }
-
-        if (audiobookshelf.session.value != null) {
-            items += folder(ABS_ALL, context.getString(R.string.auto_all_audiobookshelf_books), null, icon(R.drawable.audiobook))
-        }
-        return items
-    }
-
-    private suspend fun absAllBooks(): List<MediaItem> {
-        val library = audiobookshelf.selectedLibraryId()
-            ?: runCatching { audiobookshelf.libraries().firstOrNull()?.id }.getOrNull()
-            ?: return emptyList()
-        val books = withTimeoutOrNull(NETWORK_TIMEOUT_MS) {
-            runCatching { audiobookshelf.books(library, 0, 200).books }.getOrNull()
-        }.orEmpty()
-        return books.map { playable("$AUDIOBOOKS/abs/${it.id}", it.title, it.author, audiobookshelf.coverUrl(it.id)?.toUri()) }
-    }
-
     private suspend fun playAudiobook(path: List<String>): MediaItemsWithStartPosition? {
         val id = path.getOrNull(2) ?: return null
         return when (path.getOrNull(1)) {
@@ -881,6 +846,7 @@ constructor(
         const val NEWS = "news"
         private const val NEWS_ALL = "__all__"
         const val AUDIOBOOKS = "audiobooks"
+        const val DOWNLOADED = "downloaded"
         const val PODCASTS = "podcasts"
         const val RADIO = "radio"
         const val SUBSONIC = "subsonic"
@@ -899,7 +865,6 @@ constructor(
         private const val SUB_PLAYLIST = "$SUBSONIC/playlist"
         private const val SUB_FOLDERS = "$SUBSONIC/folders"
         private const val SUB_DIR = "$SUBSONIC/dir"
-        private const val ABS_ALL = "$AUDIOBOOKS/abs_all"
         private const val SAVED_EPISODES = "$PODCASTS/saved"
         private const val DOWNLOADED_EPISODES = "$PODCASTS/downloaded"
         private const val PODCAST_CHANNEL = "$PODCASTS/channel"
