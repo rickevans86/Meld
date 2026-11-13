@@ -56,8 +56,8 @@ Rules for the whole job:
 Add a GitHub Actions workflow "Build and Release" that runs on every push to `feat/local-folders` (and manually):
 - Build a proper release APK (`:app:assembleFossRelease`, minified, not debuggable), retrying once with
   `--refresh-dependencies` if the first try fails.
-- App name "Wavelength" via an env variable, application id `com.meld.app.debug` so it installs over earlier
-  builds and keeps data.
+- App name "Wavelength" via an env variable, application id `com.rickevans86.wavelength` (its own id since
+  0.9.2.85; never reuse an upstream id such as `com.meld.app.debug`, which makes Play Protect warn).
 - Version: keep the base version and append the run number, e.g. `0.9.2.<n>`; versionCode = base × 10000 + n.
 - Sign every build with the same key from a repository secret (`DEBUG_KEYSTORE_BASE64`), checked with keytool.
   Release builds must use that key so updates install over each other.
