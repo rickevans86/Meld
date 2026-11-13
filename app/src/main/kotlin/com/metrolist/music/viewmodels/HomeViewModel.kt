@@ -113,6 +113,10 @@ internal fun buildSpeedDialItems(
         .distinctBy { it.id }
         .take(27)
 
+/** Identifies a home-feed section so repeats the feed serves across continuations can be dropped. */
+internal fun com.metrolist.innertube.pages.HomePage.Section.sectionKey(): String =
+    "$title|${items.firstOrNull()?.id.orEmpty()}"
+
 /** Podcast shows, podcast episodes and audiobook chapters (all of which have their own tabs). */
 internal fun YTItem.isPodcastLike(): Boolean =
     this is com.metrolist.innertube.models.PodcastItem ||
@@ -879,6 +883,7 @@ class HomeViewModel @Inject constructor(
                 return@launch
             }
 
+            val existingKeys = homePage.value?.sections.orEmpty().map { it.sectionKey() }.toMutableSet()
             homePage.value = nextSections.copy(
                 chips = homePage.value?.chips,
                 sections = (homePage.value?.sections.orEmpty() + nextSections.sections).mapNotNull { section ->
@@ -889,6 +894,8 @@ class HomeViewModel @Inject constructor(
                         .filterYoutubeShorts(hideYoutubeShorts)
                     if (filteredItems.isEmpty()) null else section.copy(items = filteredItems)
                 }
+                    // Drop sections the feed repeats across continuations (same title + first item)
+                    .filter { existingKeys.add(it.sectionKey()) }
             )
             _isLoadingMore.value = false
         }
@@ -972,6 +979,8 @@ class HomeViewModel @Inject constructor(
             accountPlaylists.value = it.items.filterIsInstance<PlaylistItem>()
                 .filterOutNulls()
                 .filterNot { it.id == "SE" }
+                // Podcast playlists (e.g. the New Episodes auto-playlist) belong on the Podcasts tab
+                .filterNot { it.isPodcast }
                 .filterYoutubeShorts(hideYoutubeShorts)
         }.onFailure {
             reportException(it)

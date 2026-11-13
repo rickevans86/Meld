@@ -201,7 +201,7 @@ fun AudiobookshelfContent(
                     onPlay = { startAt -> play(book.id, startAt) },
                     onDownload = { viewModel.download(book.id) },
                     onRemoveDownload = { viewModel.removeDownload(book.id) },
-                    onToggleFinished = { viewModel.setFinished(book, progress[book.id]?.isFinished != true) },
+                    onToggleFinished = { viewModel.setFinished(book, progress[book.id]?.isComplete(book.durationSec) != true) },
                 )
             }
             return@LazyColumn
@@ -296,8 +296,9 @@ fun AudiobookshelfContent(
                 title = summary.title,
                 author = summary.author,
                 badge = when {
-                    bookProgress?.isFinished == true -> GridBadge.Finished
-                    bookProgress != null && bookProgress.progress > 0 -> GridBadge.Progress((bookProgress.progress * 100).roundToInt())
+                    bookProgress?.isComplete(summary.durationSec) == true -> GridBadge.Finished
+                    bookProgress != null && bookProgress.fractionComplete(summary.durationSec) > 0 ->
+                        GridBadge.Progress((bookProgress.fractionComplete(summary.durationSec) * 100).roundToInt())
                     downloads[summary.id]?.done == true -> GridBadge.Downloaded
                     else -> null
                 },
@@ -314,7 +315,7 @@ fun AudiobookshelfContent(
                             coverUrl = viewModel.coverUrl(current.id),
                             title = current.title,
                             author = current.author,
-                            fraction = currentProgress?.progress?.toFloat(),
+                            fraction = currentProgress?.fractionComplete(current.durationSec)?.toFloat(),
                             detail = progressText(currentProgress, current.durationSec),
                             isPlaying = isPlaying && playingItemId == current.id,
                             onOpen = { viewModel.open(current.id) },
@@ -480,7 +481,7 @@ private fun LazyListScope.bookDetail(
     onRemoveDownload: () -> Unit,
     onToggleFinished: () -> Unit,
 ) {
-    val started = progress != null && progress.currentTimeSec > 0 && !progress.isFinished
+    val started = progress != null && progress.currentTimeSec > 0 && !progress.isComplete(book.durationSec)
     item(key = "abs_book_header") {
         Column(modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = onBack, modifier = Modifier.padding(horizontal = 4.dp)) {
@@ -510,7 +511,7 @@ private fun LazyListScope.bookDetail(
             }
             if (started) {
                 LinearProgressIndicator(
-                    progress = { progress?.progress?.toFloat() ?: 0f },
+                    progress = { progress?.fractionComplete(book.durationSec)?.toFloat() ?: 0f },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -538,14 +539,14 @@ private fun LazyListScope.bookDetail(
                     Text(
                         when {
                             isThisBookPlaying -> stringResource(R.string.audiobook_pause)
-                            progress?.isFinished == true -> stringResource(R.string.audiobook_listen_again)
+                            progress?.isComplete(book.durationSec) == true -> stringResource(R.string.audiobook_listen_again)
                             started -> stringResource(R.string.abs_continue_from, formatClock(progress!!.currentTimeSec))
                             else -> stringResource(R.string.audiobook_start)
                         }
                     )
                 }
             }
-            val finished = progress?.isFinished == true
+            val finished = progress?.isComplete(book.durationSec) == true
             OutlinedButton(
                 onClick = onToggleFinished,
                 modifier = Modifier
@@ -567,7 +568,7 @@ private fun LazyListScope.bookDetail(
     }
 
     if (book.chapters.isNotEmpty()) {
-        val position = progress?.takeIf { !it.isFinished }?.currentTimeSec ?: -1.0
+        val position = progress?.takeIf { !it.isComplete(book.durationSec) }?.currentTimeSec ?: -1.0
         itemsIndexed(book.chapters, key = { index, _ -> "abs_chapter:$index" }) { index, chapter ->
             ChapterLine(
                 number = index + 1,
@@ -691,10 +692,10 @@ private fun AbsBookRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (progress != null && !progress.isFinished && progress.progress > 0) {
+            if (progress != null && !progress.isComplete(summary.durationSec) && progress.fractionComplete(summary.durationSec) > 0) {
                 Spacer(Modifier.height(6.dp))
                 LinearProgressIndicator(
-                    progress = { progress.progress.toFloat() },
+                    progress = { progress.fractionComplete(summary.durationSec).toFloat() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(3.dp),
@@ -786,10 +787,10 @@ private fun LoadingRow() {
 
 @Composable
 private fun progressText(progress: AbsProgress?, durationSec: Double): String = when {
-    progress?.isFinished == true -> stringResource(R.string.audiobook_finished)
-    progress != null && progress.progress > 0 -> stringResource(
+    progress?.isComplete(durationSec) == true -> stringResource(R.string.audiobook_finished)
+    progress != null && progress.fractionComplete(durationSec) > 0 -> stringResource(
         R.string.abs_progress,
-        (progress.progress * 100).roundToInt(),
+        (progress.fractionComplete(durationSec) * 100).roundToInt(),
         formatLength((durationSec - progress.currentTimeSec).coerceAtLeast(0.0)),
     )
     durationSec > 0 -> formatLength(durationSec)

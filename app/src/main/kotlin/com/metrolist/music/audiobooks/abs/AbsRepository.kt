@@ -251,6 +251,9 @@ constructor(
             if (wait > 0) delay(wait)
             val latest = pendingReport.remove(info.itemId) ?: return@launch
             lastReport[info.itemId] = System.currentTimeMillis()
+            // Reaching the last ABS_FINISHED_TAIL_SEC marks the book finished on the server
+            val finished = info.bookDurationSec > 0 && latest >= info.bookDurationSec - ABS_FINISHED_TAIL_SEC
+            if (finished) localPositions[info.itemId] = AbsLocalPosition(latest, System.currentTimeMillis(), finished = true)
             savePositions()
             runCatching {
                 authed { s ->
@@ -258,7 +261,7 @@ constructor(
                         s.serverUrl, s.accessToken, info.itemId,
                         currentTimeSec = latest,
                         durationSec = info.bookDurationSec,
-                        isFinished = false,
+                        isFinished = finished,
                     )
                 }
             }.onFailure { Timber.tag(TAG).w(it, "Could not sync progress for ${info.itemId}") }

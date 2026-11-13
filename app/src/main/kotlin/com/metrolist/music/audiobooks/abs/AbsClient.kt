@@ -62,6 +62,9 @@ data class AbsBook(
     val chapters: List<AbsChapter>,
 )
 
+/** A book counts as finished once playback is within this many seconds of the end. */
+const val ABS_FINISHED_TAIL_SEC = 60.0
+
 data class AbsProgress(
     val libraryItemId: String,
     val currentTimeSec: Double,
@@ -69,7 +72,26 @@ data class AbsProgress(
     val progress: Double,
     val isFinished: Boolean,
     val lastUpdate: Long,
-)
+) {
+    /**
+     * Fraction listened (0..1), from the saved position and the best duration available. The book's
+     * own duration is preferred, since the server's progress field can lag or stay at 0.
+     */
+    fun fractionComplete(bookDurationSec: Double = 0.0): Double {
+        val duration = bookDurationSec.takeIf { it > 0 } ?: durationSec
+        return when {
+            duration > 0 && currentTimeSec > 0 -> (currentTimeSec / duration).coerceIn(0.0, 1.0)
+            else -> progress.coerceIn(0.0, 1.0)
+        }
+    }
+
+    /** Finished when the server says so, or playback is within [ABS_FINISHED_TAIL_SEC] of the end. */
+    fun isComplete(bookDurationSec: Double = 0.0): Boolean {
+        if (isFinished) return true
+        val duration = bookDurationSec.takeIf { it > 0 } ?: durationSec
+        return duration > 0 && currentTimeSec >= duration - ABS_FINISHED_TAIL_SEC
+    }
+}
 
 data class AbsPage(val books: List<AbsBookSummary>, val total: Int)
 
