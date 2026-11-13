@@ -1,6 +1,6 @@
 # Planned file modifications
 
-Task AUDIOBOOK-PHONE, Codex, in progress locally. Remote claim unavailable.
+Task AUDIOBOOK-PHONE / PR #1, Codex, completed and released as v0.9.2.81 on main. No active file reservation. Remote Issue claim was unavailable.
 
 - ui/player/Player.kt and AudiobookPlayerControls.kt
 - audiobooks/AudiobookPlaybackSettings.kt and AudiobookBookmarks.kt
@@ -11,4 +11,4 @@ Task AUDIOBOOK-PHONE, Codex, in progress locally. Remote claim unavailable.
 - default English values/metrolist_strings.xml
 - relevant audiobook tests, .ai/* and additive AGENTS.md instructions
 
-Other agents should check remote history and this record before editing these files; this record is not a lock.
+Other agents may work on these files after checking current main and active PRs. The list above records the completed scope, not an active lock.
