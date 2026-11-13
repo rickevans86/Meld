@@ -42,6 +42,12 @@ class AudiobookPlaybackTest {
         assertEquals(15_000L, audiobookSeekPosition(30_000, -15, 60_000))
     }
 
+    @Test fun `chapter spanning a file boundary stays selected until the next chapter starts`() {
+        val chapters = listOf(AudiobookChapter("first", "One", 0), AudiobookChapter("second", "Two", 15_500))
+        assertEquals(0, audiobookChapterIndex(chapters, listOf("first", "second"), "second", 5_000))
+        assertEquals(1, audiobookChapterIndex(chapters, listOf("first", "second"), "second", 15_500))
+    }
+
     @Test fun `invalid saved skip times fall back independently`() {
         assertEquals(15, AudiobookPlaybackSettings.seconds(-1, AudiobookPlaybackSettings.DEFAULT_BACK))
         assertEquals(30, AudiobookPlaybackSettings.seconds(0, AudiobookPlaybackSettings.DEFAULT_FORWARD))

@@ -82,20 +82,21 @@ fun AudiobookPlayerControls(
     val back = AudiobookPlaybackSettings.seconds(storedBack, AudiobookPlaybackSettings.DEFAULT_BACK)
     val forward = AudiobookPlaybackSettings.seconds(storedForward, AudiobookPlaybackSettings.DEFAULT_FORWARD)
     val localChapterIds = currentId?.let { connection.service.audiobookRepository.bookForChapter(it)?.chapterIds?.toSet() }
+    val bookWindows = windows.filter {
+        val id = it.mediaItem.mediaId
+        when {
+            localChapterIds != null -> id in localChapterIds
+            com.metrolist.music.constants.isAbsTrackId(currentId) -> id.substringBeforeLast(':') == currentId?.substringBeforeLast(':')
+            else -> id == currentId
+        }
+    }
     val chapters = connection.service.absRepository.chaptersForTrack(currentId).ifEmpty {
-        windows.filter {
-            val id = it.mediaItem.mediaId
-            when {
-                localChapterIds != null -> id in localChapterIds
-                com.metrolist.music.constants.isAbsTrackId(currentId) -> id.substringBeforeLast(':') == currentId?.substringBeforeLast(':')
-                else -> id == currentId
-            }
-        }.map {
+        bookWindows.map {
             com.metrolist.music.audiobooks.AudiobookChapter(it.mediaItem.mediaId, it.mediaItem.mediaMetadata.title?.toString().orEmpty(), 0L)
         }
     }
-    val chapterIds = chapters.map { it.mediaId }.toSet() + listOfNotNull(currentId)
-    val currentChapter = chapters.indexOfLast { it.mediaId == currentId && it.positionMs <= positionMs }.coerceAtLeast(0)
+    val chapterIds = bookWindows.map { it.mediaItem.mediaId }
+    val currentChapter = com.metrolist.music.audiobooks.audiobookChapterIndex(chapters, chapterIds, currentId, positionMs)
     val bookmarkStore = remember(context) { AudiobookBookmarks(context.dataStore) }
     val allBookmarks by bookmarkStore.bookmarks.collectAsStateWithLifecycle(initialValue = emptyList())
     val bookmarks = allBookmarks.filter { it.mediaId in chapterIds }

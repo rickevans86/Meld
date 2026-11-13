@@ -1586,7 +1586,6 @@
     <string name="audiobook_forward_by">Skip forward %1$d seconds</string>
     <string name="audiobook_previous_chapter">Previous chapter</string>
     <string name="audiobook_next_chapter">Next chapter</string>
-    <string name="audiobook_chapters">Chapters</string>
     <string name="audiobook_bookmarks">Bookmarks</string>
     <string name="audiobook_add_bookmark">Bookmark current position</string>
     <string name="audiobook_no_bookmarks">No bookmarks for this book yet.</string>

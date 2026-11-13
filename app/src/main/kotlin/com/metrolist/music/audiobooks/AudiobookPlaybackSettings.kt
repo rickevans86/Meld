@@ -45,6 +45,14 @@ object AudiobookPlaybackSettings {
 internal fun audiobookSeekPosition(positionMs: Long, seconds: Int, durationMs: Long): Long =
     (positionMs + seconds * 1000L).coerceIn(0L, durationMs.takeIf { it > 0 } ?: Long.MAX_VALUE)
 
+internal fun audiobookChapterIndex(chapters: List<AudiobookChapter>, mediaIds: List<String>, currentId: String?, positionMs: Long): Int {
+    val currentTrack = mediaIds.indexOf(currentId)
+    return chapters.indexOfLast { chapter ->
+        val chapterTrack = mediaIds.indexOf(chapter.mediaId)
+        chapterTrack >= 0 && (chapterTrack < currentTrack || (chapterTrack == currentTrack && chapter.positionMs <= positionMs))
+    }.coerceAtLeast(0)
+}
+
 @Composable
 fun AudiobookSkipSettings() {
     val (back, setBack) = rememberPreference(AudiobookPlaybackSettings.BackKey, AudiobookPlaybackSettings.DEFAULT_BACK)
@@ -56,13 +64,13 @@ fun AudiobookSkipSettings() {
             Material3SettingsItem(
                 icon = painterResource(R.drawable.skip_previous),
                 title = { Text(stringResource(R.string.audiobook_rewind_time)) },
-                description = { Text(stringResource(R.string.audiobook_seconds, AudiobookPlaybackSettings.seconds(back, 15))) },
+                description = { Text(stringResource(R.string.audiobook_seconds, AudiobookPlaybackSettings.seconds(back, AudiobookPlaybackSettings.DEFAULT_BACK))) },
                 onClick = { pickingForward = false },
             ),
             Material3SettingsItem(
                 icon = painterResource(R.drawable.skip_next),
                 title = { Text(stringResource(R.string.audiobook_forward_time)) },
-                description = { Text(stringResource(R.string.audiobook_seconds, AudiobookPlaybackSettings.seconds(forward, 30))) },
+                description = { Text(stringResource(R.string.audiobook_seconds, AudiobookPlaybackSettings.seconds(forward, AudiobookPlaybackSettings.DEFAULT_FORWARD))) },
                 onClick = { pickingForward = true },
             ),
         ),

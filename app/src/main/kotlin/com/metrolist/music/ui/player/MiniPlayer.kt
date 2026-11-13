@@ -872,18 +872,20 @@ private fun LegacyMiniPlayer(
             }
 
             // Wavelength: on a podcast with skip buttons on, tap jumps forward and hold goes to the next episode
-            val audiobookBack by rememberPreference(com.metrolist.music.audiobooks.AudiobookPlaybackSettings.BackKey, 15)
-            val audiobookForward by rememberPreference(com.metrolist.music.audiobooks.AudiobookPlaybackSettings.ForwardKey, 30)
+            val storedAudiobookBack by rememberPreference(com.metrolist.music.audiobooks.AudiobookPlaybackSettings.BackKey, 15)
+            val storedAudiobookForward by rememberPreference(com.metrolist.music.audiobooks.AudiobookPlaybackSettings.ForwardKey, 30)
+            val audiobookBack = com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(storedAudiobookBack, 15)
+            val audiobookForward = com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(storedAudiobookForward, 30)
             val podcastSkip = if (com.metrolist.music.constants.isAudiobookId(mediaMetadata?.id)) {
                 com.metrolist.music.podcasts.PodcastSkipAmounts(
-                    com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(audiobookBack, 15),
-                    com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(audiobookForward, 30),
+                    audiobookBack,
+                    audiobookForward,
                 )
             } else com.metrolist.music.podcasts.rememberPodcastSkip(mediaMetadata)
             if (com.metrolist.music.constants.isAudiobookId(mediaMetadata?.id) && !isCasting && !isListenTogetherGuest) {
                 IconButton(onClick = {
                     val p = playerConnection.player
-                    p.seekTo(com.metrolist.music.audiobooks.audiobookSeekPosition(p.currentPosition, -com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(audiobookBack, 15), p.duration))
+                    p.seekTo(com.metrolist.music.audiobooks.audiobookSeekPosition(p.currentPosition, -audiobookBack, p.duration))
                 }) {
                     Box(Modifier.semantics { contentDescription = context.getString(R.string.audiobook_rewind_by, audiobookBack) }) {
                         com.metrolist.music.podcasts.SkipIcon(false, audiobookBack, androidx.compose.material3.LocalContentColor.current, 26.dp)
