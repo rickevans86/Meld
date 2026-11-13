@@ -29,6 +29,14 @@ fun isOnDeviceMediaId(mediaId: String): Boolean =
         mediaId.startsWith(SUBSONIC_ID_PREFIX) ||
         mediaId.startsWith(MEDIA_SERVER_ID_PREFIX)
 
+/**
+ * A YouTube item: resolved through YouTube rather than any other source. The YouTube home rows show
+ * only these, so played audiobooks, podcasts, radio, local files, Subsonic/media-server songs and
+ * Spotify items (all with their own id prefixes and their own tabs/home) stay off it.
+ */
+fun isYouTubeMediaId(mediaId: String): Boolean =
+    !isOnDeviceMediaId(mediaId) && !mediaId.startsWith("spotify:")
+
 /** Live internet radio stations: "radio:<Radio Browser station id>". Never cached or downloaded as a file. */
 const val RADIO_ID_PREFIX = "radio:"
 
