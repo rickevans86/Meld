@@ -156,8 +156,8 @@ fun MiniPlayer(
     // Create stable progress state - doesn't cause recomposition on position changes
     val progressState = remember { ProgressState(positionState, durationState) }
 
-    val connection = LocalPlayerConnection.current
-    val metadata by connection?.mediaMetadata?.collectAsStateWithLifecycle() ?: remember { mutableStateOf<com.metrolist.music.models.MediaMetadata?>(null) }
+    val connection = LocalPlayerConnection.current ?: return
+    val metadata by connection.mediaMetadata.collectAsStateWithLifecycle()
     if (useNewMiniPlayerDesign && !com.metrolist.music.constants.isAudiobookId(metadata?.id)) {
         NewMiniPlayer(
             progressState = progressState,
@@ -901,12 +901,13 @@ private fun LegacyMiniPlayer(
                 listenTogetherManager = listenTogetherManager,
             )
 
-            if (podcastSkip != null && !isListenTogetherGuest) {
+            if (podcastSkip != null && !isListenTogetherGuest && !isCasting) {
                 val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(48.dp)
+                        .semantics { contentDescription = context.getString(R.string.audiobook_forward_by, podcastSkip.forward) }
                         .clip(androidx.compose.foundation.shape.CircleShape)
                         .combinedClickable(
                             onClick = {
