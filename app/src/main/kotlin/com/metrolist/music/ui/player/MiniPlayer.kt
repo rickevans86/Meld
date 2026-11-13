@@ -60,6 +60,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -154,7 +156,9 @@ fun MiniPlayer(
     // Create stable progress state - doesn't cause recomposition on position changes
     val progressState = remember { ProgressState(positionState, durationState) }
 
-    if (useNewMiniPlayerDesign) {
+    val connection = LocalPlayerConnection.current
+    val metadata by connection?.mediaMetadata?.collectAsStateWithLifecycle() ?: remember { mutableStateOf<com.metrolist.music.models.MediaMetadata?>(null) }
+    if (useNewMiniPlayerDesign && !com.metrolist.music.constants.isAudiobookId(metadata?.id)) {
         NewMiniPlayer(
             progressState = progressState,
             modifier = modifier,
@@ -700,6 +704,7 @@ private fun LegacyMiniPlayer(
     onClick: () -> Unit = {},
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
+    val context = LocalContext.current
     val pureBlack by rememberPreference(PureBlackMiniPlayerKey, defaultValue = false)
 
     val playbackState by playerConnection.playbackState.collectAsState()
@@ -866,6 +871,26 @@ private fun LegacyMiniPlayer(
                 }
             }
 
+            // Wavelength: on a podcast with skip buttons on, tap jumps forward and hold goes to the next episode
+            val audiobookBack by rememberPreference(com.metrolist.music.audiobooks.AudiobookPlaybackSettings.BackKey, 15)
+            val audiobookForward by rememberPreference(com.metrolist.music.audiobooks.AudiobookPlaybackSettings.ForwardKey, 30)
+            val podcastSkip = if (com.metrolist.music.constants.isAudiobookId(mediaMetadata?.id)) {
+                com.metrolist.music.podcasts.PodcastSkipAmounts(
+                    com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(audiobookBack, 15),
+                    com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(audiobookForward, 30),
+                )
+            } else com.metrolist.music.podcasts.rememberPodcastSkip(mediaMetadata)
+            if (com.metrolist.music.constants.isAudiobookId(mediaMetadata?.id) && !isCasting && !isListenTogetherGuest) {
+                IconButton(onClick = {
+                    val p = playerConnection.player
+                    p.seekTo(com.metrolist.music.audiobooks.audiobookSeekPosition(p.currentPosition, -com.metrolist.music.audiobooks.AudiobookPlaybackSettings.seconds(audiobookBack, 15), p.duration))
+                }) {
+                    Box(Modifier.semantics { contentDescription = context.getString(R.string.audiobook_rewind_by, audiobookBack) }) {
+                        com.metrolist.music.podcasts.SkipIcon(false, audiobookBack, androidx.compose.material3.LocalContentColor.current, 26.dp)
+                    }
+                }
+            }
+
             LegacyPlayPauseButton(
                 playbackState = playbackState,
                 isCasting = isCasting,
@@ -874,8 +899,6 @@ private fun LegacyMiniPlayer(
                 listenTogetherManager = listenTogetherManager,
             )
 
-            // Wavelength: on a podcast with skip buttons on, tap jumps forward and hold goes to the next episode
-            val podcastSkip = com.metrolist.music.podcasts.rememberPodcastSkip(mediaMetadata)
             if (podcastSkip != null && !isListenTogetherGuest) {
                 val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
                 Box(

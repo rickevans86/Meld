@@ -1013,7 +1013,7 @@ fun BottomSheetPlayer(
                     modifier = Modifier.weight(1f),
                 ) {
                     AnimatedContent(
-                        targetState = mediaMetadata.title,
+                        targetState = if (com.metrolist.music.constants.isAudiobookId(mediaMetadata.id)) currentSong?.song?.albumName ?: mediaMetadata.title else mediaMetadata.title,
                         transitionSpec = { fadeIn() togetherWith fadeOut() },
                         label = "",
                     ) { title ->
@@ -1032,7 +1032,7 @@ fun BottomSheetPlayer(
                                         indication = null,
                                         interactionSource = remember { MutableInteractionSource() },
                                         onClick = {
-                                            if (mediaMetadata.album != null) {
+                                            if (mediaMetadata.album != null && !com.metrolist.music.constants.isAudiobookId(mediaMetadata.id)) {
                                                 state.collapseSoft()
                                                 navController.navigate("album/${mediaMetadata.album.id}")
                                             }
@@ -1534,7 +1534,20 @@ fun BottomSheetPlayer(
                 exit = shrinkVertically(shrinkTowards = Alignment.Top) + slideOutVertically(targetOffsetY = { it }) + fadeOut(),
             ) {
                 Column {
-                    if (useNewPlayerDesign) {
+                    if (com.metrolist.music.constants.isAudiobookId(mediaMetadata.id) && !isCasting && !isListenTogetherGuest) {
+                        AudiobookPlayerControls(
+                            connection = playerConnection,
+                            isPlaying = effectiveIsPlaying,
+                            enabled = true,
+                            positionMs = effectivePosition,
+                            color = TextBackgroundColor,
+                            onPlayPause = {
+                                if (playbackState == STATE_ENDED) playerConnection.player.seekTo(0L)
+                                playerConnection.player.togglePlayPause()
+                            },
+                            onSleepTimer = { showSleepTimerDialog = true },
+                        )
+                    } else if (useNewPlayerDesign) {
                         Row(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically,

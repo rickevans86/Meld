@@ -1180,6 +1180,19 @@ class MusicService :
         scope.launch {
             radioDirectory.nowPlaying.collect { sessionPlayer?.notifyMetadataChanged() }
         }
+        scope.launch {
+            dataStore.data.map { prefs ->
+                val settings = com.metrolist.music.audiobooks.AudiobookPlaybackSettings
+                settings.seconds(prefs[settings.BackKey] ?: settings.DEFAULT_BACK, settings.DEFAULT_BACK) to
+                    settings.seconds(prefs[settings.ForwardKey] ?: settings.DEFAULT_FORWARD, settings.DEFAULT_FORWARD)
+            }.distinctUntilChanged().collect {
+                audiobookSkipSetting = it
+                withContext(Dispatchers.Main) {
+                    sessionPlayer?.notifyAvailableCommandsChanged()
+                    updateNotification()
+                }
+            }
+        }
         // Podcast skip buttons setting: keep it at hand and refresh the buttons when it changes
         scope.launch {
             dataStore.data.map {
@@ -1809,11 +1822,16 @@ class MusicService :
     @Volatile
     private var podcastSkipSetting = Triple(false, com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK, com.metrolist.music.podcasts.PodcastSkip.DEFAULT_FORWARD)
 
-    /** (back, forward) seconds when next/previous should skip inside the playing podcast; null otherwise. */
+    @Volatile
+    private var audiobookSkipSetting = com.metrolist.music.audiobooks.AudiobookPlaybackSettings.DEFAULT_BACK to
+        com.metrolist.music.audiobooks.AudiobookPlaybackSettings.DEFAULT_FORWARD
+
+    /** (back, forward) seconds for audiobook or enabled podcast skip controls; null otherwise. */
     fun podcastSkipAmounts(): Pair<Int, Int>? {
+        val id = player.currentMediaItem?.mediaId ?: return null
+        if (isAudiobookId(id)) return audiobookSkipSetting
         val (enabled, back, forward) = podcastSkipSetting
         if (!enabled) return null
-        val id = player.currentMediaItem?.mediaId ?: return null
         val isEpisode = player.currentMetadata?.isEpisode == true
         return if (com.metrolist.music.podcasts.PodcastSkip.isPodcast(id, isEpisode)) back to forward else null
     }

@@ -248,6 +248,8 @@ fun FeaturesSettings(navController: NavController) {
         Spacer(Modifier.height(16.dp))
         RadioSongsSetting()
         Spacer(Modifier.height(16.dp))
+        com.metrolist.music.audiobooks.AudiobookSkipSettings()
+        Spacer(Modifier.height(16.dp))
         PodcastPlaylistsSetting()
     }
 

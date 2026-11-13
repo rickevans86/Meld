@@ -50,6 +50,7 @@ internal data class AbsTrackInfo(
     val startOffsetSec: Double,
     val bookDurationSec: Double,
     val isLast: Boolean,
+    val chapters: List<AbsChapter> = emptyList(),
 )
 
 data class PreparedAbsBook(val book: AbsBook, val songs: List<Song>, val startIndex: Int)
@@ -114,6 +115,9 @@ constructor(
             _downloads.value = downloadedIds().associateWith { AbsDownloadState(1f, done = true) }
         }
     }
+
+    fun chaptersForTrack(trackId: String?): List<com.metrolist.music.audiobooks.AudiobookChapter> =
+        absChapterNavigation(trackId, tracks)
 
     fun selectedLibraryId(): String? = context.dataStore[AbsLibraryKey]
 
@@ -186,7 +190,7 @@ constructor(
 
         book.tracks.forEachIndexed { position, track ->
             val songId = "$ABS_TRACK_ID_PREFIX$itemId:${track.index}"
-            tracks[songId] = AbsTrackInfo(itemId, track.startOffsetSec, book.durationSec, position == book.tracks.lastIndex)
+            tracks[songId] = AbsTrackInfo(itemId, track.startOffsetSec, book.durationSec, position == book.tracks.lastIndex, if (position == 0) book.chapters else emptyList())
             val path = downloadedTrack(itemId, track.index)?.let { Uri.fromFile(it).toString() }
                 ?: (session.serverUrl + track.contentUrl)
             val title = if (multiFile) track.title.substringBeforeLast('.').ifBlank { book.title } else book.title

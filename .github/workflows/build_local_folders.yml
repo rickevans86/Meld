@@ -1,10 +1,10 @@
 name: Build and Release
 
-# Every push to the feature branch (or a manual run) builds the app and publishes it as a
+# Every push to main or the feature branch (or a manual run) builds the app and publishes it as a
 # GitHub release named after its version, which is where the in-app updater looks.
 on:
   push:
-    branches: [feat/local-folders]
+    branches: [main, feat/local-folders]
   workflow_dispatch:
 
 permissions:
@@ -83,6 +83,9 @@ jobs:
       # A proper release build (not a debuggable test build), signed with the fork's key.
       # The app id stays com.meld.app.debug so it updates the installed app and keeps its data.
       # Retries once, since a dependency download occasionally fails for a moment
+      - name: Test audiobook playback
+        run: ./gradlew --console=plain :app:testFossDebugUnitTest --tests 'com.metrolist.music.audiobooks.AudiobookPlaybackTest'
+
       - name: Build APK
         run: |
           chmod +x gradlew
