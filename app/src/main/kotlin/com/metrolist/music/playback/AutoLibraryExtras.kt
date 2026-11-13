@@ -60,6 +60,7 @@ constructor(
     fun isBrowsable(mediaId: String): Boolean =
         autoAudiobooks.isBrowsable(mediaId) ||
             mediaId == DOWNLOADED ||
+            (mediaId.startsWith("$DOWNLOADED/") && autoPageNumber(mediaId.substringAfter('/')) != null) ||
             mediaId == LOCAL_FILES ||
             (mediaId.startsWith("$LOCAL_FOLDER/") && mediaId.count { it == '/' } == 2) ||
             (mediaId.startsWith("$LIB_ALBUM/") && mediaId.count { it == '/' } == 1) ||
@@ -181,8 +182,12 @@ constructor(
         parentId.startsWith("$SUB_ALBUM/") -> serverSongsWithShuffle(parentId) { subsonic.albumSongs(parentId.substringAfterLast('/')) }
         parentId.startsWith("$SUB_PLAYLIST/") -> serverSongsWithShuffle(parentId) { subsonic.playlistSongs(parentId.substringAfterLast('/')) }
         autoAudiobooks.isBrowsable(parentId) -> autoAudiobooks.children(parentId)
-        parentId == DOWNLOADED -> autoAudiobooks.downloaded().map { autoGridItem(it, context.getString(R.string.filter_audiobooks)) } +
-            downloadedEpisodes().map { autoGridItem(it.toAutoItem(DOWNLOADED_EPISODES), context.getString(R.string.filter_podcasts)) }
+        parentId == DOWNLOADED || parentId.startsWith("$DOWNLOADED/") -> {
+            val page = autoPageNumber(parentId.substringAfter('/', "0")) ?: 0
+            val items = autoAudiobooks.downloaded().map { autoGridItem(it, context.getString(R.string.filter_audiobooks)) } +
+                downloadedEpisodes().map { autoGridItem(it.toAutoItem(DOWNLOADED_EPISODES), context.getString(R.string.filter_podcasts)) }
+            autoAudiobooks.withMore(autoPage(items, page), DOWNLOADED, page)
+        }
         parentId == PODCASTS -> podcastFolders()
         parentId == SAVED_EPISODES -> savedEpisodes().map { it.toAutoItem(SAVED_EPISODES) }
         parentId == DOWNLOADED_EPISODES -> downloadedEpisodes().map { it.toAutoItem(DOWNLOADED_EPISODES) }

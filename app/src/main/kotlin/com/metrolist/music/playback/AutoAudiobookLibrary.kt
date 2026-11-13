@@ -69,9 +69,11 @@ class AutoAudiobookLibrary @Inject constructor(
         return when (path.getOrNull(1)) {
             "library", "abs_all" -> path.size in 2..3 && (path.size == 2 || page(path[2]) != null)
             "groups" -> path.size == 4 && kind(path[2]) != null && page(path[3]) != null
-            "group" -> path.size == 5 && kind(path[2]) != null && page(path[3]) != null && path[4].isNotBlank()
-            "local_playlists" -> path.size == 2
-            "local_playlist" -> path.size == 3 && path[2].isNotBlank()
+            // group/<kind>/<server page>/<id>[/<item page>]
+            "group" -> path.size in 5..6 && kind(path[2]) != null && page(path[3]) != null && path[4].isNotBlank() &&
+                (path.size == 5 || page(path[5]) != null)
+            "local_playlists" -> path.size == 2 || (path.size == 3 && page(path[2]) != null)
+            "local_playlist" -> path.size in 3..4 && path[2].isNotBlank() && (path.size == 3 || page(path[3]) != null)
             else -> false
         }
     }
@@ -81,20 +83,30 @@ class AutoAudiobookLibrary @Inject constructor(
         if (id == AutoLibraryExtras.AUDIOBOOKS) return home()
         val path = id.split('/')
         return when (path[1]) {
-            "library", "abs_all" -> library(page(path.getOrElse(2) { "0" }) ?: 0, path[1] == "abs_all")
+            "library", "abs_all" -> library(page(path.getOrNull(2)) ?: 0, path[1] == "abs_all")
             "groups" -> groups(kind(path[2])!!, page(path[3])!!)
             "group" -> {
                 val library = libraryId() ?: return emptyList()
                 val result = remote { abs.groups(library, kind(path[2])!!, page(path[3])!!, GROUP_PAGE_SIZE) }
-                result?.groups?.firstOrNull { it.id == Uri.decode(path[4]) }?.books.orEmpty().map { bookItem(it) }
+                val books = result?.groups?.firstOrNull { it.id == Uri.decode(path[4]) }?.books.orEmpty().map { bookItem(it) }
+                val number = page(path.getOrNull(5)) ?: 0
+                withMore(autoPage(books, number), path.take(5).joinToString("/"), number)
             }
-            "local_playlists" -> localPlaylists()
+            "local_playlists" -> {
+                val number = page(path.getOrNull(2)) ?: 0
+                withMore(autoPage(localPlaylists(), number), LOCAL_PLAYLISTS, number)
+            }
             "local_playlist" -> {
-                localPlaylistItems(Uri.decode(path[2]))
+                val number = page(path.getOrNull(3)) ?: 0
+                withMore(autoPage(localPlaylistItems(Uri.decode(path[2])), number), path.take(3).joinToString("/"), number)
             }
             else -> emptyList()
         }
     }
+
+    /** Page [page] of [items], with a More folder opening `[base]/[page + 1]` when items remain. */
+    fun withMore(page: AutoPage<MediaItem>, base: String, number: Int): List<MediaItem> =
+        if (page.hasMore) page.items + folder("$base/${number + 1}", R.string.auto_audiobook_more, R.drawable.audiobook) else page.items
 
     suspend fun downloaded(): List<MediaItem> = local.books.value.map { bookItem(it) } +
         if (abs.session.value != null) abs.downloadedBooks().map {
@@ -144,33 +156,39 @@ class AutoAudiobookLibrary @Inject constructor(
         return fresh ?: shelfCache?.takeIf { it.first == key }?.second.orEmpty()
     }
 
+    /** Device books then server books, one combined page; offline it pages device and downloaded books. */
     private suspend fun library(page: Int, serverOnly: Boolean): List<MediaItem> {
-        val items = mutableListOf<MediaItem>()
-        if (page == 0 && !serverOnly) items += local.books.value.sortedBy { it.title.lowercase() }.map { bookItem(it) }
+        val base = if (serverOnly) LEGACY_ALL else LIBRARY
+        val devices = if (serverOnly) emptyList() else local.books.value.sortedBy { it.title.lowercase() }.map { bookItem(it) }
         val library = libraryId()
-        val result = library?.let { remote { abs.books(it, page, BOOK_PAGE_SIZE) } }
-        val books = result?.books ?: if (page == 0 && abs.session.value != null) {
-            abs.downloadedBooks().map { AbsBookSummary(it.id, it.title, it.author, it.durationSec) }
-        } else emptyList()
-        items += books.map { bookItem(it) }
-        if (result != null && (page.toLong() + 1) * BOOK_PAGE_SIZE < result.total && result.books.isNotEmpty()) {
-            items += folder("${if (serverOnly) LEGACY_ALL else LIBRARY}/${page + 1}", R.string.auto_audiobook_more, R.drawable.audiobook)
+        val online = library?.let { id ->
+            autoCombinedPage(page, devices, localFirst = true, remote = { p, limit ->
+                remote { abs.books(id, p, limit) }?.let { result -> result.books.map { bookItem(it) } to result.total }
+            })
         }
-        return items
+        if (online != null) return withMore(online, base, page)
+        val offline = if (abs.session.value != null) {
+            abs.downloadedBooks().map { bookItem(AbsBookSummary(it.id, it.title, it.author, it.durationSec)) }
+        } else emptyList()
+        return withMore(autoPage(devices + offline, page), base, page)
     }
 
+    /** Server series, collections or playlists; app playlists follow the server playlists. */
     private suspend fun groups(kind: AbsBrowseKind, page: Int): List<MediaItem> {
-        val library = libraryId() ?: return if (kind == AbsBrowseKind.PLAYLISTS) localPlaylists() else emptyList()
-        val result = remote { abs.groups(library, kind, page, GROUP_PAGE_SIZE) }
-        val items = result?.groups.orEmpty().map { group ->
-            val artwork = group.books.firstOrNull()?.let { abs.coverUrl(it.id)?.toUri() }
-            folder("$GROUP/${kind.path}/$page/${Uri.encode(group.id)}", group.name, artwork)
-        }.toMutableList()
-        if (kind == AbsBrowseKind.PLAYLISTS && page == 0) items += localPlaylists()
-        if (result != null && (page.toLong() + 1) * GROUP_PAGE_SIZE < result.total && result.groups.isNotEmpty()) {
-            items += folder("$GROUPS/${kind.path}/${page + 1}", R.string.auto_audiobook_more, R.drawable.audiobook)
-        }
-        return items
+        val appPlaylists = if (kind == AbsBrowseKind.PLAYLISTS) localPlaylists() else emptyList()
+        val base = "$GROUPS/${kind.path}"
+        val library = libraryId() ?: return withMore(autoPage(appPlaylists, page), base, page)
+        val result = autoCombinedPage(page, appPlaylists, localFirst = false, remote = { p, limit ->
+            remote { abs.groups(library, kind, p, limit) }?.let { result ->
+                result.groups.mapIndexed { index, group ->
+                    // The group is reopened from the GROUP_PAGE_SIZE page that holds it.
+                    val groupPage = ((p.toLong() * limit + index) / GROUP_PAGE_SIZE).toInt()
+                    val artwork = group.books.firstOrNull()?.let { abs.coverUrl(it.id)?.toUri() }
+                    folder("$GROUP/${kind.path}/$groupPage/${Uri.encode(group.id)}", group.name, artwork)
+                } to result.total
+            }
+        }) ?: autoPage(appPlaylists, page)
+        return withMore(result, base, page)
     }
 
     private suspend fun localPlaylists(): List<MediaItem> {
@@ -236,7 +254,6 @@ class AutoAudiobookLibrary @Inject constructor(
 
     companion object {
         private const val SHELF_SIZE = 12
-        private const val BOOK_PAGE_SIZE = 200
         private const val GROUP_PAGE_SIZE = 50
         private const val LIBRARY = "audiobooks/library"
         private const val LEGACY_ALL = "audiobooks/abs_all"
@@ -245,6 +262,6 @@ class AutoAudiobookLibrary @Inject constructor(
         private const val LOCAL_PLAYLISTS = "audiobooks/local_playlists"
         private const val LOCAL_PLAYLIST = "audiobooks/local_playlist"
         private fun kind(raw: String) = AbsBrowseKind.entries.find { it.path == raw }
-        private fun page(raw: String) = raw.toIntOrNull()?.takeIf { it in 0..(Int.MAX_VALUE / BOOK_PAGE_SIZE - 1) }
+        private fun page(raw: String?) = autoPageNumber(raw)
     }
 }
