@@ -18,3 +18,5 @@ Data limits: server-driven rows and series/collection metadata require Audiobook
 Coordination: PR #2 owns the pending audit updates to the shared root .ai files. This feature uses a dedicated task record to avoid conflicting edits; PR #2 has been updated with the feature PR reference and current ownership/handoff. Main merge and release require separate authorization for this feature.
 
 Review artifact: the existing PR workflow assembled FOSS Debug but uploaded from the GMS directory. Corrected its upload path to app/build/outputs/apk/foss/debug/*.apk, verified against the locally produced APK. CI builds use an isolated PR application ID and PR signing key. No signing credentials or release workflow changed.
+
+CI run 43394406341: full unit tests passed and assembleFossDebug completed; the job reached its 20-minute limit during lint, so the later artifact upload was skipped. Split APK build/upload from lint and increased the job budget to 40 minutes. Lint remains enabled with the same PR environment; no source-code failure was observed. Final CI result remains pending.
