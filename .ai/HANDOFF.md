@@ -28,6 +28,19 @@ Next action: owner verifies the intended GMS nightly credentials in repository s
 Shared records updated: on this documentation branch, pending review.
 Remote synchronization: confirmed against main 4b1e9295 and all three current remote branch heads. No new remote work by other agents was found at audit start.
 
+## Latest feature handoff — AUTO-AUDIOBOOKS pagination (supersedes the Codex section below for current status)
+
+Agent: Claude
+Task: AUTO-AUDIOBOOKS (temporary ID; Issues disabled)
+Completed: explicit Android Auto pagination under the 100-item cap for every audiobook list and the Downloaded root. That covers combined device + server Library pages, server groups + app playlists, group contents, app playlists and their contents, and Downloaded; each More folder stays inside the visible page. Older browse IDs and playback routes are preserved. Also added pagination tests, task-record and change-log updates, the PR #3 description and these shared records.
+In progress: none. Owner review, car testing and live-server testing are pending.
+Branch/PR: feat/auto-audiobook-sections / https://github.com/rickevans86/Meld/pull/3 (open). Code 640e3c95 and 23d4c232; docs 2d9255da [skip ci].
+Tests: the 6 new AutoBrowsePagingTest tests passed locally on a standalone Kotlin compiler. CI run 43403522870 on 23d4c232 passed the full unit suite, FOSS debug build, review APK artifact and lint. No local Gradle build (no Android SDK in Claude's workspace).
+Blockers: none for code. Issues disabled.
+Next action: owner installs the PR #3 review APK (artifact app-universal-debug-pr-3) or waits for an authorized release. Then check the Audiobooks/Downloaded tabs and More pages on a car display with an Audiobookshelf server that has more than 98 books. Merge to main and any release need new explicit instructions.
+Shared records updated: yes (this PR #2 branch, plus the task file in PR #3).
+Remote synchronization: main 4b1e9295; PR #3 head is the docs commit 2d9255da on top of 23d4c232; release 0.9.2.81 is unchanged.
+
 ## Latest feature handoff — AUTO-AUDIOBOOKS
 
 Agent: Codex

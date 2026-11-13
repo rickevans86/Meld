@@ -24,3 +24,5 @@ Proposed CI-NIGHTLY-SIGNING follow-up: .github/workflows/build.yml only after ac
 Branch feat/auto-audiobook-sections, code 11965b3f. Implemented files: AutoAudiobookLibrary, AutoLibraryExtras, MediaLibrarySessionCallback, MusicService; AutoAudiobookSections and AutoAudiobookSectionSettings; AndroidAutoSettings; AbsClient/AbsRepository; default English strings, four auto_audiobook_* drawables, three focused tests and .ai/tasks/AUTO-AUDIOBOOKS.md. Keep these changes intact while the feature PR is reviewed. GitHub PRs remain authoritative; no Issue claim succeeded.
 
 Root .ai coordination files are updated through this documentation PR #2, not the code PR, so the two PRs do not edit the same files. No signing workflow or credential file is reserved by this feature.
+
+Pagination follow-up (Claude, PR #3, completed; review reservation only): playback/AutoBrowsePaging.kt (new), playback/AutoAudiobookLibrary.kt, playback/AutoLibraryExtras.kt (Downloaded paging), app/src/test/.../playback/AutoBrowsePagingTest.kt (new), .ai/tasks/AUTO-AUDIOBOOKS.md and one WAVELENGTH_CHANGES.md line on the feature branch.

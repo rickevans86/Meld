@@ -19,3 +19,13 @@ Remote main was verified at 4b1e92957d02fa505c5fe84974941c3921b27f7b. Latest rel
 The next unclaimed follow-up is the optional GMS nightly signing configuration. The latest failure is verified; today's secret configuration is unverified because the integration received HTTP 403 while requesting metadata. Do not infer that credentials are still absent merely from an older failed run, substitute a new signing identity, or expose credentials while investigating. Issues are still disabled, so the follow-up remains explicitly unassigned/blocked rather than remotely claimed.
 
 Pending feature: Codex's [PR #3](https://github.com/rickevans86/Meld/pull/3), AUTO-AUDIOBOOKS, adds the single scrolling Android Auto audiobook page and section controls. Code 11965b3f is locally verified (eight focused tests and FOSS debug build); application changes are not yet on main. Documentation PR #2 tracks this work separately, without application-file overlap. See the dedicated task file on the feature branch and latest HANDOFF section. Released baseline remains 0.9.2.81.
+
+## AUTO-AUDIOBOOKS update — 2026-11-13, Claude
+
+PR #3 is implementation-complete and still open; main is unchanged at 4b1e9295, and the released baseline is still 0.9.2.81. Codex's commit 25d9a88e passed all PR checks in run 43397446049.
+
+Claude then added explicit pagination for Android Auto's 100-children limit in 640e3c95 and 23d4c232. Every audiobook and Downloaded list now returns at most 98 items plus a More folder. Older browse IDs and the playback routes are unchanged.
+
+PR run 43403522870 on 23d4c232 passed: full unit suite (including 6 new pagination tests), FOSS debug build, review APK and lint. No local Gradle build was possible in Claude's workspace (no Android SDK). Physical Android Auto testing and live Audiobookshelf testing are still outstanding.
+
+The phone audiobook Library / Downloaded / Listening tabs are a separate design request, not part of PR #3.
