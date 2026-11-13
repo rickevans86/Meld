@@ -116,6 +116,10 @@ fun UpdaterScreen(
 
         Spacer(Modifier.height(4.dp))
 
+        com.metrolist.music.ui.component.WavelengthMove.UpdaterCard(
+            onOpenBackup = { navController.navigate(com.metrolist.music.ui.component.WavelengthMove.BACKUP_ROUTE) },
+        )
+
         Material3SettingsGroup(
             title = stringResource(R.string.current_version),
             items =

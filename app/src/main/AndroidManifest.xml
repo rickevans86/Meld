@@ -29,6 +29,8 @@
             <action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
         </intent>
         <package android:name="com.google.android.projection.gearhead" />
+        <!-- Wavelength: lets the new app see whether the old com.meld.app.debug app is still installed -->
+        <package android:name="com.meld.app.debug" />
     </queries>
     <application
         android:name=".App"
