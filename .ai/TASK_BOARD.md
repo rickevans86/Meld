@@ -31,3 +31,5 @@ PHONE-AUDIOBOOK-TABS — Claude — merged and released as [Wavelength 0.9.2.83]
 
 WAVELENGTH-APP-ID — Claude — done, released in 0.9.2.85. Wavelength now builds as com.rickevans86.wavelength (was com.meld.app.debug, which tripped Play Protect). Two steps: 0.9.2.84 added backup coverage + a move guide under the old id; 0.9.2.85 (merge 0a221b60) switched the id and folded in HOME-AUDIOBOOK-FILTER. Installs as a second app; migration guide in-app. Owner still to migrate on-device.
 HOME-AUDIOBOOK-FILTER — Claude — done, released in 0.9.2.85 (folded into PR #6; PR #7 closed). YouTube home rows now show only YouTube items.
+
+HOME-SOURCE-AND-ABS-PROGRESS — Claude — released in 0.9.2.86 (merge c89e127f, run 43530050429). Six reported fixes: audiobook % from position, 60s auto-finish (server-synced), YouTube/Spotify home source purity incl. Speed dial, podcast playlists out of Mixes, de-duped repeated feed sections. AbsProgressTest added. APK verified (com.rickevans86.wavelength, vc 280086, same cert).

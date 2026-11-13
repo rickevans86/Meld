@@ -51,3 +51,14 @@ Two changes shipped together as one new-app-ID build (owner backed up first):
 2. HOME-AUDIOBOOK-FILTER: the YouTube home's play-history rows (Recently Played, Quick picks, Keep listening, Forgotten favourites) now show only YouTube items. PR #7 was folded into PR #6 and closed.
 
 Merge 0a221b60; release run 43522774134; APK verified id com.rickevans86.wavelength, version code 280085, same signing cert. Main head is the [skip ci] records commit. This is the latest released baseline. Outstanding: the owner's on-device migration, plus physical car/phone testing from earlier releases.
+
+## Release 0.9.2.86 — 2026-11-14, Claude
+
+Six owner-reported fixes (PR #8, merge c89e127f, run 43530050429), new-id build:
+1. Audiobookshelf percent from position/duration (was 0% while time-left correct).
+2. Audiobooks finished within the last 60s, marked finished on the server so they leave "in progress" automatically.
+3. YouTube home shows only YouTube items and Spotify home only Spotify items, Speed dial included (pinned radio no longer in the YouTube Speed dial).
+4. Spotify home no longer mixes in YouTube rows (option A; spotifyHomeOnly setting now redundant).
+5. Podcast playlists (New Episodes auto-playlist) kept out of Mixes.
+6. De-duped repeated YouTube feed sections on scroll.
+APK verified: com.rickevans86.wavelength, version code 280086, same signing cert. Latest baseline. Outstanding: owner's on-device migration to the new app id (0.9.2.85+), and physical device/car testing.
