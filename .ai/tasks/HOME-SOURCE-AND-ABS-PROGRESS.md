@@ -1,7 +1,7 @@
 # HOME-SOURCE-AND-ABS-PROGRESS
 
 AI: Claude
-Status: implemented; owner authorized build + release on 2026-11-14. Temporary task ID because GitHub Issues are disabled.
+Status: released in Wavelength 0.9.2.86 (owner authorized build + release on 2026-11-14). Merge c89e127f, release run 43530050429; APK verified id com.rickevans86.wavelength, version code 280086, same signing cert. Temporary task ID because GitHub Issues are disabled.
 Branch: fix/abs-percent (from main; branch name predates the wider scope)
 
 Bundle of fixes the owner reported in one session (all decisions confirmed by the owner):
