@@ -1,7 +1,7 @@
 # HOME-AUDIOBOOK-FILTER
 
 AI: Claude
-Status: implemented; CI-verified on PR #7. Not yet released (coordinating with the app-ID switch). Temporary task ID because GitHub Issues are disabled.
+Status: released in Wavelength 0.9.2.85. PR #7 was folded into PR #6 (the new-app-ID build) and closed; its commits (87e65747, e8b57a44) are in main via merge 0a221b60. Temporary task ID because GitHub Issues are disabled.
 Branch: fix/home-recently-audiobooks (from main)
 
 Reported (owner screenshots): an audiobook ("Exoplanet") showed in the YouTube home's Recently Played. The owner then asked that each home show only its own source — the YouTube home only YouTube items, the Spotify home only Spotify items.

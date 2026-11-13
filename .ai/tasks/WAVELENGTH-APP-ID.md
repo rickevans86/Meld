@@ -15,5 +15,5 @@ Not carried over: server sign-ins (encrypted stores), downloaded files, and fold
 Tests: WavelengthBackupFilesTest (3) covers entry round-trip, that the key files are included, and rejection of other names and path tricks.
 
 Step 1 done: PR #5 passed CI (run 43509729500) and was merged as 27d718ca, publishing 0.9.2.84 with the old ID.
-Step 2 (branch feat/wavelength-new-id): build_local_folders.yml sets METROLIST_APPLICATION_ID to com.rickevans86.wavelength. Held until the owner confirms he has made a backup in 0.9.2.84.
+Step 2 done: the owner backed up in 0.9.2.84 and authorized the move. PR #6 (which also folded in the HOME-AUDIOBOOK-FILTER fix, PR #7) merged into main as 0a221b60, publishing Wavelength 0.9.2.85 with application id com.rickevans86.wavelength (release run 43522774134). Verified APK: id com.rickevans86.wavelength, version code 280085, same signing certificate as before, so the migration guide (not an in-place update) is the path. Status: complete. Outstanding: the owner installs 0.9.2.85 as a second app, restores the backup, signs in to servers again, re-downloads offline media, and removes the old app.
 
