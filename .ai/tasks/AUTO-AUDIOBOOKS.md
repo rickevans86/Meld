@@ -1,7 +1,7 @@
 # AUTO-AUDIOBOOKS
 
 AI: Codex (implementation, CI workflow fixes); Claude (Android Auto 100-item pagination, 2026-11-13)
-Status: implementation complete; all PR checks pass on 23d4c232 (CI run 43403522870). Awaiting owner review, car testing and live Audiobookshelf testing in PR #3 (https://github.com/rickevans86/Meld/pull/3). Not merged to main; no release. Temporary task ID because GitHub Issues are disabled.
+Status: merged and released. The owner authorized publishing on 2026-11-13. PR #3 (https://github.com/rickevans86/Meld/pull/3) was merged into main as 5e6a7b47 (merge commit; Codex's and Claude's commits preserved). Released as Wavelength 0.9.2.82 (https://github.com/rickevans86/Meld/releases/tag/v0.9.2.82). Car and live Audiobookshelf testing are still outstanding. Temporary task ID because GitHub Issues are disabled.
 Branch: feat/auto-audiobook-sections (main 4b1e9295)
 Overlap check: PR #2 is a separate documentation audit; no open feature PR or other agent claim overlaps this code.
 
@@ -43,3 +43,11 @@ Verification:
 Known limits: a refresh notification refreshes the first page of a list only. Pages are numbered by position, so if the server fails partway through, the offline fallback can repeat or skip items between pages. The older podcasts/downloaded and podcasts/saved lists (outside this feature) are unchanged.
 
 Scope: the phone audiobook Library / Downloaded / Listening tabs and their order are a separate design request, not part of this task.
+
+## Release — Claude, 2026-11-13
+
+- On the owner's instruction "Publish to release", Claude merged PR #3 into main as 5e6a7b47e067bbccab109fd1d435898b47c5a969. Main had already contained all of feat/local-folders, so nothing else came in with it.
+- Signed release workflow "Build and Release" run 43408784962 succeeded and published Wavelength 0.9.2.82. Tag v0.9.2.82 points to 5e6a7b47; the only asset is Wavelength.apk.
+- Claude downloaded the public APK and compared it with 0.9.2.81. The application ID is still com.meld.app.debug, the version code went from 280081 to 280082, and the signing certificate is identical (SHA-256 prefix 9056f5a0b0d6f4e2), so it installs as an update.
+- The legacy GMS "Build APKs" workflow also starts on pushes to main. It is the separate CI-NIGHTLY-SIGNING follow-up and does not affect the FOSS release.
+- Still outstanding: physical Android Auto head-unit testing and testing against a live Audiobookshelf server.
