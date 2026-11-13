@@ -15,4 +15,4 @@ Bundle of fixes the owner reported in one session (all decisions confirmed by th
 
 Tests: AbsProgressTest (5) covers position-based percent, duration fallback, the 60 s tail, the server finished flag and clamping. YouTubeMediaIdTest (existing) covers source ids.
 
-Verification: AbsProgressTest passed locally (standalone Kotlin compiler). Resource check clean. CI result recorded below after the PR run.
+Verification: AbsProgressTest passed locally (standalone Kotlin compiler). Resource check clean. PR #8 CI run 43527390708 passed: unit tests, FOSS debug build, APK upload and lint.
