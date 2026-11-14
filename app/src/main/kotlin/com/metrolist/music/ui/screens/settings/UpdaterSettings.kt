@@ -52,6 +52,7 @@ import com.metrolist.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.collectAsState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -177,6 +178,11 @@ fun UpdaterScreen(
 
         Spacer(Modifier.height(16.dp))
 
+        // The latest release's download, shared by the row's download button and the install button below
+        val downloadState by UpdateInstaller.state.collectAsState()
+        val downloadUrl = Updater.getCachedLatestRelease()?.let { Updater.getDownloadUrlForCurrentVariant(it) }
+        val startDownload = { downloadUrl?.let { UpdateInstaller.start(context, it) }; Unit }
+
         Material3SettingsGroup(
             title = stringResource(R.string.check_for_updates_title),
             items =
@@ -199,11 +205,21 @@ fun UpdaterScreen(
                                     strokeWidth = 2.dp,
                                 )
                             } else if (updateAvailable) {
-                                Icon(
-                                    painter = painterResource(R.drawable.download),
-                                    contentDescription = stringResource(R.string.update_available_title),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
+                                IconButton(
+                                    onClick = startDownload,
+                                    onLongClick = startDownload,
+                                    enabled = downloadUrl != null && downloadState !is UpdateDownloadState.Downloading,
+                                ) {
+                                    if (downloadState is UpdateDownloadState.Downloading) {
+                                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                                    } else {
+                                        Icon(
+                                            painter = painterResource(R.drawable.download),
+                                            contentDescription = stringResource(R.string.update_install),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                }
                             }
                         },
                         onClick = { if (!isChecking) performManualCheck() },
@@ -222,11 +238,9 @@ fun UpdaterScreen(
         }
 
         if (updateAvailable && latestVersion != null) {
-            val downloadState by UpdateInstaller.state.collectAsState()
-            val downloadUrl = Updater.getCachedLatestRelease()?.let { Updater.getDownloadUrlForCurrentVariant(it) }
             Spacer(Modifier.height(16.dp))
             Button(
-                onClick = { downloadUrl?.let { UpdateInstaller.start(context, it) } },
+                onClick = startDownload,
                 enabled = downloadUrl != null && downloadState !is UpdateDownloadState.Downloading,
                 modifier =
                     Modifier
