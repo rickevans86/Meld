@@ -62,3 +62,12 @@ Six owner-reported fixes (PR #8, merge c89e127f, run 43530050429), new-id build:
 5. Podcast playlists (New Episodes auto-playlist) kept out of Mixes.
 6. De-duped repeated YouTube feed sections on scroll.
 APK verified: com.rickevans86.wavelength, version code 280086, same signing cert. Latest baseline. Outstanding: owner's on-device migration to the new app id (0.9.2.85+), and physical device/car testing.
+
+## Release 0.9.2.88 — 2026-11-14, Claude
+
+Recognition improvements + Updater download-button fix (PR #10, folding PR #9), plus a release-pipeline fix.
+- Recognition: rolling re-query up to ~20s, UNPROCESSED mic with fallback, gain normalisation, and an optional user-token AudD fallback in Settings → Features (RECOGNITION-IMPROVE).
+- Updater: the "Latest" row download icon now downloads.
+- Pipeline: build_local_folders.yml now releases only from main. A scheduled build from the stale feat/local-folders branch had published 0.9.2.87 (old app id com.meld.app.debug, none of main's features), which leapfrogged main's version and rolled users back. main is now the sole release branch.
+Merge 87684ccd; release run 43584647468; APK verified com.rickevans86.wavelength, version code 280088, same cert. Latest baseline.
+OPEN ISSUE: upstream Spotify GQL-hash sync previously flowed via merges into feat/local-folders; it no longer reaches releases. Needs redirecting to main as a controlled, verified merge (not unattended) — flagged to owner.
