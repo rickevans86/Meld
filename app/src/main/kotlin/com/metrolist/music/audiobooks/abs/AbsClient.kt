@@ -57,6 +57,9 @@ data class AbsBook(
     val title: String,
     val author: String?,
     val narrator: String?,
+    val narrators: List<String>,
+    val description: String?,
+    val genres: List<String>,
     val durationSec: Double,
     val tracks: List<AbsTrack>,
     val chapters: List<AbsChapter>,
@@ -233,6 +236,15 @@ internal class AbsClient {
             author = metadata?.string("authorName")?.takeIf { it.isNotBlank() }
                 ?: metadata?.array("authors")?.mapNotNull { it.obj?.string("name") }?.joinToString(", ")?.takeIf { it.isNotBlank() },
             narrator = metadata?.string("narratorName")?.takeIf { it.isNotBlank() },
+            narrators = metadata?.array("narrators").orEmpty().mapNotNull { element ->
+                (element as? JsonPrimitive)?.takeIf { it.isString }?.content ?: element.obj?.string("name")
+            }.ifEmpty {
+                metadata?.string("narratorName")?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }.orEmpty()
+            },
+            description = metadata?.string("description")?.takeIf { it.isNotBlank() },
+            genres = metadata?.array("genres").orEmpty().mapNotNull { element ->
+                (element as? JsonPrimitive)?.takeIf { it.isString }?.content
+            },
             durationSec = media?.double("duration") ?: 0.0,
             tracks = media?.array("tracks").orEmpty().mapIndexedNotNull { position, element ->
                 val track = element.obj ?: return@mapIndexedNotNull null

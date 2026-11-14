@@ -482,224 +482,83 @@ private fun LazyListScope.bookDetail(
     onToggleFinished: () -> Unit,
 ) {
     val started = progress != null && progress.currentTimeSec > 0 && !progress.isComplete(book.durationSec)
-    item(key = "abs_book_header") {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = onBack, modifier = Modifier.padding(horizontal = 4.dp)) {
-                Icon(painterResource(R.drawable.arrow_back), contentDescription = stringResource(R.string.audiobooks_back))
+    val finished = progress?.isComplete(book.durationSec) == true
+
+    item(key = "abs_book_back") {
+        IconButton(onClick = onBack, modifier = Modifier.padding(horizontal = 4.dp)) {
+            Icon(painterResource(R.drawable.arrow_back), contentDescription = stringResource(R.string.audiobooks_back))
+        }
+    }
+
+    item(key = "abs_book_hero") {
+        AudiobookHero(
+            coverUrl = coverUrl,
+            title = book.title,
+            authors = book.author,
+            metaText = progressText(progress, book.durationSec),
+            finished = finished,
+            fraction = progress?.fractionComplete(book.durationSec)?.toFloat(),
+            primaryText = when {
+                isThisBookPlaying -> stringResource(R.string.audiobook_pause)
+                finished -> stringResource(R.string.audiobook_listen_again)
+                started -> stringResource(R.string.abs_continue_from, formatClock(progress!!.currentTimeSec))
+                else -> stringResource(R.string.audiobook_start)
+            },
+            primaryIcon = R.drawable.play,
+            busy = busy,
+            primaryEnabled = book.tracks.isNotEmpty(),
+            onPrimary = { onPlay(null) },
+        ) {
+            when {
+                download == null -> DetailActionButton(R.drawable.download, stringResource(R.string.abs_download)) { onDownload() }
+                download.done -> DetailActionButton(R.drawable.offline, stringResource(R.string.abs_remove_download)) { onRemoveDownload() }
+                download.failed -> DetailActionButton(R.drawable.download, stringResource(R.string.abs_retry)) { onDownload() }
+                else -> DetailActionButton(R.drawable.download, "${(download.progress * 100).roundToInt()}%", enabled = false) {}
             }
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
-                Cover(coverUrl, 112.dp)
-                Spacer(Modifier.width(16.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
-                    Text(book.title, style = MaterialTheme.typography.titleLarge, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                    book.author?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
-                    }
-                    book.narrator?.let {
-                        Text(
-                            stringResource(R.string.abs_narrated_by, it),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            DetailActionButton(
+                icon = if (finished) R.drawable.radio_button_unchecked else R.drawable.check_circle,
+                text = stringResource(if (finished) R.string.mark_unfinished else R.string.mark_finished),
+            ) { onToggleFinished() }
+        }
+    }
+
+    item(key = "abs_book_meta") {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            NarratedBy(book.narrators)
+            book.description?.let { DetailOverview(it) }
+            GenreChips(book.genres)
+        }
+    }
+
+    val useChapters = book.chapters.isNotEmpty()
+    val chapterCount = if (useChapters) book.chapters.size else book.tracks.size
+    if (useChapters || book.tracks.size > 1) {
+        item(key = "abs_chapters") {
+            var expanded by rememberSaveable(book.id) { mutableStateOf(false) }
+            val position = progress?.takeIf { !it.isComplete(book.durationSec) }?.currentTimeSec ?: -1.0
+            Column(modifier = Modifier.fillMaxWidth()) {
+                CollapsibleSectionTitle(stringResource(R.string.audiobook_chapters), chapterCount, expanded) { expanded = !expanded }
+                if (expanded && useChapters) {
+                    book.chapters.forEachIndexed { index, chapter ->
+                        ChapterLine(
+                            number = index + 1,
+                            title = chapter.title,
+                            time = formatClock(chapter.startSec),
+                            isCurrent = position >= chapter.startSec && position < chapter.endSec,
+                            onClick = { onPlay(chapter.startSec) },
                         )
                     }
-                    Text(
-                        progressText(progress, book.durationSec),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                } else if (expanded) {
+                    book.tracks.forEachIndexed { index, track ->
+                        ChapterLine(
+                            number = index + 1,
+                            title = track.title.substringBeforeLast('.'),
+                            time = formatClock(track.startOffsetSec),
+                            isCurrent = false,
+                            onClick = { onPlay(track.startOffsetSec) },
+                        )
+                    }
                 }
-            }
-            if (started) {
-                LinearProgressIndicator(
-                    progress = { progress?.fractionComplete(book.durationSec)?.toFloat() ?: 0f },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(4.dp),
-                )
-            } else {
-                Spacer(Modifier.height(12.dp))
-            }
-            Button(
-                onClick = { onPlay(null) },
-                enabled = !busy && book.tracks.isNotEmpty(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Icon(painterResource(R.drawable.play), contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        when {
-                            isThisBookPlaying -> stringResource(R.string.audiobook_pause)
-                            progress?.isComplete(book.durationSec) == true -> stringResource(R.string.audiobook_listen_again)
-                            started -> stringResource(R.string.abs_continue_from, formatClock(progress!!.currentTimeSec))
-                            else -> stringResource(R.string.audiobook_start)
-                        }
-                    )
-                }
-            }
-            val finished = progress?.isComplete(book.durationSec) == true
-            OutlinedButton(
-                onClick = onToggleFinished,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-            ) {
-                Icon(
-                    painterResource(if (finished) R.drawable.radio_button_unchecked else R.drawable.check_circle),
-                    contentDescription = null,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(if (finished) R.string.mark_unfinished else R.string.mark_finished))
-            }
-            DownloadControls(download, onDownload, onRemoveDownload)
-            if (book.chapters.isNotEmpty() || book.tracks.size > 1) {
-                SectionTitle(stringResource(R.string.audiobook_chapters))
-            }
-        }
-    }
-
-    if (book.chapters.isNotEmpty()) {
-        val position = progress?.takeIf { !it.isComplete(book.durationSec) }?.currentTimeSec ?: -1.0
-        itemsIndexed(book.chapters, key = { index, _ -> "abs_chapter:$index" }) { index, chapter ->
-            ChapterLine(
-                number = index + 1,
-                title = chapter.title,
-                time = formatClock(chapter.startSec),
-                isCurrent = position >= chapter.startSec && position < chapter.endSec,
-                onClick = { onPlay(chapter.startSec) },
-            )
-        }
-    } else if (book.tracks.size > 1) {
-        itemsIndexed(book.tracks, key = { index, _ -> "abs_track:$index" }) { index, track ->
-            ChapterLine(
-                number = index + 1,
-                title = track.title.substringBeforeLast('.'),
-                time = formatClock(track.startOffsetSec),
-                isCurrent = false,
-                onClick = { onPlay(track.startOffsetSec) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun DownloadControls(state: AbsDownloadState?, onDownload: () -> Unit, onRemove: () -> Unit) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        when {
-            state == null -> OutlinedButton(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-                Icon(painterResource(R.drawable.download), contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.abs_download))
-            }
-            state.done -> Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    painterResource(R.drawable.offline),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.abs_downloaded_offline),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = onRemove) { Text(stringResource(R.string.abs_remove_download)) }
-            }
-            state.failed -> Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.abs_download_failed),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = onDownload) { Text(stringResource(R.string.abs_retry)) }
-            }
-            else -> {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.abs_downloading, (state.progress * 100).roundToInt()),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = onRemove) { Text(stringResource(R.string.abs_cancel_download)) }
-                }
-                LinearProgressIndicator(
-                    progress = { state.progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AbsBookRow(
-    summary: AbsBookSummary,
-    progress: AbsProgress?,
-    coverUrl: String?,
-    downloaded: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        Cover(coverUrl, 64.dp)
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                summary.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            summary.author?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Text(
-                if (downloaded) {
-                    stringResource(R.string.abs_downloaded_prefix, progressText(progress, summary.durationSec))
-                } else {
-                    progressText(progress, summary.durationSec)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (progress != null && !progress.isComplete(summary.durationSec) && progress.fractionComplete(summary.durationSec) > 0) {
-                Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { progress.fractionComplete(summary.durationSec).toFloat() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp),
-                )
             }
         }
     }

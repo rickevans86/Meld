@@ -1635,4 +1635,12 @@
     <string name="audd_token_set">Token saved</string>
     <string name="audd_token_placeholder">Paste your AudD token</string>
     <string name="audd_token_help">Get a free token at dashboard.audd.io, then paste it here. Leave empty to remove it.</string>
+    <!-- Wavelength: audiobook detail page -->
+    <string name="audiobook_narrated_by_title">Narrated By</string>
+    <string name="audiobook_overview">Overview</string>
+    <string name="audiobook_genres">Genres</string>
+    <string name="audiobook_see_all">See all %1$d</string>
+    <string name="audiobook_see_less">See less</string>
+    <string name="audiobook_read_more">Read more</string>
+    <string name="audiobook_read_less">Read less</string>
 </resources>
