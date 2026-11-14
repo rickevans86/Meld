@@ -1,10 +1,12 @@
 name: Build and Release
 
-# Every push to main or the feature branch (or a manual run) builds the app and publishes it as a
-# GitHub release named after its version, which is where the in-app updater looks.
+# Every push to main (or a manual run) builds the app and publishes it as a GitHub release named
+# after its version, which is where the in-app updater looks. main is the only release branch:
+# feat/local-folders is stale (old app id, none of the recent features) and must not publish
+# releases that would leapfrog main's version number and roll users back.
 on:
   push:
-    branches: [main, feat/local-folders]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
