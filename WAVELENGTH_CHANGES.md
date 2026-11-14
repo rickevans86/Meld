@@ -6,7 +6,7 @@ the update in or to rebuild these features on top of the new code.
 
 - **Fork:** `rickevans86/Meld`, branch `feat/local-folders`
 - **Upstream:** `FrancescoGrazioso/Meld`, branch `main`
-- **Last upstream commit this is based on:** `6d741bc33970455266024b7d792a27e41dddf013`
+- **Last upstream commit this is based on:** `4c8da93731a4fcca313446133e40ee457a9eee18`
 
 > Keep this file up to date: every change to Wavelength should update the matching section below
 > and add a line to the change log at the end.
@@ -702,3 +702,4 @@ To see the exact diff at any time:
 - 2026-11-09: Podcast skip buttons: next/previous jump forward/back by a chosen amount in podcasts (app, notification, Android Auto), seconds shown on the buttons, hold in the app to change episode.
 - 2026-11-10: Fixed Android Auto showing "Tap to open" while playing (the session's player listeners weren't receiving events).
 - 2026-11-13: Merged Meld upstream 6d741bc3 (four automated Spotify GQL hash updates in `docs/spotify-gql-hashes.json`).
+- 2026-11-14: Merged Meld upstream 4c8da937 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
