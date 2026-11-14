@@ -1626,4 +1626,13 @@
     <string name="wavelength_move_restore">Restore backup</string>
     <string name="wavelength_move_remove_old">Remove old app</string>
     <string name="wavelength_move_done">Done</string>
+    <!-- Wavelength: AudD fallback recognition -->
+    <string name="audd_section">Fallback recognition</string>
+    <string name="audd_fallback_setting">Use AudD when Shazam finds nothing</string>
+    <string name="audd_fallback_desc">If the normal recognition can\'t identify a song, try AudD as a second source. Needs your own free AudD API token below.</string>
+    <string name="audd_token_setting">AudD API token</string>
+    <string name="audd_token_not_set">Not set — tap to add</string>
+    <string name="audd_token_set">Token saved</string>
+    <string name="audd_token_placeholder">Paste your AudD token</string>
+    <string name="audd_token_help">Get a free token at dashboard.audd.io, then paste it here. Leave empty to remove it.</string>
 </resources>

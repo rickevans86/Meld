@@ -1,9 +1,9 @@
 /**
  * Music Recognition Feature
- * 
+ *
  * This feature is based on the original MusicRecognizer project by Aleksey Saenko.
  * Original project: https://github.com/aleksey-saenko/MusicRecognizer
- * 
+ *
  * Special thanks to Aleksey Saenko for the music recognition implementation.
  */
 
@@ -16,7 +16,9 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import androidx.core.content.ContextCompat
+import com.metrolist.music.utils.dataStore
 import com.metrolist.shazamkit.Shazam
 import com.metrolist.shazamkit.models.RecognitionResult
 import com.metrolist.shazamkit.models.RecognitionStatus
@@ -25,27 +27,35 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import java.nio.ByteOrder
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
- * Service for recognizing music using audio fingerprinting.
- * Records audio from the microphone, generates a Shazam-compatible fingerprint,
- * and sends it to the Shazam API for recognition.
+ * Records from the microphone and identifies the music.
+ *
+ * Wavelength changes: instead of one fixed 12s capture and a single query, it listens and re-queries
+ * Shazam as the audio builds up (at [QUERY_CHECKPOINTS_MS], up to [MAX_LISTEN_MS]), stopping at the
+ * first match — the way the Shazam app behaves, which turns many unlucky single-shot misses into
+ * hits. It records from the UNPROCESSED source where available (cleaner than the voice-tuned MIC)
+ * and normalises the clip's volume before fingerprinting. If everything misses and the AudD fallback
+ * is enabled in Settings with a token, the clip is sent there as a last resort.
  */
 object MusicRecognitionService {
-    
-    // Recording parameters
+
     private const val RECORDING_SAMPLE_RATE = 44100
     private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
     private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
-    // Recording duration: 12 seconds for better recognition accuracy
-    // We use 12s directly to match the fallback duration for maximum compatibility
-    private const val RECORDING_DURATION_MS = 12000L
     private const val TAG = "MusicRecognitionService"
+
+    /** Query Shazam once the recording reaches each of these, in order. */
+    private val QUERY_CHECKPOINTS_MS = longArrayOf(5_000, 8_000, 12_000, 16_000, 20_000)
+    private const val MAX_LISTEN_MS = 20_000L
 
     private val _recognitionStatus = MutableStateFlow<RecognitionStatus>(RecognitionStatus.Ready)
     val recognitionStatus: StateFlow<RecognitionStatus> = _recognitionStatus.asStateFlow()
@@ -56,17 +66,13 @@ object MusicRecognitionService {
      * Reset to false by [reset].
      */
     var resultSavedExternally: Boolean = false
-    
-    fun hasRecordPermission(context: Context): Boolean {
-        return ContextCompat.checkSelfPermission(
-            context, 
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-    
+
+    fun hasRecordPermission(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
     /**
-     * Start the music recognition process.
-     * Records audio, generates fingerprint, and queries Shazam API.
+     * Records audio and identifies the track, re-querying as more audio arrives and, if enabled,
+     * falling back to AudD. Updates [recognitionStatus] throughout and returns the final status.
      */
     @SuppressLint("MissingPermission")
     suspend fun recognize(context: Context): RecognitionStatus = withContext(Dispatchers.IO) {
@@ -76,77 +82,57 @@ object MusicRecognitionService {
         }
 
         _recognitionStatus.value = RecognitionStatus.Listening
-        Timber.tag(TAG).d("Starting music recognition")
-        
-        try {
-            // Step 1: Record audio
-            val audioData = recordAudio()
-            Timber.tag(TAG).d("Audio recorded: %d bytes", audioData.size)
+        Timber.tag(TAG).d("Starting rolling music recognition")
 
-            _recognitionStatus.value = RecognitionStatus.Processing
-            
-            // Step 2: Convert to mono if needed and resample to 16kHz
-            Timber.tag(TAG).d("Resampling audio from %dHz to %dHz", RECORDING_SAMPLE_RATE, VibraSignature.REQUIRED_SAMPLE_RATE)
-            val decodedAudio = DecodedAudio(
-                data = audioData,
-                channelCount = 1,
-                sampleRate = RECORDING_SAMPLE_RATE,
-                pcmEncoding = AUDIO_FORMAT
-            )
-            
-            val resampledAudio = AudioResampler.resample(
-                decodedAudio,
-                VibraSignature.REQUIRED_SAMPLE_RATE
-            ).getOrElse { error ->
-                Timber.tag(TAG).e(error, "Audio resampling failed")
-                _recognitionStatus.value = RecognitionStatus.Error("Failed to resample audio: ${error.message}")
-                return@withContext _recognitionStatus.value
-            }
-            Timber.tag(TAG).d("Resampled audio: %d bytes, %d channels, %dHz", resampledAudio.data.size, resampledAudio.channelCount, resampledAudio.sampleRate)
-            
-            // Verify format
-            require(
-                resampledAudio.channelCount == 1 &&
-                resampledAudio.sampleRate == VibraSignature.REQUIRED_SAMPLE_RATE &&
-                resampledAudio.pcmEncoding == AudioFormat.ENCODING_PCM_16BIT &&
-                ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN &&
-                resampledAudio.data.isNotEmpty() && 
-                resampledAudio.data.size % 2 == 0
-            ) { "Invalid audio format for fingerprint generation" }
-            
-            // Step 3: Generate fingerprint using native library
-            val signature = try {
-                VibraSignature.fromI16(resampledAudio.data)
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Fingerprint generation failed")
-                _recognitionStatus.value = RecognitionStatus.Error("Failed to generate fingerprint: ${e.message}")
-                return@withContext _recognitionStatus.value
-            }
-            
-            // Step 4: Send to Shazam API
-            val sampleDurationMs = (resampledAudio.data.size / 2) * 1000L / VibraSignature.REQUIRED_SAMPLE_RATE
-            Timber.tag(TAG).d("Fingerprint generated, sampleDurationMs=%d", sampleDurationMs)
-            
-            val result = Shazam.recognize(signature, sampleDurationMs)
-            
-            result.fold(
-                onSuccess = { recognitionResult ->
-                    Timber.tag(TAG).i("Recognition successful: '%s' by %s", recognitionResult.title, recognitionResult.artist)
-                    _recognitionStatus.value = RecognitionStatus.Success(recognitionResult)
-                    // Add it to the playlist chosen in Settings → Features → Song recognition (if set)
-                    RecognisedSongs.onRecognised(context, recognitionResult)
-                },
-                onFailure = { error ->
-                    val message = error.message ?: "Unknown error"
-                    Timber.tag(TAG).w(error, "Recognition API returned failure: %s", message)
-                    _recognitionStatus.value = if (message.contains("No match", ignoreCase = true)) {
-                        RecognitionStatus.NoMatch("No matches found. Try again with clearer audio.")
-                    } else {
-                        RecognitionStatus.Error(message)
+        val pcm = ByteArrayOutputStream()
+        var matched: RecognitionResult? = null
+
+        try {
+            val bufferSize = AudioRecord.getMinBufferSize(RECORDING_SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
+            val audioRecord = createAudioRecord(bufferSize)
+            val buffer = ByteArray(bufferSize)
+            var nextCheckpoint = 0
+            try {
+                audioRecord.startRecording()
+                val startTime = System.currentTimeMillis()
+                while (isActive) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    if (elapsed >= MAX_LISTEN_MS) break
+                    val read = audioRecord.read(buffer, 0, bufferSize)
+                    if (read > 0) pcm.write(buffer, 0, read)
+
+                    if (nextCheckpoint < QUERY_CHECKPOINTS_MS.size && elapsed >= QUERY_CHECKPOINTS_MS[nextCheckpoint]) {
+                        nextCheckpoint++
+                        _recognitionStatus.value = RecognitionStatus.Processing
+                        matched = fingerprintAndQuery(pcm.toByteArray())
+                        if (matched != null) break
+                        _recognitionStatus.value = RecognitionStatus.Listening
                     }
                 }
-            )
-            
+            } finally {
+                runCatching { audioRecord.stop() }
+                audioRecord.release()
+            }
+
+            // If the loop ended between checkpoints, try once more with everything captured.
+            if (matched == null && isActive) {
+                _recognitionStatus.value = RecognitionStatus.Processing
+                matched = fingerprintAndQuery(pcm.toByteArray())
+            }
+
+            // Last resort: the optional AudD fallback, when enabled with a token.
+            if (matched == null && isActive) {
+                matched = tryAudDFallback(context, pcm.toByteArray())
+            }
+
+            if (matched != null) {
+                val result = matched
+                Timber.tag(TAG).i("Recognition successful: '%s' by %s", result.title, result.artist)
+                _recognitionStatus.value = RecognitionStatus.Success(result)
+                RecognisedSongs.onRecognised(context, result)
+            } else {
+                _recognitionStatus.value = RecognitionStatus.NoMatch("No matches found. Try again with clearer audio.")
+            }
             _recognitionStatus.value
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -156,48 +142,99 @@ object MusicRecognitionService {
             _recognitionStatus.value
         }
     }
-    
-    @SuppressLint("MissingPermission")
-    private suspend fun recordAudio(): ByteArray = withContext(Dispatchers.IO) {
-        val bufferSize = AudioRecord.getMinBufferSize(
-            RECORDING_SAMPLE_RATE,
-            CHANNEL_CONFIG,
-            AUDIO_FORMAT
-        )
-        Timber.tag(TAG).d("Recording audio: sampleRate=%d, bufferSize=%d, durationMs=%d", RECORDING_SAMPLE_RATE, bufferSize, RECORDING_DURATION_MS)
 
-        val audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            RECORDING_SAMPLE_RATE,
-            CHANNEL_CONFIG,
-            AUDIO_FORMAT,
-            bufferSize
-        )
-        
-        val outputStream = ByteArrayOutputStream()
-        val buffer = ByteArray(bufferSize)
-        val startTime = System.currentTimeMillis()
-        
-        try {
-            audioRecord.startRecording()
-            Timber.tag(TAG).d("AudioRecord started, recording for %dms", RECORDING_DURATION_MS)
-
-            while (System.currentTimeMillis() - startTime < RECORDING_DURATION_MS && isActive) {
-                val bytesRead = audioRecord.read(buffer, 0, bufferSize)
-                if (bytesRead > 0) {
-                    outputStream.write(buffer, 0, bytesRead)
-                }
-            }
-        } finally {
-            audioRecord.stop()
-            audioRecord.release()
+    /** Resamples to 16kHz, normalises the volume, fingerprints and queries Shazam. Null on no match/error. */
+    private suspend fun fingerprintAndQuery(pcm44k: ByteArray): RecognitionResult? {
+        if (pcm44k.size < RECORDING_SAMPLE_RATE) return null // under ~0.25s of audio: nothing to match yet
+        val resampled = resampleTo16k(pcm44k) ?: return null
+        normalizeGain(resampled)
+        if (resampled.isEmpty() || resampled.size % 2 != 0 || ByteOrder.nativeOrder() != ByteOrder.LITTLE_ENDIAN) return null
+        val signature = try {
+            VibraSignature.fromI16(resampled)
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Fingerprint generation failed")
+            return null
         }
-
-        val totalBytes = outputStream.size()
-        Timber.tag(TAG).d("Audio recording complete: %d bytes collected", totalBytes)
-        outputStream.toByteArray()
+        val sampleDurationMs = (resampled.size / 2) * 1000L / VibraSignature.REQUIRED_SAMPLE_RATE
+        return Shazam.recognize(signature, sampleDurationMs).getOrNull()
     }
-    
+
+    private suspend fun tryAudDFallback(context: Context, pcm44k: ByteArray): RecognitionResult? {
+        val prefs = context.dataStore.data.first()
+        if (prefs[AudDRecognizer.EnabledKey] != true) return null
+        val token = prefs[AudDRecognizer.TokenKey].orEmpty()
+        if (token.isBlank()) return null
+        val resampled = resampleTo16k(pcm44k) ?: return null
+        normalizeGain(resampled)
+        _recognitionStatus.value = RecognitionStatus.Processing
+        Timber.tag(TAG).d("Shazam found nothing; trying AudD fallback")
+        return AudDRecognizer.recognize(resampled, VibraSignature.REQUIRED_SAMPLE_RATE, token)
+    }
+
+    private suspend fun resampleTo16k(pcm44k: ByteArray): ByteArray? {
+        val decoded = DecodedAudio(
+            data = pcm44k,
+            channelCount = 1,
+            sampleRate = RECORDING_SAMPLE_RATE,
+            pcmEncoding = AUDIO_FORMAT,
+        )
+        return AudioResampler.resample(decoded, VibraSignature.REQUIRED_SAMPLE_RATE)
+            .getOrElse {
+                Timber.tag(TAG).w(it, "Resampling failed")
+                return null
+            }
+            .takeIf {
+                it.channelCount == 1 &&
+                    it.sampleRate == VibraSignature.REQUIRED_SAMPLE_RATE &&
+                    it.pcmEncoding == AudioFormat.ENCODING_PCM_16BIT
+            }
+            ?.data
+    }
+
+    /** Scales 16-bit PCM so its loudest sample is near full scale, so quiet captures still fingerprint. */
+    private fun normalizeGain(data: ByteArray) {
+        var peak = 0
+        var i = 0
+        while (i + 1 < data.size) {
+            val sample = ((data[i].toInt() and 0xff) or (data[i + 1].toInt() shl 8)).toShort().toInt()
+            val a = abs(sample)
+            if (a > peak) peak = a
+            i += 2
+        }
+        if (peak < 150) return // essentially silence: boosting would only amplify noise
+        val gain = 30_000.0 / peak
+        if (gain <= 1.05) return // already loud enough
+        i = 0
+        while (i + 1 < data.size) {
+            val sample = ((data[i].toInt() and 0xff) or (data[i + 1].toInt() shl 8)).toShort().toInt()
+            val scaled = (sample * gain).roundToInt().coerceIn(-32768, 32767)
+            data[i] = (scaled and 0xff).toByte()
+            data[i + 1] = ((scaled shr 8) and 0xff).toByte()
+            i += 2
+        }
+    }
+
+    /** UNPROCESSED where the device supports it (cleaner for music), else MIC, else voice recognition. */
+    @SuppressLint("MissingPermission")
+    private fun createAudioRecord(bufferSize: Int): AudioRecord {
+        val sources = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) add(MediaRecorder.AudioSource.UNPROCESSED)
+            add(MediaRecorder.AudioSource.MIC)
+            add(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+        }
+        for (source in sources) {
+            val record = runCatching {
+                AudioRecord(source, RECORDING_SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, bufferSize)
+            }.getOrNull()
+            if (record != null && record.state == AudioRecord.STATE_INITIALIZED) {
+                Timber.tag(TAG).d("Recording from audio source %d", source)
+                return record
+            }
+            record?.release()
+        }
+        return AudioRecord(MediaRecorder.AudioSource.MIC, RECORDING_SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, bufferSize)
+    }
+
     fun reset() {
         Timber.tag(TAG).d("Recognition state reset")
         _recognitionStatus.value = RecognitionStatus.Ready
