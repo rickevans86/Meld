@@ -565,6 +565,62 @@ private fun LazyListScope.bookDetail(
 }
 
 @Composable
+private fun AbsBookRow(
+    summary: AbsBookSummary,
+    progress: AbsProgress?,
+    coverUrl: String?,
+    downloaded: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Cover(coverUrl, 64.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                summary.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            summary.author?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                if (downloaded) {
+                    stringResource(R.string.abs_downloaded_prefix, progressText(progress, summary.durationSec))
+                } else {
+                    progressText(progress, summary.durationSec)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (progress != null && !progress.isComplete(summary.durationSec) && progress.fractionComplete(summary.durationSec) > 0) {
+                Spacer(Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { progress.fractionComplete(summary.durationSec).toFloat() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ChapterLine(number: Int, title: String, time: String, isCurrent: Boolean, onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
