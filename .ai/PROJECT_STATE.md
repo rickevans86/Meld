@@ -71,3 +71,7 @@ Recognition improvements + Updater download-button fix (PR #10, folding PR #9), 
 - Pipeline: build_local_folders.yml now releases only from main. A scheduled build from the stale feat/local-folders branch had published 0.9.2.87 (old app id com.meld.app.debug, none of main's features), which leapfrogged main's version and rolled users back. main is now the sole release branch.
 Merge 87684ccd; release run 43584647468; APK verified com.rickevans86.wavelength, version code 280088, same cert. Latest baseline.
 OPEN ISSUE: upstream Spotify GQL-hash sync previously flowed via merges into feat/local-folders; it no longer reaches releases. Needs redirecting to main as a controlled, verified merge (not unattended) — flagged to owner.
+
+## Release 0.9.2.89 — 2026-11-14, Claude
+
+Audiobook detail page redesign (AUDIOBOOK-DETAIL-REDESIGN, PR #11, merge 632eefd0, run 43589020771). Both the Audiobookshelf and on-phone book pages now use a centred cover + Finished badge, play/continue button, Download + Finished action row, and collapsible Chapters. Audiobookshelf books also show Narrated By (See all), an expandable Overview, and Genre chips (AbsBook now parses narrators/description/genres). New shared AudiobookDetailUi.kt. APK verified: com.rickevans86.wavelength, version code 280089, same cert. Latest baseline.

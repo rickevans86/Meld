@@ -35,3 +35,5 @@ HOME-AUDIOBOOK-FILTER — Claude — done, released in 0.9.2.85 (folded into PR 
 HOME-SOURCE-AND-ABS-PROGRESS — Claude — released in 0.9.2.86 (merge c89e127f, run 43530050429). Six reported fixes: audiobook % from position, 60s auto-finish (server-synced), YouTube/Spotify home source purity incl. Speed dial, podcast playlists out of Mixes, de-duped repeated feed sections. AbsProgressTest added. APK verified (com.rickevans86.wavelength, vc 280086, same cert).
 
 RECOGNITION-IMPROVE — Claude — released in 0.9.2.88 from main. Rolling recognition, UNPROCESSED mic, gain normalisation, optional AudD fallback (user token, Settings → Features). Includes Updater download-button fix (PR #9 folded) and the release-only-from-main pipeline fix (0.9.2.87 regression).
+
+AUDIOBOOK-DETAIL-REDESIGN — Claude — released in 0.9.2.89 from main. Richer book detail (both ABS and on-phone): hero cover + Finished badge, play/continue, Download + Finished row, collapsible chapters; ABS also Narrated By / Overview / Genres. Add-to-Playlist left off per owner.
