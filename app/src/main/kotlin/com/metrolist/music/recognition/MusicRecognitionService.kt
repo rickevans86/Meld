@@ -171,7 +171,7 @@ object MusicRecognitionService {
         return AudDRecognizer.recognize(resampled, VibraSignature.REQUIRED_SAMPLE_RATE, token)
     }
 
-    private fun resampleTo16k(pcm44k: ByteArray): ByteArray? {
+    private suspend fun resampleTo16k(pcm44k: ByteArray): ByteArray? {
         val decoded = DecodedAudio(
             data = pcm44k,
             channelCount = 1,
