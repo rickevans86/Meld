@@ -41,6 +41,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -147,6 +149,7 @@ private fun DeviceAudiobooks(
     BackHandler(enabled = openBookId != null) { viewModel.openBookId.value = null }
 
     val tabs = rememberAudiobookTabState()
+    var localChaptersExpanded by rememberSaveable(openBookId) { mutableStateOf(false) }
 
     /** Continue card: pause or resume the playing book, otherwise start it where it was left. */
     fun resume(summary: AudiobookSummary) {
@@ -207,14 +210,25 @@ private fun DeviceAudiobooks(
                     onToggleFinished = { viewModel.setFinished(book.summary.book, !book.summary.finished) },
                 )
             }
-            itemsIndexed(book.chapters, key = { _, chapter -> chapter.id }) { index, chapter ->
-                ChapterRow(
-                    number = index + 1,
-                    chapter = chapter,
-                    isCurrent = chapter.id == mediaMetadata?.id,
-                    isResumePoint = book.summary.started && !book.summary.finished && index == book.summary.resumeIndex,
-                    onClick = { play(book, index) },
-                )
+            if (book.chapters.isNotEmpty()) {
+                item(key = "local_chapters_header") {
+                    CollapsibleSectionTitle(
+                        stringResource(R.string.audiobook_chapters),
+                        book.chapters.size,
+                        localChaptersExpanded,
+                    ) { localChaptersExpanded = !localChaptersExpanded }
+                }
+                if (localChaptersExpanded) {
+                    itemsIndexed(book.chapters, key = { _, chapter -> chapter.id }) { index, chapter ->
+                        ChapterRow(
+                            number = index + 1,
+                            chapter = chapter,
+                            isCurrent = chapter.id == mediaMetadata?.id,
+                            isResumePoint = book.summary.started && !book.summary.finished && index == book.summary.resumeIndex,
+                            onClick = { play(book, index) },
+                        )
+                    }
+                }
             }
             return@LazyColumn
         }
@@ -381,89 +395,32 @@ private fun BookHeader(
 ) {
     val summary = detail.summary
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    painter = painterResource(R.drawable.arrow_back),
-                    contentDescription = stringResource(R.string.audiobooks_back),
-                )
-            }
+        IconButton(onClick = onBack, modifier = Modifier.padding(horizontal = 4.dp)) {
+            Icon(painterResource(R.drawable.arrow_back), contentDescription = stringResource(R.string.audiobooks_back))
         }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp),
+        AudiobookHero(
+            coverUrl = summary.book.coverUri,
+            title = summary.book.title,
+            authors = summary.book.author,
+            metaText = statusText(summary),
+            finished = summary.finished,
+            fraction = summary.fractionListened,
+            primaryText = when {
+                isCurrentBookPlaying -> stringResource(R.string.audiobook_pause)
+                summary.finished -> stringResource(R.string.audiobook_listen_again)
+                summary.started -> stringResource(R.string.audiobook_continue, summary.resumeIndex + 1)
+                else -> stringResource(R.string.audiobook_start)
+            },
+            primaryIcon = R.drawable.play,
+            busy = false,
+            primaryEnabled = detail.chapters.isNotEmpty(),
+            onPrimary = onContinue,
         ) {
-            BookCover(summary.book.coverUri, 112.dp)
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = summary.book.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                summary.book.author?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                }
-                Text(
-                    text = statusText(summary),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            DetailActionButton(
+                icon = if (summary.finished) R.drawable.radio_button_unchecked else R.drawable.check_circle,
+                text = stringResource(if (summary.finished) R.string.mark_unfinished else R.string.mark_finished),
+            ) { onToggleFinished() }
         }
-        if (summary.started && !summary.finished) {
-            LinearProgressIndicator(
-                progress = { summary.fractionListened },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .height(4.dp),
-            )
-        } else {
-            Spacer(Modifier.height(12.dp))
-        }
-        Button(
-            onClick = onContinue,
-            enabled = detail.chapters.isNotEmpty(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-        ) {
-            Icon(painter = painterResource(R.drawable.play), contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                when {
-                    isCurrentBookPlaying -> stringResource(R.string.audiobook_pause)
-                    summary.finished -> stringResource(R.string.audiobook_listen_again)
-                    summary.started -> stringResource(R.string.audiobook_continue, summary.resumeIndex + 1)
-                    else -> stringResource(R.string.audiobook_start)
-                }
-            )
-        }
-        OutlinedButton(
-            onClick = onToggleFinished,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-        ) {
-            Icon(
-                painter = painterResource(if (summary.finished) R.drawable.radio_button_unchecked else R.drawable.check_circle),
-                contentDescription = null,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(if (summary.finished) R.string.mark_unfinished else R.string.mark_finished))
-        }
-        Text(
-            text = stringResource(R.string.audiobook_chapters),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp),
-        )
     }
 }
 
