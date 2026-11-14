@@ -1,7 +1,7 @@
 # AUDIOBOOK-DETAIL-REDESIGN
 
 AI: Claude
-Status: implemented; owner authorized push to main + release (once CI green) on 2026-11-14. Temporary task ID because GitHub Issues are disabled.
+Status: released in Wavelength 0.9.2.89 from main (merge 632eefd0, run 43589020771). APK verified: com.rickevans86.wavelength, version code 280089, same cert. Owner authorized on 2026-11-14. Temporary task ID because GitHub Issues are disabled.
 Branch: feat/audiobook-detail-redesign (from main)
 
 Request: make the phone audiobook detail page look like the richer Audiobookshelf-style layout the owner shared (centred cover + Finished badge, Listen Again, Download/Finished row, Narrated By with avatars + See all, Overview with Read more, Genres chips, collapsible Chapters). Owner chose: apply to BOTH the Audiobookshelf and on-phone detail pages; leave "Add to Playlist" off for now.
@@ -14,4 +14,4 @@ Changes:
 - Strings: audiobook_narrated_by_title, audiobook_overview, audiobook_genres, audiobook_see_all, audiobook_see_less, audiobook_read_more, audiobook_read_less (default English only).
 No database schema or version changes.
 
-Tests: none (pure Compose UI). Resource check clean; XML valid. CI result recorded on merge.
+Tests: none (pure Compose UI). Resource check clean; XML valid. PR #11 CI passed (run 43588302299) after restoring AbsBookRow, which was accidentally removed with DownloadControls on the first attempt. Released 0.9.2.89.
