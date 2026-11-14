@@ -246,6 +246,8 @@ fun FeaturesSettings(navController: NavController) {
         Spacer(Modifier.height(16.dp))
         RecognisedSongsSetting()
         Spacer(Modifier.height(16.dp))
+        AudDFallbackSetting()
+        Spacer(Modifier.height(16.dp))
         RadioSongsSetting()
         Spacer(Modifier.height(16.dp))
         com.metrolist.music.audiobooks.AudiobookSkipSettings()
@@ -371,6 +373,65 @@ private fun RecognisedSongsSetting() {
             selectedId = selectedId,
             onChoose = ::choose,
             onDismiss = { choosing = false },
+        )
+    }
+}
+
+/**
+ * Wavelength: optional AudD fallback recogniser — a toggle plus the user's own API token.
+ */
+@Composable
+private fun AudDFallbackSetting() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val enabled by remember(context) {
+        context.dataStore.data.map { it[com.metrolist.music.recognition.AudDRecognizer.EnabledKey] ?: false }
+    }.collectAsState(initial = false)
+    val token by remember(context) {
+        context.dataStore.data.map { it[com.metrolist.music.recognition.AudDRecognizer.TokenKey].orEmpty() }
+    }.collectAsState(initial = "")
+    var editingToken by remember { mutableStateOf(false) }
+    fun setEnabled(on: Boolean) {
+        scope.launch { context.dataStore.edit { it[com.metrolist.music.recognition.AudDRecognizer.EnabledKey] = on } }
+    }
+
+    Material3SettingsGroup(
+        title = stringResource(R.string.audd_section),
+        items = listOf(
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.mic),
+                title = { Text(stringResource(R.string.audd_fallback_setting)) },
+                description = { Text(stringResource(R.string.audd_fallback_desc)) },
+                trailingContent = { Switch(checked = enabled, onCheckedChange = { setEnabled(it) }) },
+                onClick = { setEnabled(!enabled) },
+            ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.mic),
+                title = { Text(stringResource(R.string.audd_token_setting)) },
+                description = {
+                    Text(if (token.isBlank()) stringResource(R.string.audd_token_not_set) else stringResource(R.string.audd_token_set))
+                },
+                onClick = { editingToken = true },
+            ),
+        ),
+    )
+
+    if (editingToken) {
+        com.metrolist.music.ui.component.TextFieldDialog(
+            title = { Text(stringResource(R.string.audd_token_setting)) },
+            initialTextFieldValue = androidx.compose.ui.text.input.TextFieldValue(token),
+            placeholder = { Text(stringResource(R.string.audd_token_placeholder)) },
+            isInputValid = { true },
+            onDone = { value ->
+                scope.launch { context.dataStore.edit { it[com.metrolist.music.recognition.AudDRecognizer.TokenKey] = value.trim() } }
+            },
+            onDismiss = { editingToken = false },
+            extraContent = {
+                Text(
+                    text = stringResource(R.string.audd_token_help),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                )
+            },
         )
     }
 }
