@@ -1,7 +1,7 @@
 # RECOGNITION-IMPROVE
 
 AI: Claude
-Status: implemented; owner authorized push to main + release on 2026-11-14. Temporary task ID because GitHub Issues are disabled.
+Status: released in Wavelength 0.9.2.88 from main (merge 87684ccd, run 43584647468). APK verified: com.rickevans86.wavelength, version code 280088, same cert. Owner authorized push to main + release on 2026-11-14. Temporary task ID because GitHub Issues are disabled.
 Branch: feat/recognition-improve (from main; also folds in UPDATER-DOWNLOAD-BUTTON / PR #9)
 
 Problem: song recognition sometimes missed songs that the real Shazam app recognised. Root cause was a single-shot pipeline: record a fixed 12s clip, build one fingerprint, one Shazam query, give up on no match.
@@ -19,7 +19,7 @@ No database schema or version changes.
 
 Tests: none added (hard to unit-test the audio/mic/HTTP pipeline without a device; logic is straightforward). Resource check clean. CI result recorded below.
 
-Verification: CI result after the PR run (recorded on merge).
+Verification: PR #10 CI (run 43582561147) passed (unit tests, FOSS build, APK, lint). Released 0.9.2.88 from main.
 
 ## Release-branch regression fix (bundled here) — 2026-11-14
 
