@@ -79,3 +79,7 @@ Audiobook detail page redesign (AUDIOBOOK-DETAIL-REDESIGN, PR #11, merge 632eefd
 ## Release 0.9.2.91 — 2026-11-15, Claude
 
 Podcast dedicated fast-forward / rewind buttons (PODCAST-FF-REWIND, PR #12, merge 05232f0b, run 43710728432). The podcast player now shows always-on rewind/forward seek buttons for episodes (like audiobooks), above the normal controls, with their own amounts in Settings → Features → Podcasts (separate from the existing repurpose-next/previous skip setting, which stays). APK verified: com.rickevans86.wavelength, version code 280091, same cert. Latest baseline.
+
+## Release 0.9.2.92 — 2026-11-16, Claude
+
+Podcast fast-forward/rewind now in Android Auto + the notification (PODCAST-FF-AUTO, PR #13, merge 5eaba9a6, run 43767999416). The dedicated seek buttons (0.9.2.91, phone-only) now also show in the car alongside previous/next, in the overflow slot, using the same separate amounts. New CommandSeekBack/Forward session commands, distinct from the old skip commands. APK verified: com.rickevans86.wavelength, version code 280092, same cert. Latest baseline.

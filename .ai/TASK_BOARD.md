@@ -39,3 +39,5 @@ RECOGNITION-IMPROVE — Claude — released in 0.9.2.88 from main. Rolling recog
 AUDIOBOOK-DETAIL-REDESIGN — Claude — released in 0.9.2.89 from main. Richer book detail (both ABS and on-phone): hero cover + Finished badge, play/continue, Download + Finished row, collapsible chapters; ABS also Narrated By / Overview / Genres. Add-to-Playlist left off per owner.
 
 PODCAST-FF-REWIND — Claude — released in 0.9.2.91 from main. Dedicated podcast rewind/fast-forward buttons (always on for episodes), separate amounts in Settings; existing repurpose-next/previous skip setting kept.
+
+PODCAST-FF-AUTO — Claude — released in 0.9.2.92 from main. Dedicated podcast seek buttons now in Android Auto + notification, alongside prev/next.
