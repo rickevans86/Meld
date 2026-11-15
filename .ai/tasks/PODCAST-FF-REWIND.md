@@ -1,7 +1,7 @@
 # PODCAST-FF-REWIND
 
 AI: Claude
-Status: implemented; owner authorized build + release on 2026-11-14 (session continued into 2026-11-15). Temporary task ID because GitHub Issues are disabled.
+Status: released in Wavelength 0.9.2.91 from main (merge 05232f0b, run 43710728432). APK verified: com.rickevans86.wavelength, version code 280091, same cert. Owner authorized merge + release on 2026-11-15. Temporary task ID because GitHub Issues are disabled.
 Branch: feat/podcast-ff-rewind (from main)
 
 Request: add dedicated fast-forward and rewind buttons to podcasts, like audiobooks. Owner chose: keep the existing "repurpose next/previous" podcast skip setting, and give the new dedicated buttons their own separate amounts.
@@ -13,4 +13,4 @@ Changes:
 - Strings: podcast_button_forward, podcast_button_back (default English only).
 No database schema or version changes.
 
-Tests: none (player UI). Resource check clean (R.string.ok is android.R, pre-existing). CI result recorded on merge.
+Tests: none (player UI). Resource check clean (R.string.ok is android.R, pre-existing). PR #12 CI passed (run 43709016240). Released 0.9.2.91.
