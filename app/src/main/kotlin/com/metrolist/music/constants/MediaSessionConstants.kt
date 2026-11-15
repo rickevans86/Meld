@@ -17,6 +17,9 @@ object MediaSessionConstants {
     const val ACTION_ADD_TO_TARGET_PLAYLIST = "ADD_TO_TARGET_PLAYLIST"
     const val ACTION_SKIP_BACK = "SKIP_BACK"
     const val ACTION_SKIP_FORWARD = "SKIP_FORWARD"
+    // Dedicated podcast fast-forward / rewind buttons (shown alongside previous/next in Android Auto)
+    const val ACTION_SEEK_BACK = "SEEK_BACK"
+    const val ACTION_SEEK_FORWARD = "SEEK_FORWARD"
 
     val CommandToggleLibrary = SessionCommand(ACTION_TOGGLE_LIBRARY, Bundle.EMPTY)
     val CommandToggleLike = SessionCommand(ACTION_TOGGLE_LIKE, Bundle.EMPTY)
@@ -26,6 +29,8 @@ object MediaSessionConstants {
     val CommandAddToTargetPlaylist = SessionCommand(ACTION_ADD_TO_TARGET_PLAYLIST, Bundle.EMPTY)
     val CommandSkipBack = SessionCommand(ACTION_SKIP_BACK, Bundle.EMPTY)
     val CommandSkipForward = SessionCommand(ACTION_SKIP_FORWARD, Bundle.EMPTY)
+    val CommandSeekBack = SessionCommand(ACTION_SEEK_BACK, Bundle.EMPTY)
+    val CommandSeekForward = SessionCommand(ACTION_SEEK_FORWARD, Bundle.EMPTY)
 
     const val TARGET_PLAYLIST_AUTO = "auto"
 }
