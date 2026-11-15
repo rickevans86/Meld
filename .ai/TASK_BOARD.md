@@ -37,3 +37,5 @@ HOME-SOURCE-AND-ABS-PROGRESS — Claude — released in 0.9.2.86 (merge c89e127f
 RECOGNITION-IMPROVE — Claude — released in 0.9.2.88 from main. Rolling recognition, UNPROCESSED mic, gain normalisation, optional AudD fallback (user token, Settings → Features). Includes Updater download-button fix (PR #9 folded) and the release-only-from-main pipeline fix (0.9.2.87 regression).
 
 AUDIOBOOK-DETAIL-REDESIGN — Claude — released in 0.9.2.89 from main. Richer book detail (both ABS and on-phone): hero cover + Finished badge, play/continue, Download + Finished row, collapsible chapters; ABS also Narrated By / Overview / Genres. Add-to-Playlist left off per owner.
+
+PODCAST-FF-REWIND — Claude — released in 0.9.2.91 from main. Dedicated podcast rewind/fast-forward buttons (always on for episodes), separate amounts in Settings; existing repurpose-next/previous skip setting kept.
