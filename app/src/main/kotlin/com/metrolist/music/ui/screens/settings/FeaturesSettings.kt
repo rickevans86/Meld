@@ -615,6 +615,16 @@ private fun PodcastPlaylistsSetting() {
         com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK,
     )
     var pickingSkip by remember { mutableStateOf<Boolean?>(null) } // true = forward, false = back
+    // Dedicated podcast fast-forward / rewind buttons: their own amounts, always shown
+    val (buttonForward, onButtonForward) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.podcasts.PodcastSkip.ButtonForwardKey,
+        com.metrolist.music.podcasts.PodcastSkip.DEFAULT_FORWARD,
+    )
+    val (buttonBack, onButtonBack) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.podcasts.PodcastSkip.ButtonBackKey,
+        com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK,
+    )
+    var pickingButton by remember { mutableStateOf<Boolean?>(null) } // true = forward, false = back
 
     // Your YouTube account's playlists, loaded when the list opens
     LaunchedEffect(choosing) {
@@ -666,7 +676,7 @@ private fun PodcastPlaylistsSetting() {
                 trailingContent = { Switch(checked = skipEnabled, onCheckedChange = onSkipEnabled) },
                 onClick = { onSkipEnabled(!skipEnabled) },
             ),
-        ) + if (skipEnabled) listOf(
+        ) + (if (skipEnabled) listOf(
             Material3SettingsItem(
                 icon = painterResource(R.drawable.skip_next),
                 title = { Text(stringResource(R.string.podcast_skip_forward)) },
@@ -679,7 +689,20 @@ private fun PodcastPlaylistsSetting() {
                 description = { Text(com.metrolist.music.podcasts.PodcastSkip.label(skipBack)) },
                 onClick = { pickingSkip = false },
             ),
-        ) else emptyList(),
+        ) else emptyList()) + listOf(
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.fast_forward),
+                title = { Text(stringResource(R.string.podcast_button_forward)) },
+                description = { Text(com.metrolist.music.podcasts.PodcastSkip.label(buttonForward)) },
+                onClick = { pickingButton = true },
+            ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.replay),
+                title = { Text(stringResource(R.string.podcast_button_back)) },
+                description = { Text(com.metrolist.music.podcasts.PodcastSkip.label(buttonBack)) },
+                onClick = { pickingButton = false },
+            ),
+        ),
     )
 
     pickingSkip?.let { forward ->
@@ -709,6 +732,37 @@ private fun PodcastPlaylistsSetting() {
             },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { pickingSkip = null }) { Text(stringResource(android.R.string.cancel)) }
+            },
+        )
+    }
+
+    pickingButton?.let { forward ->
+        val current = if (forward) buttonForward else buttonBack
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pickingButton = null },
+            title = { Text(stringResource(if (forward) R.string.podcast_button_forward else R.string.podcast_button_back)) },
+            text = {
+                Column {
+                    com.metrolist.music.podcasts.PodcastSkip.CHOICES.forEach { seconds ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (forward) onButtonForward(seconds) else onButtonBack(seconds)
+                                    pickingButton = null
+                                }
+                                .padding(vertical = 4.dp),
+                        ) {
+                            androidx.compose.material3.RadioButton(selected = seconds == current, onClick = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(com.metrolist.music.podcasts.PodcastSkip.label(seconds))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { pickingButton = null }) { Text(stringResource(android.R.string.cancel)) }
             },
         )
     }

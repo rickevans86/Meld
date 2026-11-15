@@ -327,6 +327,8 @@ fun BottomSheetPlayer(
         ?.let { it.removePrefix(com.metrolist.music.constants.RADIO_ID_PREFIX) in radioHearts }
     // Wavelength: podcast skip buttons (next/previous jump inside the episode; hold to change episode)
     val podcastSkip = com.metrolist.music.podcasts.rememberPodcastSkip(mediaMetadata)
+    // Wavelength: dedicated podcast fast-forward / rewind buttons (always on for episodes, like audiobooks)
+    val podcastSeek = com.metrolist.music.podcasts.rememberPodcastSeekButtons(mediaMetadata)
     fun skipBy(seconds: Int) {
         val p = playerConnection.player
         val duration = p.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
@@ -1534,6 +1536,22 @@ fun BottomSheetPlayer(
                 exit = shrinkVertically(shrinkTowards = Alignment.Top) + slideOutVertically(targetOffsetY = { it }) + fadeOut(),
             ) {
                 Column {
+                    if (podcastSeek != null && !com.metrolist.music.constants.isAudiobookId(mediaMetadata.id) && !isCasting && !isListenTogetherGuest) {
+                        com.metrolist.music.podcasts.PodcastSeekRow(
+                            back = podcastSeek.back,
+                            forward = podcastSeek.forward,
+                            color = TextBackgroundColor,
+                            onSeek = { delta ->
+                                playerConnection.player.seekTo(
+                                    com.metrolist.music.audiobooks.audiobookSeekPosition(
+                                        playerConnection.player.currentPosition,
+                                        delta,
+                                        playerConnection.player.duration,
+                                    ),
+                                )
+                            },
+                        )
+                    }
                     if (com.metrolist.music.constants.isAudiobookId(mediaMetadata.id) && !isCasting && !isListenTogetherGuest) {
                         AudiobookPlayerControls(
                             connection = playerConnection,

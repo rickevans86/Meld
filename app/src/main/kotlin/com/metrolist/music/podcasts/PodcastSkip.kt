@@ -5,10 +5,16 @@
 
 package com.metrolist.music.podcasts
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -37,6 +43,11 @@ object PodcastSkip {
     val ForwardKey = intPreferencesKey("podcastSkipForwardSeconds")
     val BackKey = intPreferencesKey("podcastSkipBackSeconds")
 
+    // Dedicated fast-forward / rewind buttons in the player (always on for episodes, like audiobooks),
+    // with their own amounts kept separate from the repurpose-next/previous skip above.
+    val ButtonForwardKey = intPreferencesKey("podcastButtonForwardSeconds")
+    val ButtonBackKey = intPreferencesKey("podcastButtonBackSeconds")
+
     const val DEFAULT_FORWARD = 30
     const val DEFAULT_BACK = 15
 
@@ -57,6 +68,16 @@ object PodcastSkip {
 
 /** Seconds to skip back and forward, when the skip buttons apply to what's playing; null otherwise. */
 data class PodcastSkipAmounts(val back: Int, val forward: Int)
+
+/** The dedicated podcast fast-forward / rewind amounts, for a podcast episode; null otherwise. */
+@Composable
+fun rememberPodcastSeekButtons(mediaMetadata: MediaMetadata?): PodcastSkipAmounts? {
+    val (forward, _) = rememberPreference(PodcastSkip.ButtonForwardKey, PodcastSkip.DEFAULT_FORWARD)
+    val (back, _) = rememberPreference(PodcastSkip.ButtonBackKey, PodcastSkip.DEFAULT_BACK)
+    if (mediaMetadata == null) return null
+    if (!PodcastSkip.isPodcast(mediaMetadata.id, mediaMetadata.isEpisode)) return null
+    return PodcastSkipAmounts(back, forward)
+}
 
 @Composable
 fun rememberPodcastSkip(mediaMetadata: MediaMetadata?): PodcastSkipAmounts? {
@@ -88,5 +109,26 @@ fun SkipIcon(forward: Boolean, seconds: Int, tint: Color, size: Dp, modifier: Mo
             fontSize = (size.value * if (seconds >= 100) 0.24f else 0.3f).sp,
             modifier = Modifier.padding(top = (size.value * 0.08f).dp),
         )
+    }
+}
+
+/**
+ * A dedicated rewind / fast-forward row for the podcast player, mirroring the audiobook seek buttons.
+ * [onSeek] receives the signed number of seconds to jump.
+ */
+@Composable
+fun PodcastSeekRow(back: Int, forward: Int, color: Color, onSeek: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = { onSeek(-back) }) {
+            Box(Modifier.size(40.dp)) { SkipIcon(forward = false, seconds = back, tint = color, size = 40.dp) }
+        }
+        Spacer(Modifier.width(56.dp))
+        IconButton(onClick = { onSeek(forward) }) {
+            Box(Modifier.size(40.dp)) { SkipIcon(forward = true, seconds = forward, tint = color, size = 40.dp) }
+        }
     }
 }

@@ -1643,4 +1643,7 @@
     <string name="audiobook_see_less">See less</string>
     <string name="audiobook_read_more">Read more</string>
     <string name="audiobook_read_less">Read less</string>
+    <!-- Wavelength: dedicated podcast fast-forward / rewind buttons -->
+    <string name="podcast_button_forward">Fast-forward button amount</string>
+    <string name="podcast_button_back">Rewind button amount</string>
 </resources>
