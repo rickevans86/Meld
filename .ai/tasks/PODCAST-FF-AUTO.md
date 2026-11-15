@@ -1,7 +1,7 @@
 # PODCAST-FF-AUTO
 
 AI: Claude
-Status: implemented; CI-verified on PR. Release pending owner go-ahead. Temporary task ID because GitHub Issues are disabled.
+Status: released in Wavelength 0.9.2.92 from main (merge 5eaba9a6, run 43767999416). APK verified: com.rickevans86.wavelength, version code 280092, same cert. Temporary task ID because GitHub Issues are disabled.
 Branch: feat/podcast-ff-auto (from main)
 
 Follow-up to PODCAST-FF-REWIND (0.9.2.91): the dedicated podcast fast-forward / rewind buttons were phone-only. The owner's car screenshots showed Android Auto with just previous/next. Owner chose: add the seek buttons ALONGSIDE previous/next (not replacing them).
@@ -12,4 +12,4 @@ Changes:
 - MediaLibrarySessionCallback: registers CommandSeekBack/Forward and routes them to podcastSeekButton.
 - Reuses existing strings podcast_skip_back_by / podcast_skip_forward_by. No new strings, no schema/version changes.
 
-Tests: none (media-session/AA). Resource check clean. CI result recorded on merge.
+Tests: none (media-session/AA). Resource check clean. PR #13 CI passed (run 43765465572). Released 0.9.2.92.
