@@ -1209,6 +1209,16 @@ class MusicService :
                 }
             }
         }
+        // Dedicated podcast fast-forward / rewind button amounts: keep them at hand and refresh the buttons
+        scope.launch {
+            dataStore.data.map {
+                (it[com.metrolist.music.podcasts.PodcastSkip.ButtonBackKey] ?: com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK) to
+                    (it[com.metrolist.music.podcasts.PodcastSkip.ButtonForwardKey] ?: com.metrolist.music.podcasts.PodcastSkip.DEFAULT_FORWARD)
+            }.distinctUntilChanged().collect {
+                podcastSeekButtonSetting = it
+                kotlinx.coroutines.withContext(Dispatchers.Main) { updateNotification() }
+            }
+        }
         scope.launch {
             dataStore.data.map { it[com.metrolist.music.audiobooks.AutoAudiobookSections.Key].orEmpty() }
                 .distinctUntilChanged().drop(1).collect {
@@ -1862,6 +1872,11 @@ class MusicService :
     private var audiobookSkipSetting = com.metrolist.music.audiobooks.AudiobookPlaybackSettings.DEFAULT_BACK to
         com.metrolist.music.audiobooks.AudiobookPlaybackSettings.DEFAULT_FORWARD
 
+    /** Dedicated podcast fast-forward / rewind button amounts (back, forward), always on for episodes. */
+    @Volatile
+    private var podcastSeekButtonSetting = com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK to
+        com.metrolist.music.podcasts.PodcastSkip.DEFAULT_FORWARD
+
     /** (back, forward) seconds for audiobook or enabled podcast skip controls; null otherwise. */
     fun podcastSkipAmounts(): Pair<Int, Int>? {
         val id = player.currentMediaItem?.mediaId ?: return null
@@ -1875,6 +1890,21 @@ class MusicService :
     /** The skip buttons in Android Auto and the notification. */
     fun podcastSkip(forward: Boolean) {
         val (back, fwd) = podcastSkipAmounts() ?: (podcastSkipSetting.second to podcastSkipSetting.third)
+        sessionPlayer?.skipBy(if (forward) fwd else -back)
+    }
+
+    /** (back, forward) seconds for the dedicated podcast fast-forward / rewind buttons; null if not a podcast episode. */
+    fun podcastSeekButtonAmounts(): Pair<Int, Int>? {
+        val id = player.currentMediaItem?.mediaId ?: return null
+        if (isAudiobookId(id)) return null
+        val isEpisode = player.currentMetadata?.isEpisode == true
+        if (!com.metrolist.music.podcasts.PodcastSkip.isPodcast(id, isEpisode)) return null
+        return podcastSeekButtonSetting
+    }
+
+    /** The dedicated podcast fast-forward / rewind buttons (Android Auto and the notification). */
+    fun podcastSeekButton(forward: Boolean) {
+        val (back, fwd) = podcastSeekButtonAmounts() ?: podcastSeekButtonSetting
         sessionPlayer?.skipBy(if (forward) fwd else -back)
     }
 
@@ -1913,6 +1943,19 @@ class MusicService :
     private fun updateNotification(isLiked: Boolean? = currentSong.value?.song?.let { if (it.isEpisode) it.inLibrary != null else it.liked }) {
         val set = buttonSet()
         val radioId = player.currentMediaItem?.mediaId?.takeIf { set == ButtonSet.LIVE_RADIO }
+        val seek = podcastSeekButtonAmounts()
+        val seekButtons = if (seek == null) emptyList() else listOf(
+            CommandButton.Builder(skipIcon(forward = false, seconds = seek.first))
+                .setDisplayName(getString(R.string.podcast_skip_back_by, seek.first))
+                .setSessionCommand(com.metrolist.music.constants.MediaSessionConstants.CommandSeekBack)
+                .setSlots(CommandButton.SLOT_OVERFLOW)
+                .build(),
+            CommandButton.Builder(skipIcon(forward = true, seconds = seek.second))
+                .setDisplayName(getString(R.string.podcast_skip_forward_by, seek.second))
+                .setSessionCommand(com.metrolist.music.constants.MediaSessionConstants.CommandSeekForward)
+                .setSlots(CommandButton.SLOT_OVERFLOW)
+                .build(),
+        )
         val skip = podcastSkipAmounts()
         val skipButtons = if (skip == null) emptyList() else listOf(
             CommandButton.Builder(skipIcon(forward = false, seconds = skip.first))
@@ -1928,7 +1971,7 @@ class MusicService :
         )
         val liked = if (radioId != null) radioDirectory.isStarred(radioId.removePrefix(com.metrolist.music.constants.RADIO_ID_PREFIX)) else isLiked == true
         mediaSession?.setCustomLayout(
-            skipButtons + listOfNotNull(
+            skipButtons + seekButtons + listOfNotNull(
                 CommandButton
                     .Builder()
                     .setDisplayName(

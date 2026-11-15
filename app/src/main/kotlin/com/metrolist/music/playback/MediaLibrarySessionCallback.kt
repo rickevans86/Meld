@@ -127,6 +127,8 @@ constructor(
                 .add(MediaSessionConstants.CommandAddToTargetPlaylist)
                 .add(MediaSessionConstants.CommandSkipBack)
                 .add(MediaSessionConstants.CommandSkipForward)
+                .add(MediaSessionConstants.CommandSeekBack)
+                .add(MediaSessionConstants.CommandSeekForward)
                 .build(),
             connectionResult.availablePlayerCommands,
         )
@@ -149,6 +151,8 @@ constructor(
             MediaSessionConstants.ACTION_ADD_TO_TARGET_PLAYLIST -> addToTargetPlaylist()
             MediaSessionConstants.ACTION_SKIP_BACK -> service.podcastSkip(forward = false)
             MediaSessionConstants.ACTION_SKIP_FORWARD -> service.podcastSkip(forward = true)
+            MediaSessionConstants.ACTION_SEEK_BACK -> service.podcastSeekButton(forward = false)
+            MediaSessionConstants.ACTION_SEEK_FORWARD -> service.podcastSeekButton(forward = true)
         }
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
     }
