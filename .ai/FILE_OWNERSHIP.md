@@ -33,3 +33,5 @@ WAVELENGTH-APP-ID + HOME-AUDIOBOOK-FILTER (Claude, released 0.9.2.85; no active 
 ## Active — AUTO-DOWNLOADS-FAVOURITES, Codex, 2026-11-17 (Melbourne)
 
 Branch fix/auto-downloads-podcast-favourites from main 442ed05a. User authorized implementation, main publication, build/release and AI-record updates. Temporary task: Issues disabled; only open PR #2 contains coordination documents, no application overlap. Planned scope: MediaLibrarySessionCallback, AutoLibraryExtras, MusicService, AndroidAutoSettings, podcast favourite preferences/sorting and phone show list, default English strings, focused tests, .ai records. No schema or manual version changes. Incorporates the newer shared records from PR #2 without discarding Claude's history.
+
+AUTO-DOWNLOADS-FAVOURITES scope addition (Codex): AutoAudiobookLibrary, to retain a dedicated paginated Downloaded tile inside Audiobooks after removing the combined root. Existing download/scan/session refreshes include this node.

@@ -12,3 +12,5 @@ Implementation plan: share filtered downloads across all Auto browse/playback pa
 Verification: running eight focused tests and FOSS debug build. Initial compile found an unavailable legacy AndroidX import for the refresh-result key; replaced it with the documented constant without adding a dependency. No hardware testing claimed. No database schema, signing identity, application ID or manual version changes.
 
 PR: https://github.com/rickevans86/Meld/pull/14; implementation b598af19. Local compilation passed after fixing the legacy import. First focused test run: seven passed; button registration needed a string-resource fixture because the project's JVM tests do not package app resources. Added that fixture using the existing TestResources pattern; rerun pending.
+
+Navigation review: the car's Audiobooks page did not have a dedicated offline folder. Added a Downloaded browse tile inside Audiobooks, using the existing offline-book provider and bounded More pagination. Download/scan/account changes refresh this node. The removed combined root remains available only by legacy deep link. Focused tests/build rerun required for this addition.

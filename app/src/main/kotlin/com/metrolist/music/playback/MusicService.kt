@@ -1230,18 +1230,21 @@ class MusicService :
             absRepository.downloads.map { entries -> entries.filterValues { it.done }.keys }
                 .distinctUntilChanged().drop(1).collect {
                 mediaSession?.notifyChildrenChanged(AutoLibraryExtras.DOWNLOADED, Int.MAX_VALUE, null)
+                mediaSession?.notifyChildrenChanged(AutoAudiobookLibrary.DOWNLOADED, Int.MAX_VALUE, null)
             }
         }
         scope.launch {
             audiobookRepository.books.drop(1).collect {
                 mediaSession?.notifyChildrenChanged(AutoLibraryExtras.AUDIOBOOKS, Int.MAX_VALUE, null)
                 mediaSession?.notifyChildrenChanged(AutoLibraryExtras.DOWNLOADED, Int.MAX_VALUE, null)
+                mediaSession?.notifyChildrenChanged(AutoAudiobookLibrary.DOWNLOADED, Int.MAX_VALUE, null)
             }
         }
         scope.launch {
             downloadUtil.downloads.map { entries -> entries.filterValues { it.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED }.keys }
                 .distinctUntilChanged().drop(1).collect {
                     mediaSession?.notifyChildrenChanged(AutoLibraryExtras.DOWNLOADED, Int.MAX_VALUE, null)
+                    mediaSession?.notifyChildrenChanged(AutoAudiobookLibrary.DOWNLOADED, Int.MAX_VALUE, null)
                 }
         }
         scope.launch {
@@ -1254,6 +1257,7 @@ class MusicService :
                 .distinctUntilChanged().drop(1).collect {
                     mediaSession?.notifyChildrenChanged(AutoLibraryExtras.AUDIOBOOKS, Int.MAX_VALUE, null)
                     mediaSession?.notifyChildrenChanged(AutoLibraryExtras.DOWNLOADED, Int.MAX_VALUE, null)
+                    mediaSession?.notifyChildrenChanged(AutoAudiobookLibrary.DOWNLOADED, Int.MAX_VALUE, null)
                 }
         }
         scope.launch {
