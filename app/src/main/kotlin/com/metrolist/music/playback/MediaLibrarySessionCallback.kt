@@ -9,6 +9,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import com.metrolist.music.podcasts.PodcastFavourites
 import androidx.annotation.DrawableRes
 import androidx.core.net.toUri
 import androidx.media3.common.C
@@ -64,7 +65,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.launch
@@ -119,6 +119,8 @@ constructor(
         return MediaSession.ConnectionResult.accept(
             connectionResult.availableSessionCommands
                 .buildUpon()
+                .add(AutoPodcastFavourites.AddCommand)
+                .add(AutoPodcastFavourites.RemoveCommand)
                 .add(MediaSessionConstants.CommandToggleLike)
                 .add(MediaSessionConstants.CommandToggleStartRadio)
                 .add(MediaSessionConstants.CommandToggleLibrary)
@@ -140,6 +142,18 @@ constructor(
         customCommand: SessionCommand,
         args: Bundle,
     ): ListenableFuture<SessionResult> {
+        if (customCommand.customAction == AutoPodcastFavourites.ADD || customCommand.customAction == AutoPodcastFavourites.REMOVE) {
+            return scope.future(Dispatchers.IO) {
+                val mediaId = args.getString(androidx.media3.session.MediaConstants.EXTRA_KEY_MEDIA_ID)
+                if (mediaId == null || autoExtras.podcastChannelItem(mediaId) == null) {
+                    return@future SessionResult(SessionError.ERROR_BAD_VALUE)
+                }
+                PodcastFavourites.setFavourite(context.dataStore, mediaId, customCommand.customAction == AutoPodcastFavourites.ADD)
+                SessionResult(SessionResult.RESULT_SUCCESS, Bundle().apply {
+                    putString(AutoPodcastFavourites.REFRESH_ITEM, mediaId)
+                })
+            }
+        }
         when (customCommand.customAction) {
             MediaSessionConstants.ACTION_TOGGLE_LIKE -> toggleLike()
             MediaSessionConstants.ACTION_TOGGLE_START_RADIO -> toggleStartRadio()
@@ -318,7 +332,6 @@ constructor(
                                     AndroidAutoSection.LOCAL_FILES -> autoExtras.rootItem(AutoLibraryExtras.LOCAL_FILES)
                                     AndroidAutoSection.AUDIOBOOKS -> autoExtras.rootItem(AutoLibraryExtras.AUDIOBOOKS)
                                     AndroidAutoSection.PODCASTS -> autoExtras.rootItem(AutoLibraryExtras.PODCASTS)
-                                    AndroidAutoSection.DOWNLOADED -> autoExtras.rootItem(AutoLibraryExtras.DOWNLOADED)
                                     AndroidAutoSection.NEWS -> autoExtras.rootItem(AutoLibraryExtras.NEWS)
                                     AndroidAutoSection.RADIO -> autoExtras.rootItem(AutoLibraryExtras.RADIO)
                                     AndroidAutoSection.CONTINUE -> autoExtras.rootItem(AutoLibraryExtras.CONTINUE)
@@ -338,7 +351,7 @@ constructor(
 
                     MusicService.PLAYLIST -> {
                         val likedSongCount = database.likedSongsCount().first()
-                        val downloadedSongCount = downloadUtil.downloads.value.size
+                        val downloadedSongCount = downloadedYouTubeSongs().size
                         val showYoutubePlaylists = context.dataStore.get(AndroidAutoYouTubePlaylistsKey, false)
 
                         // Playlists pinned in the Library come right after Liked songs
@@ -435,20 +448,7 @@ constructor(
                                     )
 
                                     PlaylistEntity.DOWNLOADED_PLAYLIST_ID -> {
-                                        val downloads = downloadUtil.downloads.value
-                                        database
-                                            .allSongs()
-                                            .flowOn(Dispatchers.IO)
-                                            .map { songs ->
-                                                songs.filter {
-                                                    downloads[it.id]?.state == Download.STATE_COMPLETED
-                                                }
-                                            }.map { songs ->
-                                                songs
-                                                    .map { it to downloads[it.id] }
-                                                    .sortedBy { it.second?.updateTimeMs ?: 0L }
-                                                    .map { it.first }
-                                            }
+                                        kotlinx.coroutines.flow.flowOf(downloadedYouTubeSongs())
                                     }
 
                                     else ->
@@ -578,11 +578,18 @@ constructor(
         }
     }
 
+    private suspend fun downloadedYouTubeSongs(): List<Song> {
+        val downloads = downloadUtil.downloads.value
+        val songs = downloads.values.filter { it.state == Download.STATE_COMPLETED }
+            .map { it.request.id }.chunked(500).flatMap { database.getSongsByIds(it) }
+        return autoDownloadedYouTubeSongs(songs, downloads)
+    }
+
     private suspend fun loadPlaylistContainers(request: AndroidAutoPageRequest): List<MediaItem> {
         val builtInItems =
             if (request.offset < 2 && request.limit > 0) {
                 val likedSongCount = database.likedSongsCount().first()
-                val downloadedSongCount = downloadUtil.downloads.value.size
+                val downloadedSongCount = downloadedYouTubeSongs().size
                 listOf(
                     browsableMediaItem(
                         "${MusicService.PLAYLIST}/${PlaylistEntity.LIKED_PLAYLIST_ID}",
@@ -637,23 +644,7 @@ constructor(
                 database.likedSongsByCreateDateDesc(songRequest.limit, songRequest.offset)
 
             playlistId == PlaylistEntity.DOWNLOADED_PLAYLIST_ID -> {
-                val downloads = downloadUtil.downloads.value
-                val completedSongIds = downloads.entries
-                    .asSequence()
-                    .filter { it.value.state == Download.STATE_COMPLETED }
-                    .sortedBy { it.value.updateTimeMs }
-                    .map { it.key }
-                    .toList()
-                val existingSongIds = completedSongIds
-                    .chunked(MAX_ANDROID_AUTO_PAGE_SIZE)
-                    .flatMapTo(mutableSetOf()) { database.existingSongIds(it) }
-                val songIds = completedSongIds.asSequence()
-                    .filter(existingSongIds::contains)
-                    .drop(songRequest.offset)
-                    .take(songRequest.limit)
-                    .toList()
-                val songsById = database.getSongsByIds(songIds).associateBy { it.id }
-                songIds.mapNotNull(songsById::get)
+                downloadedYouTubeSongs().drop(songRequest.offset).take(songRequest.limit)
             }
 
             else ->
@@ -688,6 +679,7 @@ constructor(
     ): ListenableFuture<LibraryResult<MediaItem>> =
         scope.future(Dispatchers.IO) {
             try {
+                autoExtras.podcastChannelItem(mediaId)?.let { return@future LibraryResult.ofItem(it, null) }
                 database.song(mediaId).first()?.toMediaItem()?.let {
                     LibraryResult.ofItem(it, null)
                 } ?: LibraryResult.ofError(SessionError.ERROR_UNKNOWN)
@@ -852,20 +844,7 @@ constructor(
                     val songs = when (playlistId) {
                         PlaylistEntity.LIKED_PLAYLIST_ID -> database.likedSongs(SongSortType.CREATE_DATE, descending = true)
                         PlaylistEntity.DOWNLOADED_PLAYLIST_ID -> {
-                            val downloads = downloadUtil.downloads.value
-                            database
-                                .allSongs()
-                                .flowOn(Dispatchers.IO)
-                                .map { songs ->
-                                    songs.filter {
-                                        downloads[it.id]?.state == Download.STATE_COMPLETED
-                                    }
-                                }.map { songs ->
-                                    songs
-                                        .map { it to downloads[it.id] }
-                                        .sortedBy { it.second?.updateTimeMs ?: 0L }
-                                        .map { it.first }
-                                }
+                            kotlinx.coroutines.flow.flowOf(downloadedYouTubeSongs())
                         }
                         else -> database.playlistSongs(playlistId).map { list ->
                             list.map { it.song }

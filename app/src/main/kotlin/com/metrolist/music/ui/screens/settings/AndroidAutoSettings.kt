@@ -75,7 +75,6 @@ enum class AndroidAutoSection(val id: String) {
     LOCAL_FILES("local_files"),
     AUDIOBOOKS("audiobooks"),
     PODCASTS("podcasts"),
-    DOWNLOADED("downloaded"),
     NEWS("news"),
     RADIO("radio"),
     SUBSONIC("subsonic"),
@@ -92,7 +91,6 @@ fun AndroidAutoSection.label(): String = when (this) {
     AndroidAutoSection.LOCAL_FILES -> stringResource(R.string.local_files)
     AndroidAutoSection.AUDIOBOOKS -> stringResource(R.string.filter_audiobooks)
     AndroidAutoSection.PODCASTS -> stringResource(R.string.filter_podcasts)
-    AndroidAutoSection.DOWNLOADED -> stringResource(R.string.abs_downloaded)
     AndroidAutoSection.NEWS -> stringResource(R.string.news_briefing)
     AndroidAutoSection.RADIO -> stringResource(R.string.radio_tab)
     AndroidAutoSection.CONTINUE -> stringResource(R.string.auto_continue_listening)
@@ -245,7 +243,6 @@ fun AndroidAutoSettings(
                                         AndroidAutoSection.LOCAL_FILES -> R.drawable.folder
                                         AndroidAutoSection.AUDIOBOOKS -> R.drawable.audiobook
                                         AndroidAutoSection.PODCASTS -> R.drawable.mic
-                                        AndroidAutoSection.DOWNLOADED -> R.drawable.download
                                         AndroidAutoSection.NEWS -> R.drawable.newspaper
                                         AndroidAutoSection.RADIO -> R.drawable.radio
                                         AndroidAutoSection.CONTINUE -> R.drawable.history

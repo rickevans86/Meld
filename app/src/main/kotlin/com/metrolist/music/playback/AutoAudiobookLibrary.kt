@@ -67,7 +67,7 @@ class AutoAudiobookLibrary @Inject constructor(
         val path = id.split('/')
         if (path.firstOrNull() != AutoLibraryExtras.AUDIOBOOKS) return false
         return when (path.getOrNull(1)) {
-            "library", "abs_all" -> path.size in 2..3 && (path.size == 2 || page(path[2]) != null)
+            "library", "abs_all", "downloaded" -> path.size in 2..3 && (path.size == 2 || page(path[2]) != null)
             "groups" -> path.size == 4 && kind(path[2]) != null && page(path[3]) != null
             // group/<kind>/<server page>/<id>[/<item page>]
             "group" -> path.size in 5..6 && kind(path[2]) != null && page(path[3]) != null && path[4].isNotBlank() &&
@@ -84,6 +84,10 @@ class AutoAudiobookLibrary @Inject constructor(
         val path = id.split('/')
         return when (path[1]) {
             "library", "abs_all" -> library(page(path.getOrNull(2)) ?: 0, path[1] == "abs_all")
+            "downloaded" -> {
+                val number = page(path.getOrNull(2)) ?: 0
+                withMore(autoPage(downloaded(), number), DOWNLOADED, number)
+            }
             "groups" -> groups(kind(path[2])!!, page(path[3])!!)
             "group" -> {
                 val library = libraryId() ?: return emptyList()
@@ -138,6 +142,7 @@ class AutoAudiobookLibrary @Inject constructor(
 
     private fun browseTiles(): List<MediaItem> = buildList {
         add(folder(LIBRARY, R.string.auto_audiobook_library, R.drawable.auto_audiobook_library))
+        add(folder(DOWNLOADED, R.string.abs_downloaded, R.drawable.download))
         if (abs.session.value != null) {
             add(folder("$GROUPS/series/0", R.string.auto_audiobook_series, R.drawable.auto_audiobook_series))
             add(folder("$GROUPS/collections/0", R.string.auto_audiobook_collections, R.drawable.auto_audiobook_collections))
@@ -255,6 +260,7 @@ class AutoAudiobookLibrary @Inject constructor(
     companion object {
         private const val SHELF_SIZE = 12
         private const val GROUP_PAGE_SIZE = 50
+        const val DOWNLOADED = "audiobooks/downloaded"
         private const val LIBRARY = "audiobooks/library"
         private const val LEGACY_ALL = "audiobooks/abs_all"
         private const val GROUPS = "audiobooks/groups"

@@ -1646,4 +1646,6 @@
     <!-- Wavelength: dedicated podcast fast-forward / rewind buttons -->
     <string name="podcast_button_forward">Fast-forward button amount</string>
     <string name="podcast_button_back">Rewind button amount</string>
+    <string name="podcast_favourite_channel">Favourite channel</string>
+    <string name="podcast_unfavourite_channel">Remove favourite</string>
 </resources>

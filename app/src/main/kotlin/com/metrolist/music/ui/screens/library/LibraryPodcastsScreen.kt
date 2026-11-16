@@ -91,6 +91,7 @@ import com.metrolist.music.utils.joinByBullet
 import com.metrolist.music.utils.makeTimeString
 import com.metrolist.music.utils.rememberEnumPreference
 import com.metrolist.music.utils.rememberPreference
+import com.metrolist.music.podcasts.podcastFavouritesFirst
 import com.metrolist.music.constants.sortedShows
 import com.metrolist.music.constants.sortInfo
 import com.metrolist.music.viewmodels.LibraryPodcastsViewModel
@@ -121,7 +122,13 @@ fun LibraryPodcastsScreen(
         )
     val (sortDescending, onSortDescendingChange) = rememberPreference(SongSortDescendingKey, true)
 
-    val subscribedChannels by viewModel.subscribedChannels.collectAsStateWithLifecycle()
+    val subscribedChannelsUnsorted by viewModel.subscribedChannels.collectAsStateWithLifecycle()
+    val (favouriteShows, _) = rememberPreference(com.metrolist.music.podcasts.PodcastFavourites.Key, emptySet<String>())
+    val subscribedChannels = remember(subscribedChannelsUnsorted, favouriteShows) {
+        subscribedChannelsUnsorted.podcastFavouritesFirst(favouriteShows) {
+            com.metrolist.music.podcasts.PodcastFavourites.channelId(it.id)
+        }
+    }
     val followedFeedsUnsorted by viewModel.followedFeeds.collectAsStateWithLifecycle()
     // Playlists you've marked as podcasts, in the order you chose them
     val podcastPlaylistIds = com.metrolist.music.constants.rememberPodcastPlaylistIds()
@@ -152,8 +159,9 @@ fun LibraryPodcastsScreen(
     val (sortReversed, onSortReversed) = rememberPreference(com.metrolist.music.constants.PodcastShowSortReversedKey, false)
     val showSort = com.metrolist.music.constants.PodcastShowSort.entries.firstOrNull { it.name == sortName }
         ?: com.metrolist.music.constants.PodcastShowSort.RECENTLY_FOLLOWED
-    val followedFeeds = remember(followedFeedsUnsorted, showSort, sortReversed) {
+    val followedFeeds = remember(followedFeedsUnsorted, showSort, sortReversed, favouriteShows) {
         followedFeedsUnsorted.sortedShows(showSort, sortReversed) { it.sortInfo() }
+            .podcastFavouritesFirst(favouriteShows) { com.metrolist.music.podcasts.PodcastFavourites.feedId(it.feedUrl) }
     }
     val downloadedEpisodes by viewModel.downloadedEpisodes.collectAsStateWithLifecycle()
     val savedEpisodes by viewModel.savedEpisodes.collectAsStateWithLifecycle()
