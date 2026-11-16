@@ -685,7 +685,8 @@ fun HomeScreen(
     val isSpotifyHome by viewModel.useSpotifyHome.collectAsStateWithLifecycle()
     val isSpotifyHomeOnly by viewModel.spotifyHomeOnly.collectAsStateWithLifecycle()
     // Each home shows only its own source: YouTube items on the YouTube home, Spotify items on the Spotify home
-    val isCurrentSourceId = { id: String -> if (isSpotifyHome) id.startsWith("spotify:") else isYouTubeMediaId(id) }
+    val podcastHomeExcludedIds by viewModel.podcastHomeExcludedIds.collectAsStateWithLifecycle()
+    val isCurrentSourceId = { id: String -> if (isSpotifyHome) id.startsWith("spotify:") else isYouTubeMediaId(id) && id !in podcastHomeExcludedIds }
 
     // Podcast episodes played locally are left out of Home too (they're in the Podcasts tab)
     val rawQuickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
@@ -694,24 +695,32 @@ fun HomeScreen(
     val rawKeepListening by viewModel.keepListening.collectAsStateWithLifecycle()
     // Each home keeps only its own source's items (and never podcast episodes); the YouTube play-history
     // rows are empty on the Spotify home, so they drop out there.
-    val quickPicks = remember(rawQuickPicks, isSpotifyHome) { rawQuickPicks?.filter { isCurrentSourceId(it.id) && !it.song.isEpisode } }
-    val recentlyPlayed = remember(rawRecentlyPlayed, isSpotifyHome) { rawRecentlyPlayed?.filter { isCurrentSourceId(it.id) && !it.song.isEpisode } }
-    val forgottenFavorites = remember(rawForgottenFavorites, isSpotifyHome) { rawForgottenFavorites?.filter { isCurrentSourceId(it.id) && !it.song.isEpisode } }
-    val keepListening = remember(rawKeepListening, isSpotifyHome) { rawKeepListening?.filter { isCurrentSourceId(it.id) && !(it is Song && it.song.isEpisode) } }
+    val quickPicks = remember(rawQuickPicks, isSpotifyHome, podcastHomeExcludedIds) { rawQuickPicks?.filter { isCurrentSourceId(it.id) && !it.song.isEpisode } }
+    val recentlyPlayed = remember(rawRecentlyPlayed, isSpotifyHome, podcastHomeExcludedIds) { rawRecentlyPlayed?.filter { isCurrentSourceId(it.id) && !it.song.isEpisode } }
+    val forgottenFavorites = remember(rawForgottenFavorites, isSpotifyHome, podcastHomeExcludedIds) { rawForgottenFavorites?.filter { isCurrentSourceId(it.id) && !it.song.isEpisode } }
+    val keepListening = remember(rawKeepListening, isSpotifyHome, podcastHomeExcludedIds) { rawKeepListening?.filter { isCurrentSourceId(it.id) && !(it is Song && it.song.isEpisode) } }
     val rawSimilarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
     // "Similar to" rows: no podcasts or episodes, and no rows based on an episode
-    val similarRecommendations = remember(rawSimilarRecommendations) {
+    val similarRecommendations = remember(rawSimilarRecommendations, podcastHomeExcludedIds) {
         rawSimilarRecommendations?.mapNotNull { rec ->
             val title = rec.title
-            if (title is Song && title.song.isEpisode) return@mapNotNull null
-            val items = rec.items.filterNot { it.isPodcastLike() }
+            if (title.id in podcastHomeExcludedIds || (title is Song && title.song.isEpisode)) return@mapNotNull null
+            val items = rec.items.filterNot { it.isPodcastLike() || it.id in podcastHomeExcludedIds }
             if (items.isEmpty()) null else rec.copy(items = items)
         }
     }
-    val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
+    val rawAccountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
+    val accountPlaylists = remember(rawAccountPlaylists, podcastHomeExcludedIds) {
+        rawAccountPlaylists?.filterNot { it.id in podcastHomeExcludedIds }
+    }
     val rawHomePage by viewModel.homePage.collectAsStateWithLifecycle()
     // Podcasts have their own tab, so Home leaves out the Podcasts chip, podcast rows and episodes
-    val homePage = remember(rawHomePage) { rawHomePage?.withoutPodcasts() }
+    val homePage = remember(rawHomePage, podcastHomeExcludedIds) {
+        rawHomePage?.withoutPodcasts()?.let { page -> page.copy(sections = page.sections.mapNotNull { section ->
+            val items = section.items.filterNot { it.id in podcastHomeExcludedIds }
+            if (items.isEmpty()) null else section.copy(items = items)
+        }) }
+    }
     val explorePage by viewModel.explorePage.collectAsStateWithLifecycle()
     val dailyDiscover by viewModel.dailyDiscover.collectAsStateWithLifecycle()
     val communityPlaylists by viewModel.communityPlaylists.collectAsStateWithLifecycle()
@@ -719,7 +728,7 @@ fun HomeScreen(
     val allLocalItems by viewModel.allLocalItems.collectAsStateWithLifecycle()
     val allYtItems by viewModel.allYtItems.collectAsStateWithLifecycle()
     val rawSpeedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
-    val speedDialItems = remember(rawSpeedDialItems, isSpotifyHome) {
+    val speedDialItems = remember(rawSpeedDialItems, isSpotifyHome, podcastHomeExcludedIds) {
         rawSpeedDialItems.filterNot { it.isPodcastLike() }.filter { isCurrentSourceId(it.id) }
     }
     val pinnedSpeedDialItems by viewModel.pinnedSpeedDialItems.collectAsStateWithLifecycle()

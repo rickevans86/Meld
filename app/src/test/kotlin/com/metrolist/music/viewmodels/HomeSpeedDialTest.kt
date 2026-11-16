@@ -21,6 +21,12 @@ class HomeSpeedDialTest {
         assertEquals(listOf(pinned, home), result)
     }
 
+    @Test fun `explicit podcast membership excludes ordinary videos and show pins before the display limit`() {
+        val items = listOf(song("show"), song("episode"), song("music"))
+        assertEquals(listOf("music"), buildSpeedDialItems(items, items, items, items,
+            excludedIds = setOf("show", "episode")).map { it.id })
+    }
+
     private fun song(id: String) =
         SongItem(
             id = id,

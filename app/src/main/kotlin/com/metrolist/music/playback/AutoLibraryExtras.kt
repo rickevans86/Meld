@@ -699,8 +699,9 @@ constructor(
                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
             )
         }
-        return listOf(newEpisodes, saved, downloaded) + com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed)
-            .podcastFavouritesFirst(favourites) { it.mediaId } + marked + markedOnline
+        val shows = com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed)
+        val (favouriteShows, otherShows) = shows.partition { it.mediaId in favourites }
+        return listOf(newEpisodes, saved) + favouriteShows + listOf(downloaded) + otherShows + marked + markedOnline
     }
 
     /** Also serves Android Auto's node toolbar and the refresh after a favourite action. */

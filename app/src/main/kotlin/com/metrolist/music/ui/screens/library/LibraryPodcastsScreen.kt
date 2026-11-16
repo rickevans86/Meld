@@ -76,7 +76,6 @@ import com.metrolist.music.constants.SongSortTypeKey
 import com.metrolist.music.constants.ThumbnailCornerRadius
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.PodcastEntity
-import com.metrolist.music.db.entities.SpeedDialItem
 import com.metrolist.music.extensions.toMediaItem
 import com.metrolist.music.playback.queues.ListQueue
 import com.metrolist.music.ui.component.ChipsRow
@@ -90,6 +89,7 @@ import com.metrolist.music.ui.menu.SongMenu
 import com.metrolist.music.utils.joinByBullet
 import com.metrolist.music.utils.makeTimeString
 import com.metrolist.music.utils.rememberEnumPreference
+import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.rememberPreference
 import com.metrolist.music.podcasts.podcastFavouritesFirst
 import com.metrolist.music.constants.sortedShows
@@ -327,58 +327,28 @@ fun LibraryPodcastsScreen(
                         )
                     }
 
-                    // Saved podcast shows (episode playlists) from YT Music library
-                    itemsIndexed(
-                        items = subscribedChannels,
-                        key = { _, item -> item.id },
-                        contentType = { _, _ -> CONTENT_TYPE_SONG },
-                    ) { _, podcast ->
+                    val showRows = (subscribedChannels.map { podcast ->
+                        Triple(com.metrolist.music.podcasts.PodcastFavourites.channelId(podcast.id), podcast, null as com.metrolist.music.podcasts.PodcastShow?)
+                    } + followedFeeds.map { show ->
+                        Triple(com.metrolist.music.podcasts.PodcastFavourites.feedId(show.feedUrl), PodcastEntity(
+                            id = show.feedUrl, title = show.title, author = show.author, thumbnailUrl = show.artworkUrl,
+                        ), show)
+                    }).sortedShows(showSort, sortReversed) { (_, podcast, feed) -> feed?.sortInfo() ?: podcast.sortInfo() }
+                        .podcastFavouritesFirst(favouriteShows) { it.first }
+                    itemsIndexed(showRows, key = { _, row -> row.first }, contentType = { _, _ -> CONTENT_TYPE_SONG }) { _, (id, podcast, feed) ->
                         PodcastEpisodePlaylistItem(
-                            podcast = podcast,
-                            onClick = { navController.navigate("online_podcast/${podcast.id}") },
+                            podcast = if (id in favouriteShows) podcast.copy(title = "★ ${podcast.title}") else podcast,
+                            onClick = {
+                                navController.navigate(if (feed == null) "online_podcast/${podcast.id}" else
+                                    "podcast_directory?feed=${android.net.Uri.encode(feed.feedUrl)}")
+                            },
                             onMenuClick = {
                                 menuState.show {
-                                    PodcastEpisodePlaylistMenu(
-                                        podcast = podcast,
-                                        database = database,
-                                        onDismiss = menuState::dismiss,
-                                    )
+                                    if (feed == null) PodcastEpisodePlaylistMenu(podcast, database, menuState::dismiss)
+                                    else FollowedFeedMenu(feed, { viewModel.unfollowFeed(feed) }, menuState::dismiss)
                                 }
                             },
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .animateItem(),
-                        )
-                    }
-
-                    // Shows followed from Find podcasts
-                    itemsIndexed(
-                        items = followedFeeds,
-                        key = { _, show -> "feed:${show.feedUrl}" },
-                        contentType = { _, _ -> CONTENT_TYPE_SONG },
-                    ) { _, show ->
-                        PodcastEpisodePlaylistItem(
-                            podcast = PodcastEntity(
-                                id = show.feedUrl,
-                                title = show.title,
-                                author = show.author,
-                                thumbnailUrl = show.artworkUrl,
-                            ),
-                            onClick = { navController.navigate("podcast_directory?feed=${android.net.Uri.encode(show.feedUrl)}") },
-                            onMenuClick = {
-                                menuState.show {
-                                    FollowedFeedMenu(
-                                        show = show,
-                                        onUnfollow = { viewModel.unfollowFeed(show) },
-                                        onDismiss = menuState::dismiss,
-                                    )
-                                }
-                            },
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .animateItem(),
+                            modifier = Modifier.fillMaxWidth().animateItem(),
                         )
                     }
 
@@ -781,6 +751,7 @@ private fun FollowedFeedMenu(
     Material3MenuGroup(
         items =
             listOf(
+                podcastFavouriteMenuItem(com.metrolist.music.podcasts.PodcastFavourites.feedId(show.feedUrl), onDismiss),
                 Material3MenuItemData(
                     title = { Text(text = stringResource(R.string.podcast_unfollow)) },
                     icon = { Icon(painter = painterResource(R.drawable.delete), contentDescription = null) },
@@ -808,6 +779,24 @@ private fun FollowedFeedMenu(
     Spacer(Modifier.height(12.dp))
 }
 
+@Composable
+private fun podcastFavouriteMenuItem(id: String, onDismiss: () -> Unit): Material3MenuItemData {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val (favourites, _) = rememberPreference(com.metrolist.music.podcasts.PodcastFavourites.Key, emptySet<String>())
+    val favourite = id in favourites
+    return Material3MenuItemData(
+        title = { Text(stringResource(if (favourite) R.string.podcast_unfavourite_channel else R.string.podcast_favourite_channel)) },
+        icon = { Icon(painterResource(if (favourite) R.drawable.star else R.drawable.star_outline), contentDescription = null) },
+        onClick = {
+            scope.launch {
+                com.metrolist.music.podcasts.PodcastFavourites.setFavourite(context.dataStore, id, !favourite)
+                onDismiss()
+            }
+        },
+    )
+}
+
 /** Menu shown when tapping the three-dot icon on an episode playlist */
 @Composable
 private fun PodcastEpisodePlaylistMenu(
@@ -818,7 +807,6 @@ private fun PodcastEpisodePlaylistMenu(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val syncUtils = LocalSyncUtils.current
-    val isPinned by database.speedDialDao.isPinned(podcast.id).collectAsStateWithLifecycle(initialValue = false)
 
     val playlistId = podcast.id.removePrefix("MPSP")
     val shareUrl = "https://music.youtube.com/playlist?list=$playlistId"
@@ -866,47 +854,7 @@ private fun PodcastEpisodePlaylistMenu(
                         onDismiss()
                     },
                 ),
-                Material3MenuItemData(
-                    title = {
-                        Text(
-                            text =
-                                stringResource(
-                                    if (isPinned) {
-                                        R.string.unpin_from_speed_dial
-                                    } else {
-                                        R.string.pin_to_speed_dial
-                                    },
-                                ),
-                        )
-                    },
-                    icon = {
-                        Icon(
-                            painter =
-                                painterResource(
-                                    if (isPinned) R.drawable.remove else R.drawable.add,
-                                ),
-                            contentDescription = null,
-                        )
-                    },
-                    onClick = {
-                        coroutineScope.launch(Dispatchers.IO) {
-                            if (isPinned) {
-                                database.speedDialDao.delete(podcast.id)
-                            } else {
-                                database.speedDialDao.insert(
-                                    SpeedDialItem(
-                                        id = podcast.id,
-                                        title = podcast.title,
-                                        subtitle = podcast.author,
-                                        thumbnailUrl = podcast.thumbnailUrl,
-                                        type = "PLAYLIST",
-                                    ),
-                                )
-                            }
-                        }
-                        onDismiss()
-                    },
-                ),
+                podcastFavouriteMenuItem(com.metrolist.music.podcasts.PodcastFavourites.channelId(podcast.id), onDismiss),
             ),
     )
     Spacer(Modifier.height(12.dp))
