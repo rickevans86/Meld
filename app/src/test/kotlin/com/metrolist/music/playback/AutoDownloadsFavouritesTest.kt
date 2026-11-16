@@ -16,7 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+@Config(sdk = [28], application = android.app.Application::class)
 class AutoDownloadsFavouritesTest {
     private fun song(id: String, episode: Boolean = false, local: Boolean = false) =
         Song(SongEntity(id, id, isEpisode = episode, isLocal = local), emptyList())
@@ -53,7 +53,16 @@ class AutoDownloadsFavouritesTest {
     }
 
     @Test fun `browse buttons advertise the same add remove commands as channel metadata`() {
-        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val base = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        // This project's JVM tests do not package app string resources.
+        val context = object : android.content.ContextWrapper(base) {
+            @Suppress("DEPRECATION")
+            override fun getResources(): android.content.res.Resources = object : android.content.res.Resources(
+                base.resources.assets, base.resources.displayMetrics, base.resources.configuration,
+            ) {
+                override fun getString(id: Int) = "label-$id"
+            }
+        }
         val buttons = AutoPodcastFavourites.buttons(context)
         assertEquals(listOf(AutoPodcastFavourites.ADD, AutoPodcastFavourites.REMOVE), buttons.map { it.sessionCommand?.customAction })
         assertTrue(buttons.all { it.iconUri?.scheme == "android.resource" })
