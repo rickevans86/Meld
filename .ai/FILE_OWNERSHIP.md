@@ -19,7 +19,7 @@ Task COORDINATION-AUDIT-2026-11-13; branch chore/ai-coordination-audit. Complete
 
 Proposed CI-NIGHTLY-SIGNING follow-up: .github/workflows/build.yml only after access/ownership is established. No AI currently claims that implementation. The working FOSS release workflow is outside the proposed change scope.
 
-## Active review reservation — AUTO-AUDIOBOOKS, Codex, PR #3
+## Historical review reservation — AUTO-AUDIOBOOKS, Codex, PR #3 (released)
 
 Branch feat/auto-audiobook-sections, code 11965b3f. Implemented files: AutoAudiobookLibrary, AutoLibraryExtras, MediaLibrarySessionCallback, MusicService; AutoAudiobookSections and AutoAudiobookSectionSettings; AndroidAutoSettings; AbsClient/AbsRepository; default English strings, four auto_audiobook_* drawables, three focused tests and .ai/tasks/AUTO-AUDIOBOOKS.md. Keep these changes intact while the feature PR is reviewed. GitHub PRs remain authoritative; no Issue claim succeeded.
 
@@ -30,8 +30,10 @@ Pagination follow-up (Claude, PR #3, completed; review reservation only): playba
 PHONE-AUDIOBOOK-TABS (Claude, PR #4, completed and released; no active lock): audiobooks/AudiobookTabs.kt (new), ui/screens/library/audiobooks/AudiobookTabsUi.kt (new), AudiobooksScreen.kt, AudiobookshelfContent.kt, ui/screens/settings/AudiobookTabSettings.kt (new), FeaturesSettings.kt, AudiobooksViewModel.kt, AudiobookshelfViewModel.kt, AbsClient.kt/AbsRepository.kt (optional sort), default English strings, AudiobookTabsTest, README, WAVELENGTH_CHANGES and the task record.
 
 WAVELENGTH-APP-ID + HOME-AUDIOBOOK-FILTER (Claude, released 0.9.2.85; no active lock): .github/workflows/build_local_folders.yml (app id), BackupRestoreViewModel.kt + WavelengthBackupFiles, ui/component/WavelengthMove.kt, UpdaterSettings.kt, MainActivity.kt, AndroidManifest.xml (<queries>), constants/Audiobooks.kt (isYouTubeMediaId), ui/screens/HomeScreen.kt, tests, prompt.md, README/WAVELENGTH_CHANGES and task records.
-## Active — AUTO-DOWNLOADS-FAVOURITES, Codex, 2026-11-17 (Melbourne)
+## Completed — AUTO-DOWNLOADS-FAVOURITES, Codex, 2026-11-17 (Melbourne)
 
 Branch fix/auto-downloads-podcast-favourites from main 442ed05a. User authorized implementation, main publication, build/release and AI-record updates. Temporary task: Issues disabled; only open PR #2 contains coordination documents, no application overlap. Planned scope: MediaLibrarySessionCallback, AutoLibraryExtras, MusicService, AndroidAutoSettings, podcast favourite preferences/sorting and phone show list, default English strings, focused tests, .ai records. No schema or manual version changes. Incorporates the newer shared records from PR #2 without discarding Claude's history.
 
 AUTO-DOWNLOADS-FAVOURITES scope addition (Codex): AutoAudiobookLibrary, to retain a dedicated paginated Downloaded tile inside Audiobooks after removing the combined root. Existing download/scan/session refreshes include this node.
+
+AUTO-DOWNLOADS-FAVOURITES: completed/released 0.9.2.93, main 4bc049dfa230c1c805f63502a538aebf75586866; no active lock. Final scope also includes AutoDownloadedSongs, AutoPodcastFavourites, PodcastFavourites, two star vectors, two test classes and all six shared root AI records.

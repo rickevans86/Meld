@@ -1,10 +1,16 @@
 # Project state
 
-## Current work — 2026-11-17 (Melbourne), Codex
+## Current — 0.9.2.93, Codex, 2026-11-17 (Melbourne)
 
-Baseline checked live: main 442ed05a; latest release 0.9.2.92, application ID com.rickevans86.wavelength. Historical entries below describe their own releases, not the current version. The newer coordination records from PR #2 have been incorporated, preserving Claude's work and owner-confirmed podcast car test.
+Codex completed AUTO-DOWNLOADS-FAVOURITES in PR #14, merged into main as 4bc049dfa230c1c805f63502a538aebf75586866. Released [Wavelength 0.9.2.93](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.93) through the existing signed FOSS workflow, run 43951768865. The owner explicitly authorized implementation, main publication, build/release and AI-record updates.
 
-AUTO-DOWNLOADS-FAVOURITES is implemented locally; tests/build pending on fix/auto-downloads-podcast-favourites. User explicitly authorized publishing to main and release. It filters YouTube downloads/count/queue to completed YouTube music, removes the duplicate Downloaded root/settings entry, and adds persisted podcast-show favourites via native Media3 browse actions and favourite-first sorting (phone show lists share the preference). No schema, manual version or signing changes.
+Changes: YouTube downloads/count/playback/Shuffle contain completed YouTube music only; podcast-show favourites persist, expose native Media3 Favourite/Remove favourite browse actions and rank favourites first (existing sort within groups retained); the duplicate combined Downloaded root/settings row is removed. Offline books have a paginated Downloaded tile inside Audiobooks. Legacy deep links remain valid. Phone show lists share favourite ranking.
+
+Verification: 14 selected local tests passed (8 new regression tests + 6 existing pagination tests), local FOSS debug APK built; final PR CI 43950033049 on 66ff9368 passed full app/innertube unit suites, FOSS APK build/upload and lint. Release APK downloaded and verified against 0.9.2.92: application ID com.rickevans86.wavelength, same SHA-256 signing certificate 9056f5a0b0d6f4e2e44e2b1b75ece08ac761fa1dd6a3a8654e8c62cd47fb46f8, higher version code. Exact release package/version evidence is recorded in the task file. No schema, manual version, signing or application ID changes.
+
+Physical head-unit testing of these changes remains outstanding. Android Auto controls browse-action placement and support. GitHub Issues remain disabled; task/PR identity is used without claiming an Issue assignment. Newer shared records from PR #2 were incorporated without discarding Claude's history; the superseded records PR was closed after PR #14 merged. No active file reservation remains for this task.
+
+## Historical records
 
 Verified 2026-11-13 by Codex. Wavelength/Meld is an Android Kotlin app.
 

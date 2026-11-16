@@ -1,8 +1,10 @@
 # Task board
 
-## Current task — 2026-11-17, Codex
+## Current — 0.9.2.93, Codex, 2026-11-17 (Melbourne)
 
-AUTO-DOWNLOADS-FAVOURITES (temporary ID; Issues disabled): implemented locally, verification pending. Branch fix/auto-downloads-podcast-favourites; user authorized main publication/build/release. Scope and acceptance: [.ai/tasks/AUTO-DOWNLOADS-FAVOURITES.md](tasks/AUTO-DOWNLOADS-FAVOURITES.md). No overlapping application PR; PR #2 is records-only and its latest shared summaries are incorporated here.
+AUTO-DOWNLOADS-FAVOURITES — Codex — completed/released 0.9.2.93, PR #14, main 4bc049dfa230c1c805f63502a538aebf75586866, release run 43951768865. Fourteen selected local tests and FOSS debug build passed; final CI 43950033049 passed full tests/build/artifact/lint. Release APK identity/certificate/update compatibility verified. No active reservation. Physical head-unit test remains outstanding. Details: [task record](tasks/AUTO-DOWNLOADS-FAVOURITES.md). PR #2 summaries are now on main and that superseded records PR is closed.
+
+## Historical records
 
 GitHub Issues are authoritative when enabled; currently disabled (HTTP 410). GitHub PRs/commits/releases provide implementation evidence.
 

@@ -1,9 +1,12 @@
 # Handoff
 
-## Current handoff — 2026-11-17, ChatGPT Codex
+## Current — 0.9.2.93, Codex, 2026-11-17 (Melbourne)
 
-Task: AUTO-DOWNLOADS-FAVOURITES (Issues disabled). Implemented: completed YouTube-music-only download list/count/playback/Shuffle, persisted podcast-show favourite/unfavourite browse actions with favourite-first ranking, removal of duplicate Downloaded root/settings row. Legacy downloaded deep links retained. Phone show lists share favourite ranking; existing sort within groups preserved.
-Branch: fix/auto-downloads-podcast-favourites from main 442ed05a. Tests/build: running; not yet claimed passed. User authorized main merge and signed release. Next: verify tests/build/PR CI, merge, monitor existing FOSS signed release workflow, compare APK package/certificate/version with 0.9.2.92, record outcome. No physical car test available; browse-action placement/support belongs to Android Auto. Shared records incorporate the newer PR #2 summaries; no other AI's code discarded.
+Agent: ChatGPT Codex. Task: AUTO-DOWNLOADS-FAVOURITES / PR #14. Status: merged into main as 4bc049dfa230c1c805f63502a538aebf75586866; signed release 0.9.2.93, run 43951768865, published and APK verified (same app ID/cert as 0.9.2.92; higher version code). User authorized all publication steps.
+
+Completed: YouTube music-only downloads/count/queues; podcast-show favourite browse actions and persisted favourite-first ranking; duplicate Downloaded root removal; paginated offline-books entry inside Audiobooks. Fourteen selected local tests/build and full PR CI 43950033049 passed. No implementation or release work remains. Next: owner checks favourites and source-specific downloads on the head-unit; Android Auto owns action placement/support. Shared records synchronized on main, PR #2 superseded/closed, no active file reservation. Issues disabled; no Issue claim asserted. Full evidence in [task record](tasks/AUTO-DOWNLOADS-FAVOURITES.md).
+
+## Historical records
 
 Agent: Codex
 Task: AUDIOBOOK-PHONE / PR #1 (Issues disabled; no successful Issue claim)
