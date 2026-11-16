@@ -83,3 +83,5 @@ Podcast dedicated fast-forward / rewind buttons (PODCAST-FF-REWIND, PR #12, merg
 ## Release 0.9.2.92 — 2026-11-16, Claude
 
 Podcast fast-forward/rewind now in Android Auto + the notification (PODCAST-FF-AUTO, PR #13, merge 5eaba9a6, run 43767999416). The dedicated seek buttons (0.9.2.91, phone-only) now also show in the car alongside previous/next, in the overflow slot, using the same separate amounts. New CommandSeekBack/Forward session commands, distinct from the old skip commands. APK verified: com.rickevans86.wavelength, version code 280092, same cert. Latest baseline.
+
+Owner-verified in-car on 2026-11-16 (released 0.9.2.92 build): the 15/30 seek buttons show in the full Android Auto Now Playing player alongside previous/next — feature accepted. The Auto home-screen mini media card remains play-pause/previous/next only; that compact card's control set is fixed by Android Auto and cannot host app-supplied actions (those appear only in the full player and notification). Platform limitation, not a defect — PODCAST-FF-AUTO car testing is now cleared. Physical car testing of the earlier releases remains an open owner follow-up.

@@ -40,4 +40,4 @@ AUDIOBOOK-DETAIL-REDESIGN — Claude — released in 0.9.2.89 from main. Richer 
 
 PODCAST-FF-REWIND — Claude — released in 0.9.2.91 from main. Dedicated podcast rewind/fast-forward buttons (always on for episodes), separate amounts in Settings; existing repurpose-next/previous skip setting kept.
 
-PODCAST-FF-AUTO — Claude — released in 0.9.2.92 from main. Dedicated podcast seek buttons now in Android Auto + notification, alongside prev/next.
+PODCAST-FF-AUTO — Claude — released in 0.9.2.92 from main, owner-verified in-car 2026-11-16. Dedicated podcast seek buttons now in Android Auto + notification, alongside prev/next. Confirmed showing in the full Auto player; the Auto home mini media card stays prev/next only (Android Auto renders that card with a fixed control set, so app actions can't appear there). Accepted; no further code change.
