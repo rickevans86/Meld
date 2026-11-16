@@ -18,6 +18,8 @@ import com.metrolist.innertube.YouTube
 import com.metrolist.music.R
 import com.metrolist.music.audiobooks.AudiobookRepository
 import com.metrolist.music.audiobooks.abs.AbsRepository
+import com.metrolist.music.podcasts.PodcastFavourites
+import com.metrolist.music.podcasts.podcastFavouritesFirst
 import com.metrolist.music.constants.SongSortType
 import com.metrolist.music.constants.isAudiobookId
 import com.metrolist.music.db.MusicDatabase
@@ -672,11 +674,14 @@ constructor(
         val downloaded = folder(DOWNLOADED_EPISODES, context.getString(R.string.auto_downloaded_episodes), null, icon(R.drawable.offline))
         val subscribed = database.subscribedPodcasts().first()
         val followed = podcastFeeds.followed.value
+        val favourites = context.dataStore.data.first()[PodcastFavourites.Key].orEmpty()
         val channels = subscribed.map { podcast ->
-            folder("$PODCAST_CHANNEL/${podcast.id}", podcast.title, podcast.author, podcast.thumbnailUrl?.toUri())
+            val id = PodcastFavourites.channelId(podcast.id)
+            AutoPodcastFavourites.decorate(folder(id, podcast.title, podcast.author, podcast.thumbnailUrl?.toUri()), id in favourites)
         }
         val feeds = followed.map { show ->
-            folder("$PODCAST_FEED/${feedKey(show.feedUrl)}", show.title, show.author, show.artworkUrl?.toUri())
+            val id = PodcastFavourites.feedId(show.feedUrl)
+            AutoPodcastFavourites.decorate(folder(id, show.title, show.author, show.artworkUrl?.toUri()), id in favourites)
         }
         // Your playlists marked as podcasts (Settings → Features → Podcasts) come after your shows
         val prefs = context.dataStore.data.first()
@@ -694,7 +699,25 @@ constructor(
                 MediaMetadata.MEDIA_TYPE_PLAYLIST,
             )
         }
-        return listOf(newEpisodes, saved, downloaded) + com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed) + marked + markedOnline
+        return listOf(newEpisodes, saved, downloaded) + com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed)
+            .podcastFavouritesFirst(favourites) { it.mediaId } + marked + markedOnline
+    }
+
+    /** Also serves Android Auto's node toolbar and the refresh after a favourite action. */
+    suspend fun podcastChannelItem(mediaId: String): MediaItem? {
+        val path = mediaId.split('/')
+        if (path.size != 3 || path[0] != PODCASTS || path[2].isBlank()) return null
+        val item = when (path[1]) {
+            "channel" -> database.subscribedPodcasts().first().firstOrNull { it.id == path[2] }?.let {
+                folder(mediaId, it.title, it.author, it.thumbnailUrl?.toUri())
+            }
+            "feed" -> followedFeed(path[2])?.let {
+                folder(mediaId, it.title, it.author, it.artworkUrl?.toUri())
+            }
+            else -> null
+        } ?: return null
+        val favourites = context.dataStore.data.first()[PodcastFavourites.Key].orEmpty()
+        return AutoPodcastFavourites.decorate(item, mediaId in favourites)
     }
 
     private fun followedFeed(key: String) =
@@ -709,9 +732,7 @@ constructor(
         }
     }
 
-    private fun feedKey(feedUrl: String): String =
-        java.security.MessageDigest.getInstance("SHA-1").digest(feedUrl.toByteArray())
-            .joinToString("") { "%02x".format(it) }.take(16)
+    private fun feedKey(feedUrl: String): String = PodcastFavourites.feedKey(feedUrl)
 
     private suspend fun savedEpisodes(): List<Song> = database.savedPodcastEpisodesByCreateDateAsc().first()
 

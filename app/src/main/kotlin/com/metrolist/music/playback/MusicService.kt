@@ -790,6 +790,7 @@ class MusicService :
         mediaSession =
             MediaLibrarySession
                 .Builder(this, radioAwarePlayer, mediaLibrarySessionCallback)
+                .setCommandButtonsForMediaItems(AutoPodcastFavourites.buttons(this))
                 .setSessionActivity(
                     PendingIntent.getActivity(
                         this,
@@ -1253,6 +1254,12 @@ class MusicService :
                 .distinctUntilChanged().drop(1).collect {
                     mediaSession?.notifyChildrenChanged(AutoLibraryExtras.AUDIOBOOKS, Int.MAX_VALUE, null)
                     mediaSession?.notifyChildrenChanged(AutoLibraryExtras.DOWNLOADED, Int.MAX_VALUE, null)
+                }
+        }
+        scope.launch {
+            dataStore.data.map { it[com.metrolist.music.podcasts.PodcastFavourites.Key].orEmpty() }
+                .distinctUntilChanged().drop(1).collect {
+                    mediaSession?.notifyChildrenChanged(AutoLibraryExtras.PODCASTS, Int.MAX_VALUE, null)
                 }
         }
         // Your stations changed (added, removed, hearted): Android Auto re-reads its Radio list
