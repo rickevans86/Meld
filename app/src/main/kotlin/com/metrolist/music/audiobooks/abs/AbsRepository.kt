@@ -61,6 +61,8 @@ internal data class AbsLocalPosition(
     val currentTimeSec: Double,
     val updatedAt: Long,
     val finished: Boolean = false,
+    val pendingSync: Boolean = true,
+    val durationSec: Double = 0.0,
 )
 
 /** A book saved for offline listening: [progress] runs 0..1 while downloading. */
@@ -88,6 +90,7 @@ constructor(
     private val authStore = AbsAuthStore(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refreshLock = Mutex()
+    private val progressSyncLock = Mutex()
     private val json = Json { ignoreUnknownKeys = true }
     private val trackFile = File(context.filesDir, "audiobookshelf_tracks.json")
     private val tracks = ConcurrentHashMap<String, AbsTrackInfo>()
@@ -190,8 +193,11 @@ constructor(
     private suspend fun rememberRemoteProgress(progress: List<AbsProgress>) = withContext(Dispatchers.IO) {
         localReady.await()
         for (entry in progress) {
-            if (entry.lastUpdate > (localPositions[entry.libraryItemId]?.updatedAt ?: -1)) {
-                localPositions[entry.libraryItemId] = AbsLocalPosition(entry.currentTimeSec, entry.lastUpdate, entry.isFinished)
+            localPositions.compute(entry.libraryItemId) { _, current ->
+                if (entry.lastUpdate > (current?.updatedAt ?: -1)) {
+                    AbsLocalPosition(entry.currentTimeSec, entry.lastUpdate, entry.isFinished,
+                        pendingSync = false, durationSec = entry.durationSec)
+                } else current
             }
         }
         savePositions()
@@ -260,7 +266,8 @@ constructor(
     fun reportPosition(trackId: String, positionMs: Long) {
         val info = tracks[trackId] ?: return
         val currentTime = info.startOffsetSec + positionMs / 1000.0
-        localPositions[info.itemId] = AbsLocalPosition(currentTime, System.currentTimeMillis())
+        localPositions[info.itemId] = AbsLocalPosition(currentTime, System.currentTimeMillis(), durationSec = info.bookDurationSec)
+        scope.launch { savePositions() }
         val alreadyQueued = pendingReport.put(info.itemId, currentTime) != null
         if (alreadyQueued) return
         scope.launch {
@@ -270,54 +277,58 @@ constructor(
             lastReport[info.itemId] = System.currentTimeMillis()
             // Reaching the last ABS_FINISHED_TAIL_SEC marks the book finished on the server
             val finished = info.bookDurationSec > 0 && latest >= info.bookDurationSec - ABS_FINISHED_TAIL_SEC
-            if (finished) localPositions[info.itemId] = AbsLocalPosition(latest, System.currentTimeMillis(), finished = true)
+            if (finished) localPositions[info.itemId] = AbsLocalPosition(latest, System.currentTimeMillis(), finished = true, durationSec = info.bookDurationSec)
             savePositions()
-            runCatching {
-                authed { s ->
-                    client.updateProgress(
-                        s.serverUrl, s.accessToken, info.itemId,
-                        currentTimeSec = latest,
-                        durationSec = info.bookDurationSec,
-                        isFinished = finished,
-                    )
+            syncPendingProgress()
+        }
+    }
+
+    /** Retry persisted local edits; never clear a newer edit made while a request was in flight. */
+    suspend fun syncPendingProgress() = withContext(Dispatchers.IO) {
+        localReady.await()
+        if (_session.value == null || context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) return@withContext
+        progressSyncLock.withLock {
+            for ((id, saved) in HashMap(localPositions)) {
+                if (!saved.pendingSync) continue
+                try {
+                    val remote = authed { s -> client.progress(s.serverUrl, s.accessToken, id) }
+                    if (remote != null && remote.lastUpdate > saved.updatedAt) {
+                        localPositions.replace(id, saved, AbsLocalPosition(remote.currentTimeSec, remote.lastUpdate,
+                            remote.isFinished, pendingSync = false, durationSec = remote.durationSec))
+                    } else {
+                        val duration = saved.durationSec.takeIf { it > 0 } ?: downloadedBook(id)?.durationSec
+                            ?: tracks.values.firstOrNull { it.itemId == id }?.bookDurationSec ?: continue
+                        authed { s -> client.updateProgress(s.serverUrl, s.accessToken, id,
+                            saved.currentTimeSec, duration, saved.finished) }
+                        localPositions.replace(id, saved, saved.copy(pendingSync = false))
+                    }
+                    savePositions()
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    Timber.tag(TAG).w(e, "Progress remains queued for %s", id)
                 }
-            }.onFailure { Timber.tag(TAG).w(it, "Could not sync progress for ${info.itemId}") }
+            }
         }
     }
 
     /** Marks a book finished on the server, or back to not started (it then plays from the beginning). */
     suspend fun setFinished(book: AbsBook, finished: Boolean) = withContext(Dispatchers.IO) {
+        localReady.await()
         pendingReport.remove(book.id)
         val position = if (finished) book.durationSec else 0.0
-        localPositions[book.id] = AbsLocalPosition(position, System.currentTimeMillis(), finished = finished)
+        localPositions[book.id] = AbsLocalPosition(position, System.currentTimeMillis(), finished = finished, durationSec = book.durationSec)
         savePositions()
-        authed { s ->
-            client.updateProgress(
-                s.serverUrl, s.accessToken, book.id,
-                currentTimeSec = position,
-                durationSec = book.durationSec,
-                isFinished = finished,
-            )
-        }
+        syncPendingProgress()
     }
 
     fun onTrackFinished(trackId: String) {
         val info = tracks[trackId] ?: return
         if (!info.isLast) return
         pendingReport.remove(info.itemId)
-        localPositions[info.itemId] = AbsLocalPosition(info.bookDurationSec, System.currentTimeMillis(), finished = true)
+        localPositions[info.itemId] = AbsLocalPosition(info.bookDurationSec, System.currentTimeMillis(), finished = true, durationSec = info.bookDurationSec)
         scope.launch {
             savePositions()
-            runCatching {
-                authed { s ->
-                    client.updateProgress(
-                        s.serverUrl, s.accessToken, info.itemId,
-                        currentTimeSec = info.bookDurationSec,
-                        durationSec = info.bookDurationSec,
-                        isFinished = true,
-                    )
-                }
-            }.onFailure { Timber.tag(TAG).w(it, "Could not mark ${info.itemId} finished") }
+            syncPendingProgress()
         }
     }
 
@@ -460,7 +471,7 @@ constructor(
         }.onFailure { Timber.tag(TAG).w(it, "Could not read local positions") }
     }
 
-    private fun savePositions() {
+    @Synchronized private fun savePositions() {
         runCatching { positionsFile.writeText(json.encodeToString(positionMapSerializer, HashMap(localPositions))) }
             .onFailure { Timber.tag(TAG).w(it, "Could not save local positions") }
     }
@@ -477,6 +488,9 @@ constructor(
     }
 
     private suspend fun <T> authed(block: suspend (AbsSession) -> T): T {
+        if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) {
+            throw java.io.IOException(context.getString(com.metrolist.music.R.string.offline_mode_stream_unavailable))
+        }
         val current = _session.value ?: throw IllegalStateException("Not signed in")
         val session = if (expiresSoon(current.accessToken) && current.refreshToken != null) {
             runCatching { refreshSession(current) }.getOrDefault(current)

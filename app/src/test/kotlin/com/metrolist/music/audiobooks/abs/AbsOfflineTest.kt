@@ -3,6 +3,9 @@ package com.metrolist.music.audiobooks.abs
 import android.app.Application
 import android.content.ContextWrapper
 import androidx.room.Room
+import androidx.datastore.preferences.core.edit
+import com.metrolist.music.utils.dataStore
+import com.metrolist.music.constants.OfflineModeKey
 import androidx.test.core.app.ApplicationProvider
 import com.metrolist.music.db.InternalDatabase
 import com.metrolist.music.db.MusicDatabase
@@ -28,6 +31,8 @@ import org.robolectric.annotation.Config
 class AbsOfflineTest {
     @get:Rule val folder = TemporaryFolder()
     private lateinit var context: android.content.Context
+    @Volatile private var acceptUpdates = false
+    private val updates = java.util.concurrent.CopyOnWriteArrayList<String>()
     @Volatile private var progressResponse: String? = null
     private lateinit var db: MusicDatabase
     private lateinit var repository: AbsRepository
@@ -59,12 +64,17 @@ class AbsOfflineTest {
         File(audioDir, "1.wav").writeBytes(byteArrayOf(5, 6, 7, 8))
         File(context.filesDir, "audiobookshelf_positions.json").writeText(
             """{"offline-book":{"currentTimeSec":72.0,"updatedAt":2000,"finished":false}}""")
+        runBlocking { context.dataStore.edit { it[OfflineModeKey] = false } }
         repository = AbsRepository(context, db)
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/") { exchange ->
             requests.incrementAndGet()
             val body = when {
                 exchange.requestURI.path == "/api/me" -> """{"username":"Reader"}"""
+                exchange.requestURI.path.startsWith("/api/me/progress/") && exchange.requestMethod == "PATCH" -> {
+                    updates.add(exchange.requestBody.bufferedReader().readText())
+                    if (acceptUpdates) "{}" else null
+                }
                 exchange.requestURI.path.startsWith("/api/me/progress/") -> progressResponse
                 else -> null
             }
@@ -76,7 +86,10 @@ class AbsOfflineTest {
         server.start()
     }
 
-    @After fun teardown() { server.stop(0); db.close() }
+    @After fun teardown() {
+        runBlocking { context.dataStore.edit { it[OfflineModeKey] = false } }
+        server.stop(0); db.close()
+    }
 
     @Test fun `download metadata and prepare use local files with an unavailable signed-in server`() = runBlocking {
         repository.signInWithApiKey("http://127.0.0.1:${server.address.port}", "test-key")
@@ -150,4 +163,53 @@ class AbsOfflineTest {
         catch (_: IllegalStateException) { }
         assertEquals(0, requests.get())
     }
+    @Test fun `offline progress persists across restart and syncs when authentication is available`() = runBlocking {
+        repository.signInWithApiKey("http://127.0.0.1:${server.address.port}", "test-key")
+        context.dataStore.edit { it[OfflineModeKey] = true }
+        val before = requests.get()
+        repository.setFinished(book, true)
+        assertEquals(before, requests.get())
+        assertTrue(File(context.filesDir, "audiobookshelf_positions.json").readText().contains("100.0"))
+        val reopened = AbsRepository(context, db)
+        assertTrue(reopened.localProgress().single().isFinished)
+        progressResponse = """{"libraryItemId":"offline-book","currentTime":2,"duration":100,"lastUpdate":1000,"isFinished":false}"""
+        acceptUpdates = true
+        context.dataStore.edit { it[OfflineModeKey] = false }
+        reopened.syncPendingProgress()
+        assertTrue(updates.isEmpty()) // Robolectric has no Android keystore, so restore sign-in explicitly.
+        reopened.signInWithApiKey("http://127.0.0.1:${server.address.port}", "test-key")
+        reopened.syncPendingProgress()
+        assertEquals(1, updates.size)
+        assertTrue(updates.single().contains("\"isFinished\":true"))
+        val after = requests.get()
+        reopened.syncPendingProgress()
+        assertEquals(after, requests.get())
+        val saved = Json.decodeFromString(AbsLocalPosition.serializer(),
+            kotlinx.serialization.json.Json.parseToJsonElement(File(context.filesDir, "audiobookshelf_positions.json").readText())
+                .let { it as kotlinx.serialization.json.JsonObject }.getValue(book.id).toString())
+        assertFalse(saved.pendingSync)
+    }
+
+    @Test fun `failed progress upload remains queued for a later retry`() = runBlocking {
+        repository.signInWithApiKey("http://127.0.0.1:${server.address.port}", "test-key")
+        context.dataStore.edit { it[OfflineModeKey] = true }
+        repository.setFinished(book, false)
+        progressResponse = """{"libraryItemId":"offline-book","currentTime":2,"duration":100,"lastUpdate":1000,"isFinished":false}"""
+        context.dataStore.edit { it[OfflineModeKey] = false }
+        repository.syncPendingProgress()
+        assertEquals(1, updates.size)
+        acceptUpdates = true
+        repository.syncPendingProgress()
+        assertEquals(2, updates.size)
+        assertTrue(updates.last().contains("\"currentTime\":0.0"))
+    }
+
+    @Test fun `reconnect preserves newer server progress instead of uploading older local progress`() = runBlocking {
+        repository.signInWithApiKey("http://127.0.0.1:${server.address.port}", "test-key")
+        progressResponse = """{"libraryItemId":"offline-book","currentTime":90,"duration":100,"lastUpdate":9000,"isFinished":false}"""
+        repository.syncPendingProgress()
+        assertTrue(updates.isEmpty())
+        assertEquals(90.0, repository.localProgress().single().currentTimeSec, 0.0)
+    }
+
 }

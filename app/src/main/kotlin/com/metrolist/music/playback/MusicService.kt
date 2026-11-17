@@ -873,6 +873,13 @@ class MusicService :
             }
         }
 
+        connectivityObserver.networkStatus.collectLatest(scope) { connected ->
+            if (connected) while (true) {
+                absRepository.syncPendingProgress()
+                kotlinx.coroutines.delay(60_000)
+            }
+        }
+
         // Watch for audio quality setting changes
         var isFirstQualityEmit = true
         scope.launch {
@@ -4863,6 +4870,11 @@ class MusicService :
                 return@Factory dataSpec
             }
             val mediaId = stripQobuzCacheKeyPrefix(dataSpec.key ?: error("No media id"))
+            if (dataStore[com.metrolist.music.constants.OfflineModeKey] == true &&
+                !(isOnDeviceMediaId(mediaId) && !com.metrolist.music.constants.isSubsonicId(mediaId) &&
+                    !com.metrolist.music.constants.isMediaServerId(mediaId) && !com.metrolist.music.constants.isRadioId(mediaId))) {
+                throw java.io.IOException(getString(R.string.offline_mode_stream_unavailable))
+            }
             val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
 
             // Navidrome / Subsonic: stream from the server with fresh credentials
@@ -4885,6 +4897,9 @@ class MusicService :
                 if (localPath != null) {
                     if (isAbsTrackId(mediaId)) {
                         absRepository.offlineUri(mediaId)?.let { return@Factory dataSpec.withUri(it) }
+                        if (dataStore[com.metrolist.music.constants.OfflineModeKey] == true) {
+                            throw java.io.IOException(getString(R.string.offline_mode_stream_unavailable))
+                        }
                         return@Factory dataSpec.withUri(localPath.toUri())
                             .withAdditionalHeaders(absRepository.streamHeaders())
                     }

@@ -50,6 +50,7 @@ import com.metrolist.music.extensions.toEnum
 import com.metrolist.music.playback.DownloadUtil
 import com.metrolist.music.utils.PodcastRefreshTrigger
 import com.metrolist.music.utils.SyncUtils
+import com.metrolist.music.utils.get
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -462,7 +463,7 @@ constructor(
 class LibraryPodcastsViewModel
 @Inject
 constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val database: MusicDatabase,
     private val syncUtils: SyncUtils,
     private val podcastDirectory: com.metrolist.music.podcasts.PodcastDirectory,
@@ -543,6 +544,7 @@ constructor(
             }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private suspend fun fetchSePlaylist() {
+        if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) return
         YouTube.library("FEmusic_liked_playlists").completed().onSuccess {
             _sePlaylist.value = it.items
                 .filterIsInstance<com.metrolist.innertube.models.PlaylistItem>()
@@ -553,6 +555,7 @@ constructor(
     }
 
     private suspend fun fetchPodcastChannels() {
+        if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) return
         YouTube.libraryPodcastChannels().onSuccess { page ->
             val channels = page.items.filterIsInstance<ArtistItem>()
             _apiPodcastChannels.value = channels
@@ -563,6 +566,7 @@ constructor(
     }
 
     private suspend fun fetchRdpnPlaylist() {
+        if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) return
         YouTube.newEpisodesPlaylistInfo().onSuccess { item ->
             _rdpnPlaylist.value = item
             timber.log.Timber.d("[PODCAST] RDPN playlist: ${item.title}, thumbnail: ${item.thumbnail}")
@@ -582,7 +586,7 @@ constructor(
             fetchRdpnPlaylist()
         }
         viewModelScope.launch(Dispatchers.IO) {
-            syncUtils.syncPodcastSubscriptionsSuspend()
+            if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] != true) syncUtils.syncPodcastSubscriptionsSuspend()
         }
         // Observe refresh trigger for auto-refresh after subscribe/unsubscribe
         viewModelScope.launch(Dispatchers.IO) {
@@ -601,6 +605,7 @@ constructor(
     }
 
     suspend fun refreshAll() {
+        if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) return
         fetchSePlaylist()
         fetchPodcastChannels()
         fetchRdpnPlaylist()
@@ -612,6 +617,7 @@ constructor(
      * Force refresh podcast channels. Called when screen becomes visible.
      */
     fun refreshChannels() {
+        if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) return
         viewModelScope.launch(Dispatchers.IO) {
             fetchPodcastChannels()
         }

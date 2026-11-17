@@ -10,6 +10,8 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -17,7 +19,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * Simple NetworkConnectivityObserver based on OuterTune's implementation
  * Provides network connectivity monitoring for auto-play functionality
  */
-class NetworkConnectivityObserver(context: Context) {
+class NetworkConnectivityObserver(private val context: Context) {
+    @Volatile private var forcedOffline = context.dataStore[com.metrolist.music.constants.OfflineModeKey] ?: false
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -39,6 +43,12 @@ class NetworkConnectivityObserver(context: Context) {
     }
 
     init {
+        scope.launch {
+            context.dataStore.data.collect {
+                forcedOffline = it[com.metrolist.music.constants.OfflineModeKey] ?: false
+                _networkStatus.value = isCurrentlyConnected()
+            }
+        }
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
@@ -46,13 +56,14 @@ class NetworkConnectivityObserver(context: Context) {
         try {
             connectivityManager.registerNetworkCallback(request, networkCallback)
         } catch (e: Exception) {
-            // Fallback: assume connected if registration fails
-            _networkStatus.value = true
+            // Keep the current effective state if callback registration fails
+            _networkStatus.value = isCurrentlyConnected()
         }
     }
 
     fun unregister() {
-        connectivityManager.unregisterNetworkCallback(networkCallback)
+        scope.cancel()
+        runCatching { connectivityManager.unregisterNetworkCallback(networkCallback) }
     }
 
     /**
@@ -65,6 +76,7 @@ class NetworkConnectivityObserver(context: Context) {
      * "offline" without VPN. Trusting NET_CAPABILITY_INTERNET matches what OuterTune does.
      */
     fun isCurrentlyConnected(): Boolean {
+        if (forcedOffline) return false
         return try {
             val activeNetwork = connectivityManager.activeNetwork
             val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)

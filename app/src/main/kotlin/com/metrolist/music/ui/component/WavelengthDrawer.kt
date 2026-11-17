@@ -91,6 +91,7 @@ fun WavelengthDrawerSheet(
 ) {
     val alternateIsSpotify = com.metrolist.music.constants.rememberDefaultHomeSource() !=
         com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
+    val (offline, setOffline) = com.metrolist.music.utils.rememberPreference(com.metrolist.music.constants.OfflineModeKey, false)
     val disabled = com.metrolist.music.constants.rememberDisabledFeatures()
     ModalDrawerSheet {
         Column(
@@ -103,9 +104,14 @@ fun WavelengthDrawerSheet(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp),
             )
+            SwitchPreference(
+                title = { Text(stringResource(R.string.offline_mode)) },
+                checked = offline,
+                onCheckedChange = setOffline,
+            )
             listOf(WavelengthDrawer.listen(alternateIsSpotify), WavelengthDrawer.browse, WavelengthDrawer.more).forEachIndexed { index, group ->
                 if (index > 0) HorizontalDivider(modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp))
-                group.filterNot { disabled.hidesRoute(it.route) }.forEach { destination ->
+                group.filterNot { disabled.hidesRoute(it.route) || (offline && com.metrolist.music.constants.offlineHidesRoute(it.route)) }.forEach { destination ->
                     NavigationDrawerItem(
                         label = { Text(stringResource(destination.title)) },
                         icon = { Icon(painterResource(destination.icon), contentDescription = null) },
