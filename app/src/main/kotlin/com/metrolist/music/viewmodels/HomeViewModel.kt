@@ -106,10 +106,11 @@ internal fun buildSpeedDialItems(
     keepListening: List<YTItem>,
     quickPicks: List<YTItem>,
     home: List<YTItem>,
+    excludedIds: Set<String> = emptySet(),
 ): List<YTItem> =
     (pinned + keepListening + quickPicks + home)
         // Podcasts and episodes live in the Podcasts tab, so Speed dial leaves them out
-        .filterNot { it.isPodcastLike() }
+        .filterNot { it.isPodcastLike() || it.id in excludedIds }
         .distinctBy { it.id }
         .take(27)
 
@@ -133,6 +134,7 @@ class HomeViewModel @Inject constructor(
     val wrappedManager: WrappedManager,
     private val wrappedAudioService: WrappedAudioService,
     private val networkConnectivity: NetworkConnectivityObserver,
+    private val podcastHomeFilter: com.metrolist.music.podcasts.PodcastHomeFilter,
     savedStateHandle: androidx.lifecycle.SavedStateHandle,
 ) : ViewModel() {
     /** True for the side-menu home ("home_alt"), which shows whichever source isn't the default. */
@@ -173,13 +175,17 @@ class HomeViewModel @Inject constructor(
         database.speedDialDao.getAll()
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    val podcastHomeExcludedIds = podcastHomeFilter.excludedIds()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     val speedDialItems: StateFlow<List<YTItem>> =
         combine(
             database.speedDialDao.getAll(),
             keepListening,
             quickPicks,
             homePage,
-        ) { pinned, keepListening, quick, home ->
+            podcastHomeExcludedIds,
+        ) { pinned, keepListening, quick, home, excluded ->
             buildSpeedDialItems(
                 pinned = pinned.map { it.toYTItem() },
                 keepListening =
@@ -226,6 +232,7 @@ class HomeViewModel @Inject constructor(
                         )
                     },
                 home = home?.sections.orEmpty().flatMap { it.items },
+                excludedIds = excluded,
             )
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -996,6 +1003,7 @@ class HomeViewModel @Inject constructor(
         (this as List<T?>).filterNotNull()
 
     fun refresh() {
+        podcastHomeFilter.refresh()
         if (isRefreshing.value) return
         isRefreshing.value = true
         viewModelScope.launch(Dispatchers.IO) {

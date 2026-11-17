@@ -2146,6 +2146,9 @@ interface DatabaseDao {
         raw("PRAGMA wal_checkpoint(FULL)".toSQLiteQuery())
     }
 
+    @Query("SELECT id FROM song WHERE isEpisode = 1 OR id IN (SELECT songId FROM playlist_song_map WHERE playlistId IN (:playlistIds))")
+    fun podcastHomeSongIds(playlistIds: List<String>): Flow<List<String>>
+
     // Podcast methods
 
     @Query("SELECT * FROM podcast WHERE bookmarkedAt IS NOT NULL ORDER BY bookmarkedAt DESC")

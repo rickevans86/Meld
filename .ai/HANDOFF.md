@@ -77,3 +77,7 @@ Blockers: Issues disabled, so this task is identified by temporary ID/PR rather 
 Next action: review/test PR #3 on a car display and connected Audiobookshelf instance; authorize merge/release when ready. PR #2 separately carries these shared-record updates. The optional nightly signing issue remains a separate follow-up.
 Shared records updated: yes, through documentation PR #2; dedicated implementation task record is in PR #3.
 Remote synchronization: main was 4b1e9295; release 0.9.2.81 remains the published baseline. No source work from another AI was overwritten.
+
+## PHONE-PODCAST-FAVOURITES — Codex, 2026-11-17
+
+Codex / PHONE-PODCAST-FAVOURITES: implementation and nine selected tests/FOSS debug build complete. Branch fix/shared-podcast-favourites. Next: full PR CI, authorized main merge/release, APK identity/cert/version comparison, final shared-record update. No physical phone/car or live authenticated YouTube test claimed.
