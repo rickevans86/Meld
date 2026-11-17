@@ -1,10 +1,14 @@
 # AI activity log
 
-## In progress — OFFLINE-LIBRARY-ACCESS, Codex, 2026-11-17 (Melbourne)
+## Current — 0.9.2.95, Codex, 2026-11-17 (Melbourne)
 
-Completed local implementation on `fix/offline-library-access` from main `93204481`. Saved Audiobookshelf metadata, audio, covers and resume positions open without server/auth availability; failed details close instead of spinning. Completed Media3 downloads bypass remote authentication/quality lookup; airplane mode exposes source-specific saved music and podcast downloads. Server music roots also offer a local Downloads entry while online. Local files retain their direct playback path. Only completed downloads are covered; streaming/discovery/live radio still need a connection.
+OFFLINE-LIBRARY-ACCESS completed by ChatGPT Codex in [PR #16](https://github.com/rickevans86/Meld/pull/16), feature `fb7e0e5c`, main merge `b3c1911d3f3433eee648ed4698d23a003b338496`. [Wavelength 0.9.2.95](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.95) published by signed release run `43999649417`. PR CI `43998334078` passed full tests, FOSS debug build/upload and lint. Local verification: 270 app + 10 innertube tests passed, FOSS debug build, diff/resource checks passed.
 
-Validation: all 270 app and 10 innertube tests passed; FOSS debug APK built; diff whitespace and default English resource uniqueness passed. Regression tests cover unavailable server/no credentials, missing metadata/audio, resume persistence and completed/partial cache ranges. No physical phone/head-unit airplane-mode or real decoder test claimed. No schema, manual version, signing or app-ID changes. Continuing the user's standing main/build/release/AI-record workflow; PR CI and release remain pending. Issues disabled, so this is a temporary task ID, not a remote Issue claim. See [task](tasks/OFFLINE-LIBRARY-ACCESS.md).
+Downloaded ABS metadata/audio/covers/resume now use local data before server/auth; missing completed-book files fail locally, failed details stop spinning. Completed Media3 downloads bypass remote stream auth/quality resolution for phone and Android Auto. Airplane mode exposes source-specific downloaded music and podcast downloads; music-server roots also offer a Downloads entry when the network is present but the server is unavailable. Existing local-file playback retained. Streaming/discovery/live radio still require connectivity.
+
+Public APK downloaded and verified: `com.rickevans86.wavelength`, `0.9.2.95`, code `280095` (higher than 280094), non-debuggable, same SHA-256 signing certificate `9056f5a0b0d6f4e2e44e2b1b75ece08ac761fa1dd6a3a8654e8c62cd47fb46f8`. Tag points to the tested main merge. No schema/manual version/signing/app-ID changes. Continuing the user's standing main/build/release/AI-record workflow. Issues disabled; temporary task ID used without asserting an Issue claim.
+
+No implementation/release work or active reservation remains. Physical phone/head-unit airplane-mode playback, actual audio decoding and live authenticated server reconnection remain untested; owner device validation is the next action. All six shared AI records and [task record](tasks/OFFLINE-LIBRARY-ACCESS.md) updated; prior AI history retained.
 
 - Claude: verified existing commit 8917088 adds podcast skip controls; 442be11 repairs Android Auto listener forwarding; e4ff3a6 records upstream sync.
 - Codex: audited remote branches, issues and PRs; preserved existing audiobook code; created these coordination records. Attempt to create task Issue failed with HTTP 410 (Issues disabled).

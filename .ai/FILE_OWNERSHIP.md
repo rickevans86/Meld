@@ -44,6 +44,8 @@ Branch fix/shared-podcast-favourites from main f76f8a49. User authorized impleme
 
 PHONE-PODCAST-FAVOURITES completed/released 0.9.2.94, PR #15 / main 650649af7175bcd072bec9b24d5d3c493216bbb7; no active reservation. Final file scope is recorded in the task; all shared records updated.
 
-## Active — OFFLINE-LIBRARY-ACCESS, Codex, 2026-11-17
+## Completed — OFFLINE-LIBRARY-ACCESS, Codex, 2026-11-17
 
-Branch fix/offline-library-access from main 93204481. Local implementation of user-reported ABS offline bug and broader airplane-mode download access. Scope: AbsRepository; AudiobookshelfViewModel/Content; MusicService/cache helper; offline downloads UI; HomeScreen/SubsonicScreen/MediaServerScreen; default English strings; tests; AI records. No new publication/release claim. No overlapping PR found; Issues disabled.
+Branch fix/offline-library-access from main 93204481. Local implementation of user-reported ABS offline bug and broader airplane-mode download access. Scope: AbsRepository; AudiobookshelfViewModel/Content; MusicService/cache helper; offline downloads UI; HomeScreen/SubsonicScreen/MediaServerScreen; default English strings; tests; AI records. Continuing the user’s standing main/build/release workflow. No overlapping PR found; Issues disabled.
+
+OFFLINE-LIBRARY-ACCESS completed/released 0.9.2.95, PR #16 / main b3c1911d, release run 43999649417. No active reservation remains. Final scope and verification are in the task record.
