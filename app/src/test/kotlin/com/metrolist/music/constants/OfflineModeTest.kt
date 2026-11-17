@@ -13,4 +13,13 @@ class OfflineModeTest {
             .forEach { assertFalse(it, offlineHidesRoute(it)) }
         assertFalse(offlineHidesRoute(null))
     }
+    @Test fun `uncached RSS and other streams cannot use the direct local file path`() {
+        listOf("podcast:episode", "radio:station", "subsonic:song", "mediaserver:song", "spotify:song", "youtube")
+            .forEach { assertFalse(it, offlineAllowsDirectPlayback(it)) }
+        assertTrue(offlineAllowsDirectPlayback("local:file"))
+        assertTrue(offlineAllowsDirectPlayback("audiobook:device:chapter"))
+        // ABS files still undergo the repository's local-file check before opening.
+        assertTrue(offlineAllowsDirectPlayback("audiobook:abs:book:0"))
+    }
+
 }
