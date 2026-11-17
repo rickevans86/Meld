@@ -1653,4 +1653,6 @@
     <string name="offline_choose_audiobook">You’re offline. Choose a downloaded audiobook.</string>
     <string name="offline_audiobook_missing">Some downloaded book files are missing. Download this book again when you’re online.</string>
     <string name="offline_sign_in_hint">Connect to sign in. Your downloaded books remain available offline.</string>
+    <string name="offline_mode">Offline mode</string>
+    <string name="offline_mode_stream_unavailable">Offline mode is on. Choose downloaded content or a local file.</string>
 </resources>

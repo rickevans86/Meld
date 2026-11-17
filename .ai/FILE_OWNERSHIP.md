@@ -1,5 +1,9 @@
 # Planned file modifications
 
+## In progress — MANUAL-OFFLINE-MODE, ChatGPT Codex, 2026-11-17 (Melbourne)
+
+Branch `feat/manual-offline-mode` from main `bd0ae8ed`; no open PR/overlap found. Issues disabled, temporary task ID (no remote claim). User requests a drawer Offline mode switch hiding online services and restricting podcasts/audiobooks to Downloaded; sync saved ABS progress when online again. Reuse DataStore, existing downloaded views and effective connectivity. Scope: drawer/MainActivity navigation; offline preference/connectivity; podcast/audiobook views; ABS progress persistence/retry and service playback; tests/default English strings. No schema/manual version/signing changes. Local verification: 276 app + 10 innertube tests passed, FOSS debug build succeeded, diff and default English XML/name checks passed. Tests cover connected-network override/persisted switch, offline route filtering, restart-persisted progress, failed upload retry and newer-server conflict protection. Robolectric lacks Android Keystore, so the restart test restores sign-in explicitly after checking saved progress. No physical device/head-unit success claimed. PR build/lint and signed release pending. Continuing standing main/build/release/AI-record authorization.
+
 Task AUDIOBOOK-PHONE / PR #1, Codex, completed and released as v0.9.2.81 on main. No active file reservation. Remote Issue claim was unavailable.
 
 - ui/player/Player.kt and AudiobookPlayerControls.kt

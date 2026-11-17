@@ -113,9 +113,11 @@ fun LibraryPodcastsScreen(
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    var podcastFilter by rememberEnumPreference(PodcastFilterKey, PodcastFilter.EPISODES)
+    var savedPodcastFilter by rememberEnumPreference(PodcastFilterKey, PodcastFilter.EPISODES)
+    val (offline) = rememberPreference(com.metrolist.music.constants.OfflineModeKey, false)
+    val podcastFilter = if (offline) PodcastFilter.DOWNLOADED else savedPodcastFilter
     val online by playerConnection.service.connectivityObserver.networkStatus.collectAsStateWithLifecycle()
-    LaunchedEffect(online) { if (!online) podcastFilter = PodcastFilter.DOWNLOADED }
+    LaunchedEffect(online) { if (!online && !offline) savedPodcastFilter = PodcastFilter.DOWNLOADED }
 
     val (sortType, onSortTypeChange) =
         rememberEnumPreference(
@@ -183,10 +185,10 @@ fun LibraryPodcastsScreen(
 
     // Refresh channels when screen becomes visible (ON_RESUME)
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, offline) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
+                if (event == Lifecycle.Event.ON_RESUME && !offline) {
                     viewModel.refreshChannels()
                 }
             }
@@ -221,7 +223,7 @@ fun LibraryPodcastsScreen(
                     state = pullToRefreshState,
                     isRefreshing = isRefreshing,
                     onRefresh = {
-                        if (!isRefreshing) {
+                        if (!offline && !isRefreshing) {
                             isRefreshing = true
                             coroutineScope.launch {
                                 viewModel.refreshAll()
@@ -254,14 +256,14 @@ fun LibraryPodcastsScreen(
                 )
                 ChipsRow(
                     chips =
-                        listOf(
+                        if (offline) listOf(PodcastFilter.DOWNLOADED to stringResource(R.string.filter_downloaded)) else listOf(
                             PodcastFilter.EPISODES to stringResource(R.string.filter_episodes),
                             PodcastFilter.CHANNELS to stringResource(R.string.filter_channels),
                             PodcastFilter.DOWNLOADED to stringResource(R.string.filter_downloaded),
                             PodcastFilter.DISCOVER to stringResource(R.string.podcast_discover),
                         ),
                     currentValue = podcastFilter,
-                    onValueUpdate = { podcastFilter = it },
+                    onValueUpdate = { savedPodcastFilter = it },
                     modifier = Modifier.weight(1f),
                 )
                 com.metrolist.music.ui.component.SortMenuButton(
@@ -277,7 +279,7 @@ fun LibraryPodcastsScreen(
                     onReversedChange = onSortReversed,
                 )
                 // On the Podcasts tab, search is the top-bar search button; inside Library it stays here
-                if (onDeselect != null) IconButton(onClick = { navController.navigate("podcast_directory") }) {
+                if (!offline && onDeselect != null) IconButton(onClick = { navController.navigate("podcast_directory") }) {
                     Icon(
                         painter = painterResource(R.drawable.search),
                         contentDescription = stringResource(R.string.podcast_directory),

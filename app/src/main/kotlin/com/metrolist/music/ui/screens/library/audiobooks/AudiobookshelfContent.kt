@@ -88,6 +88,7 @@ fun AudiobookshelfContent(
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
 
+    val (offline) = com.metrolist.music.utils.rememberPreference(com.metrolist.music.constants.OfflineModeKey, false)
     val session by viewModel.session.collectAsState()
     val signInExpired by viewModel.signInExpired.collectAsState()
     val libraries by viewModel.libraries.collectAsState()
@@ -118,6 +119,10 @@ fun AudiobookshelfContent(
         if (!online || (session == null && downloadedBooks.isNotEmpty())) tabs.select(AudiobookTab.DOWNLOADED)
     }
     LaunchedEffect(tabs.sort) { viewModel.setSort(tabs.sort) }
+
+    LaunchedEffect(offline) {
+        if (offline && openBookId != null && downloads[openBookId]?.done != true) viewModel.close()
+    }
 
     val playingItemId = mediaMetadata?.id?.takeIf(::isAbsTrackId)?.removePrefix("audiobook:abs:")?.substringBeforeLast(':')
 
@@ -158,7 +163,7 @@ fun AudiobookshelfContent(
         item(key = "header") { header() }
 
         val current = session
-        if (current == null) {
+        if (current == null && !offline) {
             item(key = "sign_in") {
                 SignInForm(
                     busy = busy,
@@ -170,7 +175,7 @@ fun AudiobookshelfContent(
             if (downloadedBooks.isEmpty()) return@LazyColumn
         }
 
-        if (signInExpired) {
+        if (signInExpired && !offline) {
             item(key = "expired") {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -211,7 +216,7 @@ fun AudiobookshelfContent(
             return@LazyColumn
         }
 
-        if (current != null) item(key = "account") {
+        if (current != null && !offline) item(key = "account") {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -245,7 +250,7 @@ fun AudiobookshelfContent(
             }
         }
 
-        if (libraries.size > 1) {
+        if (!offline && libraries.size > 1) {
             item(key = "libraries") {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -281,7 +286,7 @@ fun AudiobookshelfContent(
         }
 
         val results = searchResults
-        if (query.isNotBlank() && results != null) {
+        if (!offline && query.isNotBlank() && results != null) {
             if (results.isEmpty()) {
                 item(key = "no_results") { EmptyText(stringResource(R.string.abs_no_results)) }
             }

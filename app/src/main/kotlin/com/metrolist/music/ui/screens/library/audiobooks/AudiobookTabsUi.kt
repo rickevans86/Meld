@@ -70,10 +70,11 @@ internal fun rememberAudiobookTabState(): AudiobookTabState {
     val (orderRaw, _) = rememberPreference(AudiobookTabs.OrderKey, "")
     val (selectedRaw, saveSelected) = rememberPreference(AudiobookTabs.SelectedKey, "")
     val (sortRaw, saveSort) = rememberPreference(AudiobookTabs.SortKey, AudiobookSort.TITLE.id)
+    val (offline) = rememberPreference(com.metrolist.music.constants.OfflineModeKey, false)
     val order = remember(orderRaw) { AudiobookTabs.decode(orderRaw) }
     return AudiobookTabState(
-        order = order,
-        selected = AudiobookTabs.selected(selectedRaw, order),
+        order = if (offline) listOf(AudiobookTab.DOWNLOADED) else order,
+        selected = if (offline) AudiobookTab.DOWNLOADED else AudiobookTabs.selected(selectedRaw, order),
         select = { saveSelected(it.id) },
         sort = AudiobookTabs.sort(sortRaw),
         setSort = { saveSort(it.id) },

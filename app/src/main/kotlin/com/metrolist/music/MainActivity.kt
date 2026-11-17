@@ -762,14 +762,15 @@ class MainActivity : FragmentActivity() {
                 val bottomTabRoutes = com.metrolist.music.constants.rememberBottomTabs()
                 val barAlternateIsSpotify = com.metrolist.music.constants.rememberDefaultHomeSource() !=
                     com.metrolist.music.constants.HOME_SOURCE_SPOTIFY
+                val (offlineMode) = rememberPreference(com.metrolist.music.constants.OfflineModeKey, false)
                 val navigationItems =
-                    remember(bottomTabRoutes, disabledFeatures, barAlternateIsSpotify) {
+                    remember(bottomTabRoutes, disabledFeatures, barAlternateIsSpotify, offlineMode) {
                         val choices = com.metrolist.music.constants.bottomTabChoices(barAlternateIsSpotify)
                         bottomTabRoutes
                             .mapNotNull { route -> choices.firstOrNull { it.route == route } }
-                            .filterNot { disabledFeatures.hidesRoute(it.route) }
+                            .filterNot { disabledFeatures.hidesRoute(it.route) || (offlineMode && com.metrolist.music.constants.offlineHidesRoute(it.route)) }
                             .take(com.metrolist.music.constants.MAX_BOTTOM_TABS)
-                            .ifEmpty { listOf(choices.first()) }
+                            .ifEmpty { listOf(if (offlineMode) Screens.LocalFiles else choices.first()) }
                     }
                 val routeIndexMap = remember(navigationItems) {
                     navigationItems.mapIndexed { i, s -> s.route to i }.toMap()
@@ -839,6 +840,15 @@ class MainActivity : FragmentActivity() {
 
                 val currentRoute by remember {
                     derivedStateOf { navBackStackEntry?.destination?.route }
+                }
+
+                LaunchedEffect(offlineMode, currentRoute) {
+                    if (offlineMode && com.metrolist.music.constants.offlineHidesRoute(currentRoute)) {
+                        navController.navigate("podcasts") {
+                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
                 }
 
                 val inSearchScreen by remember {
@@ -1191,7 +1201,7 @@ class MainActivity : FragmentActivity() {
                                                     }
                                                     return@actions
                                                 }
-                                                if (currentRoute in searchableRoutes) {
+                                                if (!offlineMode && currentRoute in searchableRoutes) {
                                                     IconButton(onClick = { openTabSearch() }) {
                                                         Icon(
                                                             painter = painterResource(R.drawable.search),
@@ -1199,7 +1209,7 @@ class MainActivity : FragmentActivity() {
                                                         )
                                                     }
                                                 }
-                                                if (showHistoryButton) {
+                                                if (!offlineMode && showHistoryButton) {
                                                     IconButton(onClick = { navController.navigate("history") }) {
                                                         Icon(
                                                             painter = painterResource(R.drawable.history),
@@ -1221,7 +1231,7 @@ class MainActivity : FragmentActivity() {
                                                         )
                                                     }
                                                 }
-                                                IconButton(onClick = { showAccountDialog = true }) {
+                                                if (!offlineMode) IconButton(onClick = { showAccountDialog = true }) {
                                                     BadgedBox(badge = {
                                                         if (latestVersionName != BuildConfig.BASE_VERSION_NAME) {
                                                             Badge()

@@ -1,5 +1,9 @@
 # Handoff
 
+## In progress — MANUAL-OFFLINE-MODE, ChatGPT Codex, 2026-11-17 (Melbourne)
+
+Branch `feat/manual-offline-mode` from main `bd0ae8ed`; no open PR/overlap found. Issues disabled, temporary task ID (no remote claim). User requests a drawer Offline mode switch hiding online services and restricting podcasts/audiobooks to Downloaded; sync saved ABS progress when online again. Reuse DataStore, existing downloaded views and effective connectivity. Scope: drawer/MainActivity navigation; offline preference/connectivity; podcast/audiobook views; ABS progress persistence/retry and service playback; tests/default English strings. No schema/manual version/signing changes. Local verification: 276 app + 10 innertube tests passed, FOSS debug build succeeded, diff and default English XML/name checks passed. Tests cover connected-network override/persisted switch, offline route filtering, restart-persisted progress, failed upload retry and newer-server conflict protection. Robolectric lacks Android Keystore, so the restart test restores sign-in explicitly after checking saved progress. No physical device/head-unit success claimed. PR build/lint and signed release pending. Continuing standing main/build/release/AI-record authorization.
+
 ## Current — 0.9.2.95, Codex, 2026-11-17 (Melbourne)
 
 OFFLINE-LIBRARY-ACCESS completed by ChatGPT Codex in [PR #16](https://github.com/rickevans86/Meld/pull/16), feature `fb7e0e5c`, main merge `b3c1911d3f3433eee648ed4698d23a003b338496`. [Wavelength 0.9.2.95](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.95) published by signed release run `43999649417`. PR CI `43998334078` passed full tests, FOSS debug build/upload and lint. Local verification: 270 app + 10 innertube tests passed, FOSS debug build, diff/resource checks passed.
