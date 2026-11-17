@@ -38,6 +38,8 @@ AUTO-DOWNLOADS-FAVOURITES scope addition (Codex): AutoAudiobookLibrary, to retai
 
 AUTO-DOWNLOADS-FAVOURITES: completed/released 0.9.2.93, main 4bc049dfa230c1c805f63502a538aebf75586866; no active lock. Final scope also includes AutoDownloadedSongs, AutoPodcastFavourites, PodcastFavourites, two star vectors, two test classes and all six shared root AI records.
 
-## Active — PHONE-PODCAST-FAVOURITES, Codex, 2026-11-17 (Sydney)
+## Completed — PHONE-PODCAST-FAVOURITES, Codex, 2026-11-17 (Sydney)
 
 Branch fix/shared-podcast-favourites from main f76f8a49. User authorized implementation/main/release/AI records. No open PR or active application overlap. Scope: PodcastFavourites + migration/filter helpers; App startup if needed; LibraryPodcastsScreen; AutoLibraryExtras; HomeViewModel/HomeScreen; lightweight DAO queries (no schema); tests; .ai records. Task record .ai/tasks/PHONE-PODCAST-FAVOURITES.md.
+
+PHONE-PODCAST-FAVOURITES completed/released 0.9.2.94, PR #15 / main 650649af7175bcd072bec9b24d5d3c493216bbb7; no active reservation. Final file scope is recorded in the task; all shared records updated.

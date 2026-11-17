@@ -1,6 +1,12 @@
 # Handoff
 
-## Current — 0.9.2.93, Codex, 2026-11-17 (Melbourne)
+## Current — 0.9.2.94, Codex, 2026-11-17 (Sydney)
+
+Agent: ChatGPT Codex. Task: PHONE-PODCAST-FAVOURITES / PR #15. Status: merged, released 0.9.2.94 and public APK verified. PR #15, main merge 650649af7175bcd072bec9b24d5d3c493216bbb7, signed release run 43985275212; final PR CI 43983342034 on 567eeb20 passed full app/innertube tests, FOSS APK build/upload and lint. Nine selected local tests and FOSS debug APK passed.
+
+Completed: shared phone/Auto favourite actions and ordering, safe podcast pin migration, explicit podcast membership exclusions on YouTube music home. All shared AI records synchronized on main; no implementation/release work or file reservation remains. Next: owner tests phone favourite menus, existing-pin migration, car favourites and playlist filtering with authenticated YouTube. Network-first uncached membership and host action placement remain runtime limits. Issues disabled; temporary task/PR used without claiming an Issue assignment.
+
+## Previous release — 0.9.2.93, Codex, 2026-11-17 (Melbourne)
 
 Agent: ChatGPT Codex. Task: AUTO-DOWNLOADS-FAVOURITES / PR #14. Status: merged into main as 4bc049dfa230c1c805f63502a538aebf75586866; signed release 0.9.2.93, run 43951768865, published and APK verified (same app ID/cert as 0.9.2.92; higher version code). User authorized all publication steps.
 
@@ -78,6 +84,6 @@ Next action: review/test PR #3 on a car display and connected Audiobookshelf ins
 Shared records updated: yes, through documentation PR #2; dedicated implementation task record is in PR #3.
 Remote synchronization: main was 4b1e9295; release 0.9.2.81 remains the published baseline. No source work from another AI was overwritten.
 
-## PHONE-PODCAST-FAVOURITES — Codex, 2026-11-17
+## Implementation history — PHONE-PODCAST-FAVOURITES, Codex, 2026-11-17
 
 Codex / PHONE-PODCAST-FAVOURITES: implementation and nine selected tests/FOSS debug build complete. Branch fix/shared-podcast-favourites. Next: full PR CI, authorized main merge/release, APK identity/cert/version comparison, final shared-record update. No physical phone/car or live authenticated YouTube test claimed.

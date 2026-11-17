@@ -1,6 +1,10 @@
 # Task board
 
-## Current — 0.9.2.93, Codex, 2026-11-17 (Melbourne)
+## Current — 0.9.2.94, Codex, 2026-11-17 (Sydney)
+
+PHONE-PODCAST-FAVOURITES — Codex — completed/released 0.9.2.94. PR #15, main merge 650649af7175bcd072bec9b24d5d3c493216bbb7, signed release run 43985275212; final PR CI 43983342034 on 567eeb20 passed full app/innertube tests, FOSS APK build/upload and lint. Nine selected local tests and FOSS debug APK passed. APK update identity/certificate verified. No active file lock. [Task record](tasks/PHONE-PODCAST-FAVOURITES.md). Physical phone/car and live YouTube checks remain outstanding.
+
+## Previous release — 0.9.2.93, Codex, 2026-11-17 (Melbourne)
 
 AUTO-DOWNLOADS-FAVOURITES — Codex — completed/released 0.9.2.93, PR #14, main 4bc049dfa230c1c805f63502a538aebf75586866, release run 43951768865. Fourteen selected local tests and FOSS debug build passed; final CI 43950033049 passed full tests/build/artifact/lint. Release APK identity/certificate/update compatibility verified. No active reservation. Physical head-unit test remains outstanding. Details: [task record](tasks/AUTO-DOWNLOADS-FAVOURITES.md). PR #2 summaries are now on main and that superseded records PR is closed.
 
@@ -47,6 +51,6 @@ AUDIOBOOK-DETAIL-REDESIGN — Claude — released in 0.9.2.89 from main. Richer 
 PODCAST-FF-REWIND — Claude — released in 0.9.2.91 from main. Dedicated podcast rewind/fast-forward buttons (always on for episodes), separate amounts in Settings; existing repurpose-next/previous skip setting kept.
 
 PODCAST-FF-AUTO — Claude — released in 0.9.2.92 from main, owner-verified in-car 2026-11-16. Dedicated podcast seek buttons now in Android Auto + notification, alongside prev/next. Confirmed showing in the full Auto player; the Auto home mini media card stays prev/next only (Android Auto renders that card with a fixed control set, so app actions can't appear there). Accepted; no further code change.
-## PHONE-PODCAST-FAVOURITES — Codex, 2026-11-17
+## Implementation history — PHONE-PODCAST-FAVOURITES, Codex, 2026-11-17
 
 PHONE-PODCAST-FAVOURITES — Codex — implemented/locally verified, PR CI pending; main/release authorized by owner. Scope: shared phone/Auto favourites, safe pin migration, podcast music-home exclusions. Nine selected tests/build passed. No Issue claim: Issues disabled.

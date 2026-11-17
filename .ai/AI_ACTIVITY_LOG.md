@@ -36,3 +36,5 @@
 ## PHONE-PODCAST-FAVOURITES — Codex, 2026-11-17
 
 Codex, 2026-11-17 (Sydney), PHONE-PODCAST-FAVOURITES: refreshed main f76f8a49 and live PRs (none), read collaboration records, recorded scope before edits. Replaced phone show pin controls with shared favourite actions, unified mixed-source ordering, aligned Auto placement, added persist-before-delete pin migration and explicit playlist-membership music-home filtering with offline cache. Nine selected tests and local FOSS debug build passed; CI/release pending.
+
+- Codex, 2026-11-17 (Sydney): PHONE-PODCAST-FAVOURITES completed, merged and released 0.9.2.94. PR #15, main merge 650649af7175bcd072bec9b24d5d3c493216bbb7, signed release run 43985275212; final PR CI 43983342034 on 567eeb20 passed full app/innertube tests, FOSS APK build/upload and lint. Nine selected local tests and FOSS debug APK passed. Downloaded release APK verified: same app ID/certificate as 0.9.2.93, higher version code, non-debuggable. Updated seven AI records; no hardware/live authenticated YouTube success claimed.

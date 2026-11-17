@@ -21,3 +21,5 @@
 ## PHONE-PODCAST-FAVOURITES — Codex, 2026-11-17
 
 PHONE-PODCAST-FAVOURITES (Codex): reuse the existing PodcastFavourites IDs/preferences on phone/Auto. Sort all show sources together before stable favourite partition; favourites follow Episodes for later, ahead of Downloaded on Auto. Migrate only PLAYLIST pins matching subscribed podcast-show IDs, persist favourite before deletion, no one-time flag so late account sync can identify pins safely. Classify explicit playlist membership for music-home filtering without permanently retagging songs; preserve last successful membership offline and refresh on pull-to-refresh.
+
+- PHONE-PODCAST-FAVOURITES release: preserve prior agent history and original signed FOSS pipeline; record downloaded-APK compatibility before declaring release 0.9.2.94 complete. Release tag points to the tested main code; final records-only follow-up uses [skip ci].

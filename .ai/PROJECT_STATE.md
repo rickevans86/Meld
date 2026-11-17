@@ -1,6 +1,14 @@
 # Project state
 
-## Current — 0.9.2.93, Codex, 2026-11-17 (Melbourne)
+## Current — 0.9.2.94, Codex, 2026-11-17 (Sydney)
+
+Codex completed PHONE-PODCAST-FAVOURITES and published [Wavelength 0.9.2.94](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.94) from main. PR #15, main merge 650649af7175bcd072bec9b24d5d3c493216bbb7, signed release run 43985275212; final PR CI 43983342034 on 567eeb20 passed full app/innertube tests, FOSS APK build/upload and lint. Nine selected local tests and FOSS debug APK passed.
+
+Phone show/RSS menus now use the same Favourite/Remove favourite preference and IDs as Android Auto. Both place favourites immediately after Episodes for later; phone combines RSS/YouTube shows under the selected sort before favouriting. Existing subscribed podcast-show playlist pins migrate to favourites (persist first, delete second), leaving music/song/artist pins untouched. Explicit podcast-playlist membership filters ordinary YouTube videos from music-home rows/Speed dial, with persisted offline membership and pull-to-refresh reload; song.isEpisode is not permanently changed.
+
+The public APK was downloaded, signature verified against 0.9.2.93, and confirmed to use com.rickevans86.wavelength with the same signing certificate, higher version code and a non-debuggable release build. Exact package/version evidence is in the task record. User authorized main publication/build/release/AI records. No schema, manual version, signing or app-ID changes. No implementation/release work remains; phone/head-unit and live authenticated YouTube testing remain outstanding. A failed first remote membership lookup cannot classify uncached videos; last successful membership is retained offline.
+
+## Previous release — 0.9.2.93, Codex, 2026-11-17 (Melbourne)
 
 Codex completed AUTO-DOWNLOADS-FAVOURITES in PR #14, merged into main as 4bc049dfa230c1c805f63502a538aebf75586866. Released [Wavelength 0.9.2.93](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.93) through the existing signed FOSS workflow, run 43951768865. The owner explicitly authorized implementation, main publication, build/release and AI-record updates.
 
@@ -97,6 +105,6 @@ Podcast dedicated fast-forward / rewind buttons (PODCAST-FF-REWIND, PR #12, merg
 Podcast fast-forward/rewind now in Android Auto + the notification (PODCAST-FF-AUTO, PR #13, merge 5eaba9a6, run 43767999416). The dedicated seek buttons (0.9.2.91, phone-only) now also show in the car alongside previous/next, in the overflow slot, using the same separate amounts. New CommandSeekBack/Forward session commands, distinct from the old skip commands. APK verified: com.rickevans86.wavelength, version code 280092, same cert. Latest baseline.
 
 Owner-verified in-car on 2026-11-16 (released 0.9.2.92 build): the 15/30 seek buttons show in the full Android Auto Now Playing player alongside previous/next — feature accepted. The Auto home-screen mini media card remains play-pause/previous/next only; that compact card's control set is fixed by Android Auto and cannot host app-supplied actions (those appear only in the full player and notification). Platform limitation, not a defect — PODCAST-FF-AUTO car testing is now cleared. Physical car testing of the earlier releases remains an open owner follow-up.
-## PHONE-PODCAST-FAVOURITES — Codex, 2026-11-17
+## Implementation history — PHONE-PODCAST-FAVOURITES, Codex, 2026-11-17
 
 PHONE-PODCAST-FAVOURITES (Codex) is locally implemented on fix/shared-podcast-favourites; nine selected tests and FOSS debug APK passed. Full CI and authorized main/release publication pending. Baseline remains 0.9.2.93. See tasks/PHONE-PODCAST-FAVOURITES.md.
