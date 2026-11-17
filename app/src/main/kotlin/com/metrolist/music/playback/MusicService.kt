@@ -4871,8 +4871,7 @@ class MusicService :
             }
             val mediaId = stripQobuzCacheKeyPrefix(dataSpec.key ?: error("No media id"))
             if (dataStore[com.metrolist.music.constants.OfflineModeKey] == true &&
-                !(isOnDeviceMediaId(mediaId) && !com.metrolist.music.constants.isSubsonicId(mediaId) &&
-                    !com.metrolist.music.constants.isMediaServerId(mediaId) && !com.metrolist.music.constants.isRadioId(mediaId))) {
+                !com.metrolist.music.constants.offlineAllowsDirectPlayback(mediaId)) {
                 throw java.io.IOException(getString(R.string.offline_mode_stream_unavailable))
             }
             val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
