@@ -114,6 +114,8 @@ fun LibraryPodcastsScreen(
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
     var podcastFilter by rememberEnumPreference(PodcastFilterKey, PodcastFilter.EPISODES)
+    val online by playerConnection.service.connectivityObserver.networkStatus.collectAsStateWithLifecycle()
+    LaunchedEffect(online) { if (!online) podcastFilter = PodcastFilter.DOWNLOADED }
 
     val (sortType, onSortTypeChange) =
         rememberEnumPreference(

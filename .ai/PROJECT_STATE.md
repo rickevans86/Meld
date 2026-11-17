@@ -1,5 +1,11 @@
 # Project state
 
+## In progress — OFFLINE-LIBRARY-ACCESS, Codex, 2026-11-17 (Melbourne)
+
+Completed local implementation on `fix/offline-library-access` from main `93204481`. Saved Audiobookshelf metadata, audio, covers and resume positions open without server/auth availability; failed details close instead of spinning. Completed Media3 downloads bypass remote authentication/quality lookup; airplane mode exposes source-specific saved music and podcast downloads. Server music roots also offer a local Downloads entry while online. Local files retain their direct playback path. Only completed downloads are covered; streaming/discovery/live radio still need a connection.
+
+Validation: all 270 app and 10 innertube tests passed; FOSS debug APK built; diff whitespace and default English resource uniqueness passed. Regression tests cover unavailable server/no credentials, missing metadata/audio, resume persistence and completed/partial cache ranges. No physical phone/head-unit airplane-mode or real decoder test claimed. No schema, manual version, signing or app-ID changes. Continuing the user's standing main/build/release/AI-record workflow; PR CI and release remain pending. Issues disabled, so this is a temporary task ID, not a remote Issue claim. See [task](tasks/OFFLINE-LIBRARY-ACCESS.md).
+
 ## Current — 0.9.2.94, Codex, 2026-11-17 (Sydney)
 
 Codex completed PHONE-PODCAST-FAVOURITES and published [Wavelength 0.9.2.94](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.94) from main. PR #15, main merge 650649af7175bcd072bec9b24d5d3c493216bbb7, signed release run 43985275212; final PR CI 43983342034 on 567eeb20 passed full app/innertube tests, FOSS APK build/upload and lint. Nine selected local tests and FOSS debug APK passed.

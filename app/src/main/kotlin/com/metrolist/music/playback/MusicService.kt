@@ -4859,6 +4859,9 @@ class MusicService :
         playerProvider: () -> ExoPlayer?,
     ): DataSource.Factory {
         return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
+            if (completedDownloadIsCached(downloadCache, dataSpec, downloadUtil.downloads.value[dataSpec.key])) {
+                return@Factory dataSpec
+            }
             val mediaId = stripQobuzCacheKeyPrefix(dataSpec.key ?: error("No media id"))
             val storedFormat = runBlocking(Dispatchers.IO) { database.format(mediaId).first() }
 

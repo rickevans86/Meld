@@ -30,6 +30,8 @@ class AudiobookshelfViewModel
 @Inject
 constructor(
     private val repository: AbsRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
+    private val connectivity: com.metrolist.music.utils.NetworkConnectivityObserver,
 ) : ViewModel() {
     val session = repository.session
     val signInExpired = repository.signInExpired
@@ -81,12 +83,13 @@ constructor(
     private var searchJob: Job? = null
 
     init {
-        if (session.value != null) refreshAll()
+        if (session.value != null && connectivity.isCurrentlyConnected()) refreshAll()
         viewModelScope.launch {
             downloads.collect { states ->
                 _downloadedBooks.value = withContext(Dispatchers.IO) { repository.downloadedBooks() }
                     .filter { states[it.id]?.done == true }
                     .map { AbsBookSummary(it.id, it.title, it.author, it.durationSec) }
+                loadLocalProgress()
             }
         }
     }
@@ -117,6 +120,10 @@ constructor(
     }
 
     fun refreshAll() {
+        if (!connectivity.isCurrentlyConnected()) {
+            refreshProgress()
+            return
+        }
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
@@ -142,6 +149,7 @@ constructor(
         _libraryId.value = id
         viewModelScope.launch {
             repository.selectLibrary(id)
+            if (!connectivity.isCurrentlyConnected()) return@launch
             _loading.value = true
             runCatching { loadFirstPage() }.onFailure { _error.value = describe(it) }
             _loading.value = false
@@ -152,7 +160,7 @@ constructor(
     fun setSort(value: com.metrolist.music.audiobooks.AudiobookSort) {
         if (value == sort) return
         sort = value
-        if (_libraryId.value == null) return
+        if (_libraryId.value == null || !connectivity.isCurrentlyConnected()) return
         viewModelScope.launch {
             _loading.value = true
             runCatching { loadFirstPage() }.onFailure { _error.value = describe(it) }
@@ -161,6 +169,7 @@ constructor(
     }
 
     fun loadMore() {
+        if (!connectivity.isCurrentlyConnected()) return
         val library = _libraryId.value ?: return
         if (_loading.value || _books.value.size >= _totalBooks.value) return
         viewModelScope.launch {
@@ -176,6 +185,12 @@ constructor(
 
     fun search(query: String) {
         searchJob?.cancel()
+        if (!connectivity.isCurrentlyConnected()) {
+            _searchResults.value = if (query.isBlank()) null else _downloadedBooks.value.filter {
+                it.title.contains(query.trim(), ignoreCase = true) || it.author.orEmpty().contains(query.trim(), ignoreCase = true)
+            }
+            return
+        }
         val library = _libraryId.value
         if (query.isBlank() || library == null) {
             _searchResults.value = null
@@ -190,14 +205,27 @@ constructor(
     }
 
     fun open(itemId: String) {
+        if (!connectivity.isCurrentlyConnected() && !repository.isDownloaded(itemId)) {
+            _error.value = context.getString(com.metrolist.music.R.string.offline_choose_audiobook)
+            return
+        }
         openBookId.value = itemId
         _openBook.value = null
         viewModelScope.launch {
             runCatching { repository.book(itemId) }
                 .onSuccess { if (openBookId.value == itemId) _openBook.value = it }
-                .onFailure { _error.value = describe(it) }
+                .onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    if (openBookId.value == itemId) close()
+                    _error.value = describe(it)
+                    return@launch
+                }
+            loadLocalProgress()
+            if (!connectivity.isCurrentlyConnected()) return@launch
             runCatching { repository.progress(itemId) }.onSuccess { progress ->
-                _progress.value = if (progress == null) _progress.value - itemId else _progress.value + (itemId to progress)
+                if (progress != null && progress.lastUpdate >= (_progress.value[itemId]?.lastUpdate ?: -1)) {
+                    _progress.value = _progress.value + (itemId to progress)
+                }
             }
         }
     }
@@ -226,10 +254,19 @@ constructor(
         _openBook.value = null
     }
 
+    private suspend fun loadLocalProgress() {
+        val local = repository.localProgress()
+        _progress.value = _progress.value + local.filter { it.lastUpdate >= (_progress.value[it.libraryItemId]?.lastUpdate ?: -1) }
+            .associateBy { it.libraryItemId }
+    }
+
     fun refreshProgress() {
         viewModelScope.launch {
+            loadLocalProgress()
+            if (!connectivity.isCurrentlyConnected()) return@launch
             runCatching { repository.allProgress() }
                 .onSuccess { list -> _progress.value = list.associateBy { it.libraryItemId } }
+            loadLocalProgress()
             runCatching { repository.inProgress() }
                 .onSuccess { _inProgress.value = it }
         }
@@ -237,6 +274,10 @@ constructor(
 
     /** Prepares the book on the server's terms, then hands it to [onReady] to start playback. */
     fun play(itemId: String, startAtSec: Double?, onReady: (PreparedAbsBook) -> Unit) {
+        if (!connectivity.isCurrentlyConnected() && !repository.isDownloaded(itemId)) {
+            _error.value = context.getString(com.metrolist.music.R.string.offline_choose_audiobook)
+            return
+        }
         if (_busy.value) return
         viewModelScope.launch {
             _busy.value = true
@@ -261,6 +302,10 @@ constructor(
     }
 
     private fun runSignIn(block: suspend () -> Unit) {
+        if (!connectivity.isCurrentlyConnected()) {
+            _error.value = context.getString(com.metrolist.music.R.string.offline_sign_in_hint)
+            return
+        }
         if (_busy.value) return
         viewModelScope.launch {
             _busy.value = true

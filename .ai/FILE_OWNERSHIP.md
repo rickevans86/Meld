@@ -43,3 +43,7 @@ AUTO-DOWNLOADS-FAVOURITES: completed/released 0.9.2.93, main 4bc049dfa230c1c805f
 Branch fix/shared-podcast-favourites from main f76f8a49. User authorized implementation/main/release/AI records. No open PR or active application overlap. Scope: PodcastFavourites + migration/filter helpers; App startup if needed; LibraryPodcastsScreen; AutoLibraryExtras; HomeViewModel/HomeScreen; lightweight DAO queries (no schema); tests; .ai records. Task record .ai/tasks/PHONE-PODCAST-FAVOURITES.md.
 
 PHONE-PODCAST-FAVOURITES completed/released 0.9.2.94, PR #15 / main 650649af7175bcd072bec9b24d5d3c493216bbb7; no active reservation. Final file scope is recorded in the task; all shared records updated.
+
+## Active — OFFLINE-LIBRARY-ACCESS, Codex, 2026-11-17
+
+Branch fix/offline-library-access from main 93204481. Local implementation of user-reported ABS offline bug and broader airplane-mode download access. Scope: AbsRepository; AudiobookshelfViewModel/Content; MusicService/cache helper; offline downloads UI; HomeScreen/SubsonicScreen/MediaServerScreen; default English strings; tests; AI records. No new publication/release claim. No overlapping PR found; Issues disabled.

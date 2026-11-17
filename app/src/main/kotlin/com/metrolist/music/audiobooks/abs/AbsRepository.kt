@@ -19,6 +19,7 @@ import com.metrolist.music.db.entities.SongEntity
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.get
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -107,12 +108,16 @@ constructor(
     private val _signInExpired = MutableStateFlow(false)
     val signInExpired = _signInExpired.asStateFlow()
 
+    private val localReady = CompletableDeferred<Unit>()
+
     init {
         _session.value = authStore.load()
         scope.launch {
-            loadTracks()
-            loadPositions()
-            _downloads.value = downloadedIds().associateWith { AbsDownloadState(1f, done = true) }
+            try {
+                loadTracks()
+                loadPositions()
+                _downloads.value = downloadedIds().associateWith { AbsDownloadState(1f, done = true) }
+            } finally { localReady.complete(Unit) }
         }
     }
 
@@ -147,6 +152,7 @@ constructor(
     fun coverUrl(itemId: String): String? {
         val cached = coverFile(itemId)
         if (cached.exists()) return Uri.fromFile(cached).toString()
+        if (isDownloaded(itemId)) return null
         return _session.value?.let { "${it.serverUrl}/api/items/$itemId/cover?token=${Uri.encode(it.accessToken)}" }
     }
 
@@ -168,26 +174,36 @@ constructor(
     suspend fun inProgress() = authed { s -> client.inProgress(s.serverUrl, s.accessToken) }
 
     suspend fun allProgress() = authed { s -> client.allProgress(s.serverUrl, s.accessToken) }
+        .also { rememberRemoteProgress(it) }
 
-    /** The book from the server, or from its download when the server can't be reached. */
-    suspend fun book(itemId: String): AbsBook =
-        try {
-            authed { s -> client.book(s.serverUrl, s.accessToken, itemId) }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            if (e is AbsHttpException && e.code != 401) throw e
-            downloadedBook(itemId) ?: throw e
-        }
+    /** Completed downloads never need a reachable server to open their metadata. */
+    suspend fun book(itemId: String): AbsBook = withContext(Dispatchers.IO) {
+        localReady.await()
+        downloadedBook(itemId) ?: if (isDownloaded(itemId)) {
+            throw java.io.IOException(context.getString(com.metrolist.music.R.string.offline_audiobook_missing))
+        } else authed { s -> client.book(s.serverUrl, s.accessToken, itemId) }
+    }
 
     suspend fun progress(itemId: String) = authed { s -> client.progress(s.serverUrl, s.accessToken, itemId) }
+        .also { it?.let { progress -> rememberRemoteProgress(listOf(progress)) } }
+
+    private suspend fun rememberRemoteProgress(progress: List<AbsProgress>) = withContext(Dispatchers.IO) {
+        localReady.await()
+        for (entry in progress) {
+            if (entry.lastUpdate > (localPositions[entry.libraryItemId]?.updatedAt ?: -1)) {
+                localPositions[entry.libraryItemId] = AbsLocalPosition(entry.currentTimeSec, entry.lastUpdate, entry.isFinished)
+            }
+        }
+        savePositions()
+    }
 
     /**
      * Saves the book's files as songs and positions them so the player starts at [startAtSec],
      * or where the server says the listener stopped when it's null.
      */
     suspend fun prepare(itemId: String, startAtSec: Double?): PreparedAbsBook = withContext(Dispatchers.IO) {
-        val session = _session.value ?: throw IllegalStateException("Not signed in")
         val book = book(itemId)
+        val offline = isDownloaded(itemId)
         if (book.tracks.isEmpty()) throw IllegalStateException("This book has no audio files")
 
         val target = startAtSec ?: resumePosition(itemId)
@@ -199,7 +215,8 @@ constructor(
             val songId = "$ABS_TRACK_ID_PREFIX$itemId:${track.index}"
             tracks[songId] = AbsTrackInfo(itemId, track.startOffsetSec, book.durationSec, position == book.tracks.lastIndex, if (position == 0) book.chapters else emptyList())
             val path = downloadedTrack(itemId, track.index)?.let { Uri.fromFile(it).toString() }
-                ?: (session.serverUrl + track.contentUrl)
+                ?: if (offline) throw java.io.IOException(context.getString(com.metrolist.music.R.string.offline_audiobook_missing))
+                else ((_session.value ?: error("Not signed in")).serverUrl + track.contentUrl)
             val title = if (multiFile) track.title.substringBeforeLast('.').ifBlank { book.title } else book.title
             val existing = database.getSongById(songId)?.song
             with(database) {
@@ -357,6 +374,17 @@ constructor(
 
     fun downloadedBooks(): List<AbsBook> = downloadedIds().mapNotNull(::downloadedBook)
 
+    suspend fun localProgress(): List<AbsProgress> = withContext(Dispatchers.IO) {
+        localReady.await()
+        downloadedBooks().mapNotNull { book ->
+            localPositions[book.id]?.let { saved ->
+                AbsProgress(book.id, saved.currentTimeSec, book.durationSec,
+                    if (book.durationSec > 0) (saved.currentTimeSec / book.durationSec).coerceIn(0.0, 1.0) else 0.0,
+                    saved.finished, saved.updatedAt)
+            }
+        }
+    }
+
     /** The downloaded file for a track id, when the book has been saved. */
     fun offlineUri(trackId: String): Uri? {
         val (itemId, index) = parseTrackId(trackId) ?: return null
@@ -368,6 +396,8 @@ constructor(
      * which covers listening while offline. A newer local position is pushed to the server.
      */
     private suspend fun resumePosition(itemId: String): Double {
+        localReady.await()
+        if (isDownloaded(itemId)) return localPositions[itemId]?.let { if (it.finished) 0.0 else it.currentTimeSec } ?: 0.0
         val server = runCatching { progress(itemId) }
         val remote = server.getOrNull()
         val local = localPositions[itemId]
@@ -484,6 +514,7 @@ constructor(
     private suspend fun cacheCover(itemId: String): String? {
         val file = coverFile(itemId).also { it.parentFile?.mkdirs() }
         if (file.exists()) return Uri.fromFile(file).toString()
+        if (isDownloaded(itemId)) return null
         val session = _session.value ?: return null
         return runCatching {
             file.writeBytes(client.download("${session.serverUrl}/api/items/$itemId/cover", session.accessToken))

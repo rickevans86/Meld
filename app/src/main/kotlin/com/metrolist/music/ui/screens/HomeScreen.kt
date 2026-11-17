@@ -684,6 +684,12 @@ fun HomeScreen(
     val spotifyHomeSections by viewModel.spotifyHomeSections.collectAsStateWithLifecycle()
     val isSpotifyHome by viewModel.useSpotifyHome.collectAsStateWithLifecycle()
     val isSpotifyHomeOnly by viewModel.spotifyHomeOnly.collectAsStateWithLifecycle()
+    val online by playerConnection.service.connectivityObserver.networkStatus.collectAsStateWithLifecycle()
+    if (!online) {
+        com.metrolist.music.ui.component.OfflineDownloadsContent(
+            if (isSpotifyHome) com.metrolist.music.playback.OfflineMusicSource.SPOTIFY else com.metrolist.music.playback.OfflineMusicSource.YOUTUBE)
+        return
+    }
     // Each home shows only its own source: YouTube items on the YouTube home, Spotify items on the Spotify home
     val podcastHomeExcludedIds by viewModel.podcastHomeExcludedIds.collectAsStateWithLifecycle()
     val isCurrentSourceId = { id: String -> if (isSpotifyHome) id.startsWith("spotify:") else isYouTubeMediaId(id) && id !in podcastHomeExcludedIds }
