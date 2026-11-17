@@ -113,6 +113,10 @@ fun AudiobookshelfContent(
     val query = if (onAudiobooksTab) pageQuery else inlineQuery
     val listState = rememberLazyListState()
     val tabs = rememberAudiobookTabState()
+    val online by playerConnection.service.connectivityObserver.networkStatus.collectAsState()
+    LaunchedEffect(online, session, downloadedBooks.isNotEmpty()) {
+        if (!online || (session == null && downloadedBooks.isNotEmpty())) tabs.select(AudiobookTab.DOWNLOADED)
+    }
     LaunchedEffect(tabs.sort) { viewModel.setSort(tabs.sort) }
 
     val playingItemId = mediaMetadata?.id?.takeIf(::isAbsTrackId)?.removePrefix("audiobook:abs:")?.substringBeforeLast(':')
@@ -163,7 +167,7 @@ fun AudiobookshelfContent(
                     onSignInWithKey = viewModel::signInWithApiKey,
                 )
             }
-            return@LazyColumn
+            if (downloadedBooks.isEmpty()) return@LazyColumn
         }
 
         if (signInExpired) {
@@ -207,7 +211,7 @@ fun AudiobookshelfContent(
             return@LazyColumn
         }
 
-        item(key = "account") {
+        if (current != null) item(key = "account") {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier

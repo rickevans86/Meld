@@ -96,10 +96,8 @@ fun SubsonicScreen(
         }
     }
 
-    if (session == null) {
-        SignInForm(viewModel)
-    } else {
-        Browser(viewModel)
+    com.metrolist.music.ui.component.OfflineDownloadsGate(com.metrolist.music.playback.OfflineMusicSource.SUBSONIC) {
+        if (session == null) SignInForm(viewModel) else Browser(viewModel)
     }
 }
 

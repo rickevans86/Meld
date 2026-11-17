@@ -1,5 +1,11 @@
 # AI activity log
 
+## In progress — OFFLINE-LIBRARY-ACCESS, Codex, 2026-11-17 (Melbourne)
+
+Completed local implementation on `fix/offline-library-access` from main `93204481`. Saved Audiobookshelf metadata, audio, covers and resume positions open without server/auth availability; failed details close instead of spinning. Completed Media3 downloads bypass remote authentication/quality lookup; airplane mode exposes source-specific saved music and podcast downloads. Server music roots also offer a local Downloads entry while online. Local files retain their direct playback path. Only completed downloads are covered; streaming/discovery/live radio still need a connection.
+
+Validation: all 270 app and 10 innertube tests passed; FOSS debug APK built; diff whitespace and default English resource uniqueness passed. Regression tests cover unavailable server/no credentials, missing metadata/audio, resume persistence and completed/partial cache ranges. No physical phone/head-unit airplane-mode or real decoder test claimed. No schema, manual version, signing or app-ID changes. Continuing the user's standing main/build/release/AI-record workflow; PR CI and release remain pending. Issues disabled, so this is a temporary task ID, not a remote Issue claim. See [task](tasks/OFFLINE-LIBRARY-ACCESS.md).
+
 - Claude: verified existing commit 8917088 adds podcast skip controls; 442be11 repairs Android Auto listener forwarding; e4ff3a6 records upstream sync.
 - Codex: audited remote branches, issues and PRs; preserved existing audiobook code; created these coordination records. Attempt to create task Issue failed with HTTP 410 (Issues disabled).
 - Codex: implemented AUDIOBOOK-PHONE and added focused unit tests; user authorized main publication/release. No build success claimed yet.

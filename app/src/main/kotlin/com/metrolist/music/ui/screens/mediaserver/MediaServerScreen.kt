@@ -108,7 +108,9 @@ fun MediaServerScreen(
         }
     }
 
-    if (session == null) SignIn(viewModel) else Browser(viewModel)
+    com.metrolist.music.ui.component.OfflineDownloadsGate(com.metrolist.music.playback.OfflineMusicSource.MEDIA_SERVER) {
+        if (session == null) SignIn(viewModel) else Browser(viewModel)
+    }
 }
 
 @Composable
