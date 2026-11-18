@@ -80,6 +80,9 @@ class AutoAudiobookLibrary @Inject constructor(
 
     suspend fun children(id: String): List<MediaItem>? {
         if (!isBrowsable(id)) return null
+        val offline = context.dataStore.data.first()[com.metrolist.music.constants.OfflineModeKey] == true
+        if (offline && id == AutoLibraryExtras.AUDIOBOOKS) return withMore(autoPage(downloaded(), 0), DOWNLOADED, 0)
+        if (offline && !autoOfflineBrowseAllowed(id)) return emptyList()
         if (id == AutoLibraryExtras.AUDIOBOOKS) return home()
         val path = id.split('/')
         return when (path[1]) {
@@ -113,9 +116,9 @@ class AutoAudiobookLibrary @Inject constructor(
         if (page.hasMore) page.items + folder("$base/${number + 1}", R.string.auto_audiobook_more, R.drawable.audiobook) else page.items
 
     suspend fun downloaded(): List<MediaItem> = local.books.value.map { bookItem(it) } +
-        if (abs.session.value != null) abs.downloadedBooks().map {
+        abs.downloadedBooks().map {
             bookItem(AbsBookSummary(it.id, it.title, it.author, it.durationSec))
-        } else emptyList()
+        }
 
     private suspend fun home(): List<MediaItem> {
         val prefs = context.dataStore.data.first()

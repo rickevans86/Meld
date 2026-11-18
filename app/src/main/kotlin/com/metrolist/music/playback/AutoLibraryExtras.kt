@@ -672,6 +672,7 @@ constructor(
         val saved = folder(SAVED_EPISODES, context.getString(R.string.auto_saved_episodes), null, icon(R.drawable.mic))
         // Episodes downloaded on the phone (play offline)
         val downloaded = folder(DOWNLOADED_EPISODES, context.getString(R.string.auto_downloaded_episodes), null, icon(R.drawable.offline))
+        if (context.dataStore.data.first()[com.metrolist.music.constants.OfflineModeKey] == true) return listOf(downloaded)
         val subscribed = database.subscribedPodcasts().first()
         val followed = podcastFeeds.followed.value
         val favourites = context.dataStore.data.first()[PodcastFavourites.Key].orEmpty()

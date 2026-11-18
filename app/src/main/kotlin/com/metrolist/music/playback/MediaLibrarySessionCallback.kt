@@ -203,11 +203,15 @@ constructor(
                         Bundle().apply {
                             params?.extras?.let { putAll(it) }
                             // Tells Android Auto to show its search button
-                            putBoolean("android.media.browse.SEARCH_SUPPORTED", true)
+                            putBoolean("android.media.browse.SEARCH_SUPPORTED", context.dataStore.get(com.metrolist.music.constants.OfflineModeKey, false).not())
                         },
                     ).build(),
             ),
         )
+
+    private val browseParents = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    fun offlineRefreshParents(): List<String> = browseParents.toList()
 
     override fun onSubscribe(
         session: MediaLibrarySession,
@@ -217,6 +221,7 @@ constructor(
     ): ListenableFuture<LibraryResult<Void>> =
         Futures.immediateFuture(
             if (isBrowsableMediaId(parentId) || autoExtras.isBrowsable(parentId)) {
+                browseParents.add(parentId)
                 LibraryResult.ofVoid(params)
             } else {
                 LibraryResult.ofError(SessionError.ERROR_BAD_VALUE, params)
@@ -261,6 +266,16 @@ constructor(
     ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> =
         scope.future(Dispatchers.IO) {
             try {
+                if (context.dataStore.data.first()[com.metrolist.music.constants.OfflineModeKey] == true) {
+                    if (parentId == MusicService.ROOT) {
+                        val items = listOf(AutoLibraryExtras.PODCASTS, AutoLibraryExtras.AUDIOBOOKS, AutoLibraryExtras.LOCAL_FILES)
+                            .map(autoExtras::rootItem)
+                        return@future LibraryResult.ofItemList(items.paginate(page, pageSize), params)
+                    }
+                    if (!autoOfflineBrowseAllowed(parentId)) {
+                        return@future LibraryResult.ofItemList(emptyList<MediaItem>(), params)
+                    }
+                }
                 autoExtras.children(parentId)?.let { children ->
                     return@future LibraryResult.ofItemList(children.paginate(page, pageSize), params)
                 }
@@ -708,7 +723,7 @@ constructor(
         params: MediaLibraryService.LibraryParams?
     ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
         return scope.future(Dispatchers.IO) {
-            if (query.isEmpty()) {
+            if (context.dataStore.get(com.metrolist.music.constants.OfflineModeKey, false) || query.isEmpty()) {
                 return@future LibraryResult.ofItemList(emptyList(), params)
             }
 

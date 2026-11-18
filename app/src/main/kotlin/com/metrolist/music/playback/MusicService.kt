@@ -1273,6 +1273,17 @@ class MusicService :
                     mediaSession?.notifyChildrenChanged(AutoLibraryExtras.PODCASTS, Int.MAX_VALUE, null)
                 }
         }
+        scope.launch {
+            dataStore.data.map { it[com.metrolist.music.constants.OfflineModeKey] ?: false }
+                .distinctUntilChanged().collect {
+                    (mediaLibrarySessionCallback.offlineRefreshParents() + listOf(ROOT, PLAYLIST, SONG, ARTIST, ALBUM, AutoLibraryExtras.PODCASTS,
+                        "podcasts/downloaded", AutoLibraryExtras.AUDIOBOOKS, AutoAudiobookLibrary.DOWNLOADED,
+                        AutoLibraryExtras.LOCAL_FILES, AutoLibraryExtras.RADIO, AutoLibraryExtras.NEWS,
+                        AutoLibraryExtras.SUBSONIC, AutoLibraryExtras.MEDIA_SERVER)).distinct().forEach { id ->
+                        mediaSession?.notifyChildrenChanged(id, Int.MAX_VALUE, null)
+                    }
+                }
+        }
         // Your stations changed (added, removed, hearted): Android Auto re-reads its Radio list
         scope.launch {
             radioDirectory.favourites.drop(1).collect {
