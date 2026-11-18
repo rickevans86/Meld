@@ -1,12 +1,18 @@
 # Planned file modifications
 
-## In progress — AUTO-OFFLINE-MODE, ChatGPT Codex, 2026-11-18
+## Current — 0.9.2.98, ChatGPT Codex, 2026-11-18
 
-Branch fix/auto-offline-mode from main 668b5f43. No open PR overlap. Issues remain disabled; temporary task ID. User asks to share the phone Offline mode with Android Auto. Scope: Auto browse root/stale-node filtering, downloaded podcast/book lists and mode-change browse notifications; tests. Same OfflineModeKey, no separate setting. No schema/version/signing changes. Tests/build pending. Continuing standing publication workflow; physical head-unit refresh remains untested.
+AUTO-OFFLINE-MODE completed in [PR #19](https://github.com/rickevans86/Meld/pull/19), feature 677ec709, main/tag `341620f41a3223e90a53f75fd031ab3c825afa74`. [Wavelength 0.9.2.98](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.98) published by signed workflow 44281137089. Full CI 44279339922 passed app/innertube tests, APK build/upload and lint. Two targeted local regression tests and FOSS debug build passed; diff checked.
+
+Android Auto reads the phone's existing OfflineModeKey. Offline root exposes Podcasts, Audiobooks and Local files; podcasts offer Downloaded only, books show paginated downloaded device/ABS books without requiring an authenticated server session. Stale online browse nodes and online search results are blocked before catalogue requests. Mode changes notify root/standard nodes and tracked subscribed parents, including already-open pages. Turning the switch off restores ordinary car browsing. Playback restrictions and progress reconnect sync from 0.9.2.97 remain intact. Android Auto owns rendering/refresh timing; no physical head-unit success claimed.
+
+Public APK downloaded and verified: `com.rickevans86.wavelength`, non-debuggable, `0.9.2.98` / code `280098`, higher than 280097, same certificate SHA-256 `9056f5a0b0d6f4e2e44e2b1b75ece08ac761fa1dd6a3a8654e8c62cd47fb46f8`. Tag matches tested merge. No schema/manual version/signing changes. Scope: MediaLibrarySessionCallback, AutoLibraryExtras, AutoAudiobookLibrary, MusicService, AutoOfflineMode helper/test and AI records.
+
+AI: ChatGPT Codex. Issues disabled; temporary task ID, no remote claim. Standing main/build/release authorization used. All six shared records and task updated; earlier agents' history preserved. No active file reservation or implementation/release work remains. Next: owner checks toggling phone Offline mode while Auto is connected, downloaded playback and normal-menu restoration on the actual head unit.
 
 
 
-## Current — 0.9.2.97, ChatGPT Codex, 2026-11-17 (Melbourne)
+## Previous release — 0.9.2.97, ChatGPT Codex, 2026-11-17 (Melbourne)
 
 MANUAL-OFFLINE-MODE completed and [released as Wavelength 0.9.2.97](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.97). Main implementation [PR #17](https://github.com/rickevans86/Meld/pull/17), feature a2d10b1a, merge cb80fb0a; final RSS guard [PR #18](https://github.com/rickevans86/Meld/pull/18), feature a9bb6e70, main/tag `2b3a87e379dc62463c79b86cf00eaf1aea727eb4`. Full PR CI 44014179903 and 44016930349 passed app/innertube tests, FOSS debug build/upload and lint. Signed release run `44018249348` succeeded. Earlier automatic run 96 (44015546132) was cancelled before publication to include the RSS guard; no 0.9.2.96 release was published.
 
