@@ -1,11 +1,19 @@
 # Handoff
 
-## In progress — PODCAST-STARTUP-BUFFER, ChatGPT Codex, 2026-11-19
+## Current — 0.9.2.99, ChatGPT Codex, 2026-11-19
 
-Branch feat/podcast-startup-buffer from main 9290a0fa. No open PR overlap; temporary ID, Issues disabled. User requests 2-minute default startup buffer with 2-minute increments, including YouTube podcast playlists. Scope: LoadControl, podcast preference/settings, playlist-origin classification and tests. Choices 2–20 minutes; completed files bypass the startup requirement; short fully loaded episodes use Media3 end-of-source readiness. Normal music and stall-recovery policy retained. No schema/version/signing changes. Build/tests pending; physical playback untested.
+PODCAST-STARTUP-BUFFER completed in [PR #20](https://github.com/rickevans86/Meld/pull/20), final feature 993e463c, main/tag `086edc460b89e4c2a6f95824388a8eda43bd8216`. [Wavelength 0.9.2.99](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.99) published by signed run `44506134232`. Final full PR CI `44503794400` passed app/innertube tests, APK build/upload and lint. Five targeted local regression tests and FOSS debug build passed; diff and English XML/name checks passed. Superseded checks were replaced after correcting the startup watchdog; final code passed.
+
+Settings → Features → Podcasts → Podcast startup buffer: default 2 minutes; choices 2, 4, 6, …, 20 minutes stored in DataStore. PodcastLoadControl uses the relevant period's media item and a shared allocator with separate normal/podcast policies. Podcast loading prioritizes time over the audio byte cap and continues beyond the previous 50-second limit, maintaining the chosen requirement plus 30 seconds. Startup waits for the chosen media duration or the known remaining episode duration, whichever is shorter; completed downloads/local files bypass the requirement. Normal music startup and the 2-second stall-recovery threshold are retained. Initial recovery no longer clears a buffer that is still growing.
+
+Classification includes RSS/native episode metadata, selected YouTube podcast playlist origin (including VL IDs), local/cached playlist membership and a conservative initial-membership window. Ordinary YouTube videos in marked podcast playlists therefore use the podcast policy without permanently rewriting song metadata. The same player policy serves phone and Android Auto. Setting changes apply to subsequent buffering decisions; existing ready playback is not forcibly paused.
+
+Public APK downloaded/verified: `com.rickevans86.wavelength`, non-debuggable, `0.9.2.99`, code `280099` greater than 280098, same certificate SHA-256 `9056f5a0b0d6f4e2e44e2b1b75ece08ac761fa1dd6a3a8654e8c62cd47fb46f8`. Release tag matches the tested merge. Scope: MusicService, PodcastLoadControl, PodcastBuffer preference/classification, YouTubePlaylistQueue origin accessor, FeaturesSettings, default English resources, PodcastLoadControlTest and shared AI records. No Room schema/manual version/signing changes.
+
+AI: ChatGPT Codex. Issues disabled; temporary task ID, no remote claim. Standing implementation/main/build/release authorization used. All six shared records and task updated while preserving prior AI history; no active reservation or implementation/release work remains. Next: owner validates actual streamed RSS and YouTube-playlist buffering at 2/4 minutes, short clips, downloaded files and the head unit. Tests cover policy/timeline decisions; real network buffering/audio decoding and physical phone/head-unit validation remain outstanding.
 
 
-## Current — 0.9.2.98, ChatGPT Codex, 2026-11-18
+## Previous release — 0.9.2.98, ChatGPT Codex, 2026-11-18
 
 AUTO-OFFLINE-MODE completed in [PR #19](https://github.com/rickevans86/Meld/pull/19), feature 677ec709, main/tag `341620f41a3223e90a53f75fd031ab3c825afa74`. [Wavelength 0.9.2.98](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.98) published by signed workflow 44281137089. Full CI 44279339922 passed app/innertube tests, APK build/upload and lint. Two targeted local regression tests and FOSS debug build passed; diff checked.
 
