@@ -3388,13 +3388,16 @@ class MusicService :
         }
         if (initialBufferRecoveryJob?.isActive == true) return
 
+        val bufferedAtStart = player.bufferedPosition
+        val bufferedAtStart = player.bufferedPosition
         initialBufferRecoveryJob =
             scope.launch {
                 delay(INITIAL_BUFFER_RECOVERY_DELAY_MS)
                 if (player.playbackState != Player.STATE_BUFFERING ||
                     !player.playWhenReady ||
                     player.currentPosition >= INITIAL_BUFFER_RECOVERY_POSITION_MS ||
-                    player.currentMediaItem?.mediaId != mediaId
+                    player.currentMediaItem?.mediaId != mediaId ||
+                    player.bufferedPosition > bufferedAtStart
                 ) {
                     return@launch
                 }
