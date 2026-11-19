@@ -51,6 +51,8 @@ import com.metrolist.music.playback.DownloadUtil
 import com.metrolist.music.utils.PodcastRefreshTrigger
 import com.metrolist.music.utils.SyncUtils
 import com.metrolist.music.utils.get
+import com.metrolist.music.constants.youTubePodcastPlaylists
+import androidx.datastore.preferences.core.edit
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -65,6 +67,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -468,6 +471,30 @@ constructor(
     private val syncUtils: SyncUtils,
     private val podcastDirectory: com.metrolist.music.podcasts.PodcastDirectory,
 ) : ViewModel() {
+    val markedPlaylistCounts = context.dataStore.data.map { prefs ->
+        prefs.youTubePodcastPlaylists().mapNotNull { yt ->
+            prefs[com.metrolist.music.podcasts.podcastPlaylistCountKey(yt.id)]?.let { yt.id to it }
+        }.toMap()
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyMap())
+
+    private var playlistCountJob: kotlinx.coroutines.Job? = null
+    fun refreshMarkedPlaylistCounts() {
+        if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true || playlistCountJob?.isActive == true) return
+        playlistCountJob = viewModelScope.launch(Dispatchers.IO) {
+            val ids = context.dataStore.data.first().youTubePodcastPlaylists().map { it.id }.distinct()
+            for (id in ids) {
+                if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) break
+                try {
+                    val page = YouTube.playlist(id).getOrNull() ?: continue
+                    val count = com.metrolist.music.podcasts.podcastPlaylistEpisodeCount(
+                        page.playlist.songCountText, page.songs.size, page.songsContinuation != null) ?: continue
+                    context.dataStore.edit { it[com.metrolist.music.podcasts.podcastPlaylistCountKey(id)] = count }
+                } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (_: Exception) { /* Keep the last successful count. */ }
+            }
+        }
+    }
+
     // Shows followed from Find podcasts (played from their public feeds)
     val followedFeeds = podcastDirectory.followed
 
@@ -576,6 +603,7 @@ constructor(
     }
 
     init {
+        refreshMarkedPlaylistCounts()
         viewModelScope.launch(Dispatchers.IO) {
             fetchSePlaylist()
         }
@@ -605,6 +633,7 @@ constructor(
     }
 
     suspend fun refreshAll() {
+        refreshMarkedPlaylistCounts()
         if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) return
         fetchSePlaylist()
         fetchPodcastChannels()
@@ -617,6 +646,7 @@ constructor(
      * Force refresh podcast channels. Called when screen becomes visible.
      */
     fun refreshChannels() {
+        refreshMarkedPlaylistCounts()
         if (context.dataStore[com.metrolist.music.constants.OfflineModeKey] == true) return
         viewModelScope.launch(Dispatchers.IO) {
             fetchPodcastChannels()

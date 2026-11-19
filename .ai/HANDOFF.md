@@ -1,5 +1,10 @@
 # Handoff
 
+## In progress — PODCAST-PLAYLIST-ROWS, ChatGPT Codex, 2026-11-19
+
+Branch fix/podcast-playlist-rows from main 4e2ed6ba. User screenshots show synthetic marked YouTube playlist rows hard-code 0 songs and omit menu. Add cached exact episode counts, common row/menu and favourite ordering with shared phone/Auto playlist IDs. Unknown totals remain unknown; partial pages are not totals. Scope LibraryPodcastsScreen/ViewModel, PodcastFavourites, AutoLibraryExtras, count helper/tests and AI records. No open PR overlap; Issues disabled, temporary task ID. No schema/version/signing changes. Two targeted tests and FOSS debug APK passed; diff checked. Full CI/release pending. Standing main/build/release workflow continues; live authenticated/device tests outstanding.
+
+
 ## Current — 0.9.2.100, ChatGPT Codex, 2026-11-19
 
 PODCAST-STARTUP-CRASH completed in [PR #21](https://github.com/rickevans86/Meld/pull/21), feature c5241578, main/tag `f3defc7095e7689ddb852b22e4f7c04774350733`. [Wavelength 0.9.2.100](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.100) published by signed workflow `44513054423`. Full CI `44510223393` passed app/innertube tests, APK build/upload and lint. Six targeted local tests, including real ExoPlayer construction/release, and FOSS debug APK passed; diff checked.
