@@ -137,6 +137,7 @@ fun LibraryPodcastsScreen(
     // Playlists you've marked as podcasts, in the order you chose them
     val podcastPlaylistIds = com.metrolist.music.constants.rememberPodcastPlaylistIds()
     val allPlaylists by viewModel.allPlaylists.collectAsStateWithLifecycle()
+    val playlistCounts by viewModel.markedPlaylistCounts.collectAsStateWithLifecycle()
     val youTubePodcastPlaylists = com.metrolist.music.constants.rememberYouTubePodcastPlaylists()
     val podcastPlaylists = remember(podcastPlaylistIds, allPlaylists, youTubePodcastPlaylists) {
         podcastPlaylistIds.mapNotNull { id -> allPlaylists.firstOrNull { it.id == id } } +
@@ -198,6 +199,19 @@ fun LibraryPodcastsScreen(
         }
     }
 
+    val playlistRows = podcastPlaylists.associateBy { playlist ->
+        com.metrolist.music.podcasts.PodcastFavourites.playlistId(
+            if (playlist.id.startsWith("yt_")) playlist.playlist.browseId!! else playlist.id,
+            playlist.id.startsWith("yt_"))
+    }
+    val markedRows = playlistRows.map { (id, playlist) ->
+        val count = if (playlist.id.startsWith("yt_")) playlistCounts[playlist.playlist.browseId]
+            else if (playlist.songCount == 0) playlist.playlist.remoteSongCount ?: 0 else playlist.songCount
+        Triple(id, PodcastEntity(id = id, title = playlist.playlist.name,
+            author = listOfNotNull(if (playlist.id.startsWith("yt_")) "YouTube" else null,
+                count?.let { pluralStringResource(R.plurals.n_episode, it, it) }).joinToString(" · "),
+            thumbnailUrl = playlist.thumbnails.firstOrNull()), null as com.metrolist.music.podcasts.PodcastShow?)
+    }
     val lazyListState = rememberLazyListState()
 
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -337,18 +351,27 @@ fun LibraryPodcastsScreen(
                         Triple(com.metrolist.music.podcasts.PodcastFavourites.feedId(show.feedUrl), PodcastEntity(
                             id = show.feedUrl, title = show.title, author = show.author, thumbnailUrl = show.artworkUrl,
                         ), show)
-                    }).sortedShows(showSort, sortReversed) { (_, podcast, feed) -> feed?.sortInfo() ?: podcast.sortInfo() }
+                    } + markedRows).sortedShows(showSort, sortReversed) { (id, podcast, feed) ->
+                        if (id in playlistRows) com.metrolist.music.constants.ShowSortInfo(podcast.title, null, null, null)
+                        else feed?.sortInfo() ?: podcast.sortInfo()
+                    }
                         .podcastFavouritesFirst(favouriteShows) { it.first }
                     itemsIndexed(showRows, key = { _, row -> row.first }, contentType = { _, _ -> CONTENT_TYPE_SONG }) { _, (id, podcast, feed) ->
                         PodcastEpisodePlaylistItem(
                             podcast = if (id in favouriteShows) podcast.copy(title = "★ ${podcast.title}") else podcast,
                             onClick = {
-                                navController.navigate(if (feed == null) "online_podcast/${podcast.id}" else
+                                val playlist = playlistRows[id]
+                                if (playlist != null) {
+                                    navController.navigate(if (playlist.id.startsWith("yt_") ||
+                                        (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.browseId != null))
+                                        "online_playlist/${playlist.playlist.browseId}" else "local_playlist/${playlist.id}")
+                                } else navController.navigate(if (feed == null) "online_podcast/${podcast.id}" else
                                     "podcast_directory?feed=${android.net.Uri.encode(feed.feedUrl)}")
                             },
                             onMenuClick = {
                                 menuState.show {
-                                    if (feed == null) PodcastEpisodePlaylistMenu(podcast, database, menuState::dismiss)
+                                    if (id in playlistRows) Material3MenuGroup(items = listOf(podcastFavouriteMenuItem(id, menuState::dismiss)))
+                                    else if (feed == null) PodcastEpisodePlaylistMenu(podcast, database, menuState::dismiss)
                                     else FollowedFeedMenu(feed, { viewModel.unfollowFeed(feed) }, menuState::dismiss)
                                 }
                             },
@@ -356,27 +379,7 @@ fun LibraryPodcastsScreen(
                         )
                     }
 
-                    // Your own playlists marked as podcasts (Settings → Features → Podcasts)
-                    itemsIndexed(
-                        items = podcastPlaylists,
-                        key = { _, playlist -> "podcast_playlist:${playlist.id}" },
-                        contentType = { _, _ -> CONTENT_TYPE_SONG },
-                    ) { _, playlist ->
-                        com.metrolist.music.ui.component.PlaylistListItem(
-                            playlist = playlist,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.browseId != null) {
-                                            navController.navigate("online_playlist/${playlist.playlist.browseId}")
-                                        } else {
-                                            navController.navigate("local_playlist/${playlist.id}")
-                                        }
-                                    }
-                                    .animateItem(),
-                        )
-                    }
+
                 }
             }
 

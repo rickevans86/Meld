@@ -684,29 +684,37 @@ constructor(
             val id = PodcastFavourites.feedId(show.feedUrl)
             AutoPodcastFavourites.decorate(folder(id, show.title, show.author, show.artworkUrl?.toUri()), id in favourites)
         }
-        // Your playlists marked as podcasts (Settings → Features → Podcasts) come after your shows
-        val prefs = context.dataStore.data.first()
-        val markedIds = prefs.podcastPlaylistIds()
-        val markedOnline = prefs.youTubePodcastPlaylists().map { yt ->
-            folder("${MusicService.YOUTUBE_PLAYLIST}/${yt.id}", yt.title, "YouTube", yt.thumbnail?.toUri(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
-        }
-        val allPlaylists = database.playlistsByCreateDateAsc().first()
-        val marked = markedIds.mapNotNull { id -> allPlaylists.firstOrNull { it.id == id } }.map { playlist ->
-            folder(
-                "${MusicService.PLAYLIST}/${playlist.id}",
-                playlist.playlist.name,
-                context.resources.getQuantityString(R.plurals.n_song, playlist.songCount, playlist.songCount),
-                playlist.thumbnails.firstOrNull()?.toUri(),
-                MediaMetadata.MEDIA_TYPE_PLAYLIST,
-            )
-        }
+        val marked = markedPodcastPlaylistItems().map { AutoPodcastFavourites.decorate(it, it.mediaId in favourites) }
         val shows = com.metrolist.music.constants.sortPodcastFolders(context, channels, feeds, subscribed, followed)
-        val (favouriteShows, otherShows) = shows.partition { it.mediaId in favourites }
-        return listOf(newEpisodes, saved) + favouriteShows + listOf(downloaded) + otherShows + marked + markedOnline
+        val (favouriteShows, otherShows) = (shows + marked).partition { it.mediaId in favourites }
+        return listOf(newEpisodes, saved) + favouriteShows + listOf(downloaded) + otherShows
+    }
+
+    private suspend fun markedPodcastPlaylistItems(): List<MediaItem> {
+        val prefs = context.dataStore.data.first()
+        val online = prefs.youTubePodcastPlaylists().map { yt ->
+            val count = prefs[com.metrolist.music.podcasts.podcastPlaylistCountKey(yt.id)]
+            folder(PodcastFavourites.playlistId(yt.id, true), yt.title,
+                count?.let { context.resources.getQuantityString(R.plurals.n_episode, it, it) } ?: "YouTube",
+                yt.thumbnail?.toUri(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
+        }
+        val all = database.playlistsByCreateDateAsc().first()
+        val local = prefs.podcastPlaylistIds().mapNotNull { id -> all.firstOrNull { it.id == id } }.map { playlist ->
+            val count = if (playlist.songCount == 0) playlist.playlist.remoteSongCount ?: 0 else playlist.songCount
+            folder(PodcastFavourites.playlistId(playlist.id, false), playlist.playlist.name,
+                context.resources.getQuantityString(R.plurals.n_episode, count, count),
+                playlist.thumbnails.firstOrNull()?.toUri(), MediaMetadata.MEDIA_TYPE_PLAYLIST)
+        }
+        return local + online
     }
 
     /** Also serves Android Auto's node toolbar and the refresh after a favourite action. */
     suspend fun podcastChannelItem(mediaId: String): MediaItem? {
+        if (mediaId.count { it == '/' } == 1 &&
+            (mediaId.startsWith("${MusicService.YOUTUBE_PLAYLIST}/") || mediaId.startsWith("${MusicService.PLAYLIST}/"))) {
+            val item = markedPodcastPlaylistItems().firstOrNull { it.mediaId == mediaId } ?: return null
+            return AutoPodcastFavourites.decorate(item, mediaId in context.dataStore.data.first()[PodcastFavourites.Key].orEmpty())
+        }
         val path = mediaId.split('/')
         if (path.size != 3 || path[0] != PODCASTS || path[2].isBlank()) return null
         val item = when (path[1]) {

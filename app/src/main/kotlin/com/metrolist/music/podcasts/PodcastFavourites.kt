@@ -21,6 +21,9 @@ object PodcastFavourites {
         }
     }
 
+    fun playlistId(id: String, online: Boolean) =
+        if (online) "youtube_playlist/${id.removePrefix("VL")}" else "playlist/$id"
+
     fun channelId(id: String) = "podcasts/channel/$id"
 
     fun feedKey(feedUrl: String): String = MessageDigest.getInstance("SHA-1")
