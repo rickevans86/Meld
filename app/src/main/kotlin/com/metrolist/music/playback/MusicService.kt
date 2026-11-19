@@ -415,6 +415,9 @@ class MusicService :
 
     private lateinit var audioQuality: com.metrolist.music.constants.AudioQuality
 
+    @Volatile private var podcastBufferIds: Set<String> = emptySet()
+    @Volatile private var podcastMembershipLoaded = false
+    @Inject lateinit var podcastBufferMembership: com.metrolist.music.podcasts.PodcastHomeFilter
     private var currentQueue: Queue = EmptyQueue
     var queueTitle: String? = null
 
@@ -878,6 +881,10 @@ class MusicService :
                 absRepository.syncPendingProgress()
                 kotlinx.coroutines.delay(60_000)
             }
+        }
+
+        scope.launch {
+            podcastBufferMembership.excludedIds().collect { podcastBufferIds = it; podcastMembershipLoaded = true }
         }
 
         // Watch for audio quality setting changes
@@ -1617,13 +1624,20 @@ class MusicService :
                 )
                 .setRenderersFactory(createRenderersFactory(normalizationProcessor, eqProcessor, silenceProcessor, useAudioTrackPlaybackParams))
                 .setLoadControl(
-                    // Start playback once ~750ms is buffered (media3's default is 1000ms) so first
-                    // audio is audible a touch sooner. min/max/after-rebuffer match the media3 1.x
-                    // defaults (50s / 50s / 2000ms) so buffering and post-stall recovery are unchanged.
-                    DefaultLoadControl
-                        .Builder()
-                        .setBufferDurationsMs(50_000, 50_000, 750, 2_000)
-                        .build(),
+                    PodcastLoadControl(
+                        isPodcast = { item ->
+                            val uri = item.localConfiguration?.uri
+                            val downloaded = downloadUtil.downloads.value[item.mediaId]?.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
+                            val selected = dataStore.get(com.metrolist.music.constants.PodcastPlaylistsKey, "")
+                                .split('\n').filter { it.isNotBlank() }
+                            val queueId = (currentQueue as? com.metrolist.music.playback.queues.YouTubePlaylistQueue)?.playlistId
+                                ?.removePrefix("VL")
+                            uri?.scheme !in listOf("file", "content") && !downloaded && !isAudiobookId(item.mediaId) &&
+                                com.metrolist.music.podcasts.PodcastBuffer.isPodcast(item.mediaId,
+                                    item.metadata?.isEpisode == true, queueId, selected, podcastBufferIds, podcastMembershipLoaded)
+                        },
+                        minutes = { dataStore.get(com.metrolist.music.podcasts.PodcastBuffer.MinutesKey, 2) },
+                    ),
                 )
                 .setHandleAudioBecomingNoisy(true)
                 .setWakeMode(C.WAKE_MODE_NETWORK)

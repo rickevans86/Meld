@@ -1,5 +1,10 @@
 # Decisions
 
+## In progress — PODCAST-STARTUP-BUFFER, ChatGPT Codex, 2026-11-19
+
+Branch feat/podcast-startup-buffer from main 9290a0fa. No open PR overlap; temporary ID, Issues disabled. User requests 2-minute default startup buffer with 2-minute increments, including YouTube podcast playlists. Scope: LoadControl, podcast preference/settings, playlist-origin classification and tests. Choices 2–20 minutes; completed files bypass the startup requirement; short fully loaded episodes use Media3 end-of-source readiness. Normal music and stall-recovery policy retained. No schema/version/signing changes. Build/tests pending; physical playback untested.
+
+
 ## Current — 0.9.2.98, ChatGPT Codex, 2026-11-18
 
 AUTO-OFFLINE-MODE completed in [PR #19](https://github.com/rickevans86/Meld/pull/19), feature 677ec709, main/tag `341620f41a3223e90a53f75fd031ab3c825afa74`. [Wavelength 0.9.2.98](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.98) published by signed workflow 44281137089. Full CI 44279339922 passed app/innertube tests, APK build/upload and lint. Two targeted local regression tests and FOSS debug build passed; diff checked.

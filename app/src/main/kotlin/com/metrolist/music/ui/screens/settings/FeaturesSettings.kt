@@ -614,6 +614,22 @@ private fun PodcastPlaylistsSetting() {
         com.metrolist.music.podcasts.PodcastSkip.BackKey,
         com.metrolist.music.podcasts.PodcastSkip.DEFAULT_BACK,
     )
+    val (bufferMinutes, setBufferMinutes) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.podcasts.PodcastBuffer.MinutesKey, 2)
+    var pickingBuffer by remember { mutableStateOf(false) }
+    if (pickingBuffer) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { pickingBuffer = false },
+        title = { Text(stringResource(R.string.podcast_startup_buffer)) },
+        text = { androidx.compose.foundation.lazy.LazyColumn {
+            items(10) { index ->
+                val value = (index + 1) * 2
+                androidx.compose.material3.TextButton(onClick = { setBufferMinutes(value); pickingBuffer = false }) {
+                    Text(stringResource(R.string.podcast_buffer_minutes, value))
+                }
+            }
+        } },
+        confirmButton = {},
+    )
     var pickingSkip by remember { mutableStateOf<Boolean?>(null) } // true = forward, false = back
     // Dedicated podcast fast-forward / rewind buttons: their own amounts, always shown
     val (buttonForward, onButtonForward) = com.metrolist.music.utils.rememberPreference(
@@ -668,6 +684,13 @@ private fun PodcastPlaylistsSetting() {
                 description = { Text(stringResource(R.string.episode_delete_on_finish_desc)) },
                 trailingContent = { Switch(checked = deleteOnFinish, onCheckedChange = onDeleteOnFinish) },
                 onClick = { onDeleteOnFinish(!deleteOnFinish) },
+            ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.download),
+                title = { Text(stringResource(R.string.podcast_startup_buffer)) },
+                description = { Text(stringResource(R.string.podcast_buffer_minutes,
+                    com.metrolist.music.podcasts.PodcastBuffer.minutes(bufferMinutes))) },
+                onClick = { pickingBuffer = true },
             ),
             Material3SettingsItem(
                 icon = painterResource(R.drawable.fast_forward),
