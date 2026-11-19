@@ -1,11 +1,17 @@
 # Planned file modifications
 
-## In progress — PODCAST-PLAYLIST-ROWS, ChatGPT Codex, 2026-11-19
+## Current — 0.9.2.101, ChatGPT Codex, 2026-11-19
 
-Branch fix/podcast-playlist-rows from main 4e2ed6ba. User screenshots show synthetic marked YouTube playlist rows hard-code 0 songs and omit menu. Add cached exact episode counts, common row/menu and favourite ordering with shared phone/Auto playlist IDs. Unknown totals remain unknown; partial pages are not totals. Scope LibraryPodcastsScreen/ViewModel, PodcastFavourites, AutoLibraryExtras, count helper/tests and AI records. No open PR overlap; Issues disabled, temporary task ID. No schema/version/signing changes. Two targeted tests and FOSS debug APK passed; diff checked. Full CI/release pending. Standing main/build/release workflow continues; live authenticated/device tests outstanding.
+PODCAST-PLAYLIST-ROWS completed in [PR #22](https://github.com/rickevans86/Meld/pull/22), feature c5130beda66f24b6e69c726b1b9fba8ca250dca2, main/tag `b02af0eba20a9c60f1ee3e3990a455d453a77a9c`. [Wavelength 0.9.2.101](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.101) published by signed workflow `44528629336`. Full CI `44526413518` passed app/innertube tests, APK build/upload and lint. Two targeted local regression tests and FOSS debug APK passed; diff checked. Release audiobook playback regression also passed.
+
+Marked YouTube podcast playlists now use the common show row with a three-dot Favourite channel menu. Exact episode totals are fetched and cached on refresh, retaining the previous successful total on failure. A complete nonempty first page can supply a fallback; partial pages and abbreviated totals are not treated as exact counts. Unknown totals display YouTube without a false zero. Local marked playlists also use episode labels and the common menu. Rows combine with native channels/feeds before sorting and favourite-first placement, so favourites appear below Episodes for later. Phone and Android Auto use the same normalized online/local playlist favourite IDs and saved preference; Auto validates configured playlist folders and exposes its native favourite actions. Existing navigation and playback routes remain intact.
+
+Public APK downloaded and verified: `com.rickevans86.wavelength`, non-debuggable, `0.9.2.101`, code `280101` greater than 280100, same signing certificate SHA-256 `9056f5a0b0d6f4e2e44e2b1b75ece08ac761fa1dd6a3a8654e8c62cd47fb46f8`. Tag matches the tested merge. No playback/load-control, schema, manual version or signing changes. Scope: LibraryPodcastsScreen, LibraryPodcastsViewModel, PodcastFavourites, AutoLibraryExtras, count helper/tests and AI records.
+
+AI: ChatGPT Codex. Issues disabled; temporary task ID, no remote claim. No overlapping PR at task start. Standing main/build/release authorization used. All six shared records and task updated; earlier history preserved. No active file reservation or implementation/release work remains. Next owner check: install the update, open Podcasts with authenticated YouTube connectivity, confirm the actual count after refresh, use the playlist three-dot Favourite channel action and confirm placement below Episodes for later; verify the same saved favourite on physical Android Auto. Live authenticated playlist, physical phone/head-unit tests remain outstanding; unit tests verify count parsing, shared identity and favourite partitioning, not the actual user account or device UI.
 
 
-## Current — 0.9.2.100, ChatGPT Codex, 2026-11-19
+## Previous release — 0.9.2.100, ChatGPT Codex, 2026-11-19
 
 PODCAST-STARTUP-CRASH completed in [PR #21](https://github.com/rickevans86/Meld/pull/21), feature c5241578, main/tag `f3defc7095e7689ddb852b22e4f7c04774350733`. [Wavelength 0.9.2.100](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.100) published by signed workflow `44513054423`. Full CI `44510223393` passed app/innertube tests, APK build/upload and lint. Six targeted local tests, including real ExoPlayer construction/release, and FOSS debug APK passed; diff checked.
 
