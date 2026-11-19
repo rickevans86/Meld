@@ -1,5 +1,10 @@
 # Decisions
 
+## In progress — PODCAST-STARTUP-CRASH, ChatGPT Codex, 2026-11-19
+
+User supplied crash report for 0.9.2.99 on Samsung Android 17: MusicService creation fails with LoadControl.getBackBufferDurationUs not implemented. Prior policy-only tests missed real ExoPlayer construction. Replace Kotlin interface delegation with explicit forwarding of allocator, back-buffer and preloading callbacks; add actual player construction/release regression. Branch fix/podcast-load-control-startup from main e22f2fd7; no open PR overlap; Issues disabled, temporary task ID. Scope PodcastLoadControl, its tests and AI records. Buffer setting retained. No schema/version/signing changes. Six targeted tests passed, including actual ExoPlayer construction/release; FOSS debug APK built and diff checked. Full CI/release pending; physical device untested. Standing fix/main/build/release workflow continues.
+
+
 ## Current — 0.9.2.99, ChatGPT Codex, 2026-11-19
 
 PODCAST-STARTUP-BUFFER completed in [PR #20](https://github.com/rickevans86/Meld/pull/20), final feature 993e463c, main/tag `086edc460b89e4c2a6f95824388a8eda43bd8216`. [Wavelength 0.9.2.99](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.99) published by signed run `44506134232`. Final full PR CI `44503794400` passed app/innertube tests, APK build/upload and lint. Five targeted local regression tests and FOSS debug build passed; diff and English XML/name checks passed. Superseded checks were replaced after correcting the startup watchdog; final code passed.

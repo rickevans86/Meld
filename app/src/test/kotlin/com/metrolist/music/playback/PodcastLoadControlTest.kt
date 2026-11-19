@@ -60,4 +60,16 @@ class PodcastLoadControlTest {
         assertTrue(PodcastBuffer.isPodcast("youtube-episode", true, null, emptyList(), emptySet(), true))
     }
 
+    @Test fun `real player creation and release support all startup callbacks`() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
+        for (podcast in listOf(false, true)) {
+            val control = PodcastLoadControl({ podcast }, { 2 })
+            assertEquals(0L, control.getBackBufferDurationUs(PlayerId.UNSET))
+            assertFalse(control.retainBackBufferFromKeyframe(PlayerId.UNSET))
+            val player = androidx.media3.exoplayer.ExoPlayer.Builder(context).setLoadControl(control).build()
+            try { assertEquals(androidx.media3.common.Player.STATE_IDLE, player.playbackState) }
+            finally { player.release() }
+        }
+    }
+
 }

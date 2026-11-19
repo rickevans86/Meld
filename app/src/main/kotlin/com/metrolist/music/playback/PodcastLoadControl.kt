@@ -17,13 +17,21 @@ internal class PodcastLoadControl private constructor(
     private val podcast: LoadControl,
     private val isPodcast: (MediaItem) -> Boolean,
     private val minutes: () -> Int,
-) : LoadControl by normal {
+) : LoadControl {
     constructor(isPodcast: (MediaItem) -> Boolean, minutes: () -> Int) : this(
         DefaultAllocator(true, 65_536), isPodcast, minutes)
     private constructor(allocator: DefaultAllocator, classify: (MediaItem) -> Boolean, minutes: () -> Int) : this(
         DefaultLoadControl.Builder().setAllocator(allocator).setBufferDurationsMs(50_000, 50_000, 750, 2_000).build(),
         DefaultLoadControl.Builder().setAllocator(allocator).setBufferDurationsMs(1_230_000, 1_230_000, 120_000, 2_000)
             .setPrioritizeTimeOverSizeThresholds(true).build(), classify, minutes)
+
+    // Java default interface methods must be forwarded explicitly on Android.
+    override fun getAllocator(playerId: PlayerId) = normal.getAllocator(playerId)
+    override fun getBackBufferDurationUs(playerId: PlayerId) = normal.getBackBufferDurationUs(playerId)
+    override fun retainBackBufferFromKeyframe(playerId: PlayerId) = normal.retainBackBufferFromKeyframe(playerId)
+    override fun shouldContinuePreloading(playerId: PlayerId, timeline: Timeline,
+        mediaPeriodId: androidx.media3.exoplayer.source.MediaSource.MediaPeriodId, bufferedDurationUs: Long) =
+        normal.shouldContinuePreloading(playerId, timeline, mediaPeriodId, bufferedDurationUs)
 
     private fun applies(p: LoadControl.Parameters): Boolean {
         if (p.timeline.isEmpty) return false
