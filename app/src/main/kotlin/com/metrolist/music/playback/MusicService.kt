@@ -3389,7 +3389,6 @@ class MusicService :
         if (initialBufferRecoveryJob?.isActive == true) return
 
         val bufferedAtStart = player.bufferedPosition
-        val bufferedAtStart = player.bufferedPosition
         initialBufferRecoveryJob =
             scope.launch {
                 delay(INITIAL_BUFFER_RECOVERY_DELAY_MS)
