@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.withContext
 
 class YouTubePlaylistQueue(
-    private val playlistId: String,
+    val playlistId: String,
     private val playlistTitle: String? = null,
     private val initialSongs: List<SongItem> = emptyList(),
     private val initialContinuation: String? = null,

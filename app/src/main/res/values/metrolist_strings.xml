@@ -1655,4 +1655,6 @@
     <string name="offline_sign_in_hint">Connect to sign in. Your downloaded books remain available offline.</string>
     <string name="offline_mode">Offline mode</string>
     <string name="offline_mode_stream_unavailable">Offline mode is on. Choose downloaded content or a local file.</string>
+    <string name="podcast_startup_buffer">Podcast startup buffer</string>
+    <string name="podcast_buffer_minutes">%1$d minutes</string>
 </resources>
