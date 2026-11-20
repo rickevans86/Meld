@@ -1,0 +1,5 @@
+# RADIO-EMPTY-BUFFER
+
+## In progress — RADIO-EMPTY-BUFFER, ChatGPT Codex, 2026-11-20
+
+User's 0.9.2.103 Samsung Android 17 radio report: FAILED_RUNTIME_CHECK, IllegalArgumentException: The source buffer is this buffer, RadioAudioCapture.queueInput. Main 2811b509, no open PR overlap. Issues disabled, temporary task ID. Reserve RadioAudioCapture, RadioRecognitionFallbackTest and all shared AI records/task. Reproduce Media3 shared empty input/drain buffer alias, apply minimal empty-input guard and verify real PCM/output retention plus existing recognition tests. Standing fix/main/build/release authorization applies. New regression reproduced the exact IllegalArgumentException before the fix. One-line early return for empty input follows the existing audio-processor pattern. All six targeted tests (including actual Media3 AudioProcessingPipeline drain/EOS, pending-output retention and stale-sample protection) and FOSS debug APK passed on final source; diff checked. Full CI/release pending; physical Samsung and live radio/recognition checks remain outstanding. No schema/manual version/signing changes.
