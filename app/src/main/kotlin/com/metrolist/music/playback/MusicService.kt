@@ -19,8 +19,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.database.SQLException
-import android.media.AudioDeviceCallback
-import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.audiofx.AudioEffect
@@ -188,7 +186,6 @@ import com.metrolist.music.constants.PlayerVolumeKey
 import com.metrolist.music.constants.PreventDuplicateTracksInQueueKey
 import com.metrolist.music.constants.RememberShuffleAndRepeatKey
 import com.metrolist.music.constants.RepeatModeKey
-import com.metrolist.music.constants.ResumeOnBluetoothConnectKey
 import com.metrolist.music.constants.ScrobbleDelayPercentKey
 import com.metrolist.music.constants.ScrobbleDelaySecondsKey
 import com.metrolist.music.constants.ScrobbleMinSongDurationKey
@@ -668,25 +665,20 @@ class MusicService :
             }
         }
 
-    private val audioDeviceCallback =
-        object : AudioDeviceCallback() {
-            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
-                super.onAudioDevicesAdded(addedDevices)
-                val hasBluetooth =
-                    addedDevices?.any {
-                        it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-                    } == true
+    private var audioOutputChangeMonitor: AudioOutputChangeMonitor? = null
 
-                if (hasBluetooth) {
-                    if (dataStore.get(ResumeOnBluetoothConnectKey, false)) {
-                        if (player.playbackState == Player.STATE_READY && !player.isPlaying) {
-                            player.play()
-                        }
-                    }
-                }
-            }
-        }
+    private fun pauseOnAudioOutputChange() {
+        if (!::player.isInitialized) return
+        // A later focus/volume/network recovery must not undo this pause.
+        wasPlayingBeforeAudioFocusLoss = false
+        wasPlayingBeforeVolumeMute = false
+        isPausedByVolumeMute = false
+        pausedDueToNetworkError = false
+        retryJob?.cancel()
+        player.pause()
+        secondaryPlayer?.pause()
+        fadingPlayer?.pause()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -832,7 +824,11 @@ class MusicService :
             }
         registerReceiver(screenStateReceiver, screenStateFilter)
 
-        audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
+        audioOutputChangeMonitor = AudioOutputChangeMonitor(
+            audioManager,
+            getSystemService(android.media.MediaRouter::class.java),
+            ::pauseOnAudioOutputChange,
+        ).also { it.start() }
 
         audioQuality = startupPrefs!![AudioQualityKey]?.let { value ->
             if (value == "VERY_HIGH") com.metrolist.music.constants.AudioQuality.HIGH
@@ -5667,6 +5663,8 @@ class MusicService :
 
     override fun onDestroy() {
         isRunning = false
+        audioOutputChangeMonitor?.stop()
+        audioOutputChangeMonitor = null
         preCacheJob?.cancel()
 
         if (!::player.isInitialized) {
@@ -5692,7 +5690,6 @@ class MusicService :
             unregisterReceiver(screenStateReceiver)
         } catch (e: Exception) {
         }
-        audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
         castConnectionHandler?.release()
         if (dataStore.get(PersistentQueueKey, true)) {
             saveQueueToDiskBlocking()
