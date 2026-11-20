@@ -143,10 +143,17 @@ object MusicRecognitionService {
         }
     }
 
+    /** Radio fallback uses decoded stream audio, without microphone access or recognition-playlist side effects. */
+    internal suspend fun recognizeRadioAudio(context: Context, audio: DecodedAudio): RecognitionResult? {
+        if (audio.channelCount != 1 || audio.pcmEncoding != AUDIO_FORMAT) return null
+        return fingerprintAndQuery(audio.data, audio.sampleRate)
+            ?: tryAudDFallback(context, audio.data, audio.sampleRate, updateStatus = false)
+    }
+
     /** Resamples to 16kHz, normalises the volume, fingerprints and queries Shazam. Null on no match/error. */
-    private suspend fun fingerprintAndQuery(pcm44k: ByteArray): RecognitionResult? {
+    private suspend fun fingerprintAndQuery(pcm44k: ByteArray, sampleRate: Int = RECORDING_SAMPLE_RATE): RecognitionResult? {
         if (pcm44k.size < RECORDING_SAMPLE_RATE) return null // under ~0.25s of audio: nothing to match yet
-        val resampled = resampleTo16k(pcm44k) ?: return null
+        val resampled = resampleTo16k(pcm44k, sampleRate) ?: return null
         normalizeGain(resampled)
         if (resampled.isEmpty() || resampled.size % 2 != 0 || ByteOrder.nativeOrder() != ByteOrder.LITTLE_ENDIAN) return null
         val signature = try {
@@ -159,23 +166,23 @@ object MusicRecognitionService {
         return Shazam.recognize(signature, sampleDurationMs).getOrNull()
     }
 
-    private suspend fun tryAudDFallback(context: Context, pcm44k: ByteArray): RecognitionResult? {
+    private suspend fun tryAudDFallback(context: Context, pcm44k: ByteArray, sampleRate: Int = RECORDING_SAMPLE_RATE, updateStatus: Boolean = true): RecognitionResult? {
         val prefs = context.dataStore.data.first()
         if (prefs[AudDRecognizer.EnabledKey] != true) return null
         val token = prefs[AudDRecognizer.TokenKey].orEmpty()
         if (token.isBlank()) return null
-        val resampled = resampleTo16k(pcm44k) ?: return null
+        val resampled = resampleTo16k(pcm44k, sampleRate) ?: return null
         normalizeGain(resampled)
-        _recognitionStatus.value = RecognitionStatus.Processing
+        if (updateStatus) _recognitionStatus.value = RecognitionStatus.Processing
         Timber.tag(TAG).d("Shazam found nothing; trying AudD fallback")
         return AudDRecognizer.recognize(resampled, VibraSignature.REQUIRED_SAMPLE_RATE, token)
     }
 
-    private suspend fun resampleTo16k(pcm44k: ByteArray): ByteArray? {
+    private suspend fun resampleTo16k(pcm44k: ByteArray, sampleRate: Int): ByteArray? {
         val decoded = DecodedAudio(
             data = pcm44k,
             channelCount = 1,
-            sampleRate = RECORDING_SAMPLE_RATE,
+            sampleRate = sampleRate,
             pcmEncoding = AUDIO_FORMAT,
         )
         return AudioResampler.resample(decoded, VibraSignature.REQUIRED_SAMPLE_RATE)

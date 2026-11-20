@@ -1,0 +1,5 @@
+# RADIO-RECOGNITION-FALLBACK
+
+## In progress — RADIO-RECOGNITION-FALLBACK, ChatGPT Codex, 2026-11-20
+
+From main 3d4b2dd0, no open PR overlap. Issues disabled; temporary task ID, no remote claim. User requests recognising the radio song as fallback when metadata is missing/unusable. Reserve RecognisedSongs, MusicRecognitionService, MusicService, PlayerMenu, new bounded radio PCM capture/tests, default English strings and AI records. Reuse fingerprint/AudD pipeline on radio audio without microphone permission; metadata first, recognition only on missing/unmatched metadata; same radio playlist and phone chooser, no arbitrary unrelated search result. Four targeted Robolectric tests and FOSS debug build passed on final source; diff and default English XML checked. Tests cover fallback order/failures/cancellation, strict match rejection, pass-through/downmix, bounded rolling capture, stale/cross-station/non-radio isolation and reset. Recognition failure guard verified after an initial error-path test failure. Full PR CI/main/release pending under standing authorization; live matching and physical phone/Auto untested. No schema/manual version/signing changes.
