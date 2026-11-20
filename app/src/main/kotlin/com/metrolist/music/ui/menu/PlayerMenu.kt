@@ -148,19 +148,6 @@ fun PlayerMenu(
     val radioSavedIds by (radioDirectory?.favourites ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList<com.metrolist.music.radio.RadioStation>()))
         .collectAsStateWithLifecycle()
     val radioSaved = radioSavedIds.any { it.songId == mediaMetadata.id }
-    suspend fun radioSongIds(): List<String> {
-        val id = playerConnection.service.resolveRadioSongForPlaylist()
-        if (id == null) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                Toast.makeText(
-                    context,
-                    R.string.radio_song_not_found,
-                    Toast.LENGTH_LONG,
-                ).show()
-            }
-        }
-        return listOfNotNull(id)
-    }
     val coroutineScope = rememberCoroutineScope()
     val downloadUtil = LocalDownloadUtil.current
 
@@ -269,18 +256,14 @@ fun PlayerMenu(
     ) { }
 
     AddToPlaylistDialog(
-        isVisible = showChoosePlaylistDialog,
+        isVisible = showChoosePlaylistDialog && !isRadio,
         onGetSong = {
-            if (isRadio) {
-                radioSongIds()
-            } else {
-                database.withTransaction {
-                    insert(mediaMetadata)
-                }
-                listOf(mediaMetadata.id)
+            database.withTransaction {
+                insert(mediaMetadata)
             }
+            listOf(mediaMetadata.id)
         },
-        onGetSongIds = { if (isRadio) radioSongIds() else listOf(mediaMetadata.id) },
+        onGetSongIds = { listOf(mediaMetadata.id) },
         onDismiss = {
             showChoosePlaylistDialog = false
         },
@@ -452,7 +435,14 @@ fun PlayerMenu(
                                 )
                             },
                             text = stringResource(if (isRadio) R.string.radio_add_song_to_playlist else R.string.add_to_playlist),
-                            onClick = { showChoosePlaylistDialog = true },
+                            onClick = {
+                                if (isRadio) {
+                                    playerConnection.service.addToTargetPlaylist()
+                                    onDismiss()
+                                } else {
+                                    showChoosePlaylistDialog = true
+                                }
+                            },
                         ),
                         if (isRadio) null else NewAction(
                             icon = {

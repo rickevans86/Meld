@@ -2790,12 +2790,6 @@ class MusicService :
         }
     }
 
-    suspend fun resolveRadioSongForPlaylist(): String? {
-        val song = resolveCurrentRadioSong() ?: return null
-        withContext(Dispatchers.IO) { database.insert(song.toMediaMetadata()) }
-        return song.id
-    }
-
     fun addToTargetPlaylist() {
         // Live radio resolves the current song from metadata or recognition.
         val radioId = player.currentMediaItem?.mediaId

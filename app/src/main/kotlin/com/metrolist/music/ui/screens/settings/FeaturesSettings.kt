@@ -437,7 +437,7 @@ private fun AudDFallbackSetting() {
 }
 
 /**
- * Radio songs: the playlist the add button in Android Auto puts the radio station's current song into.
+ * Radio songs: the shared destination for the phone and Android Auto radio add actions.
  */
 @Composable
 private fun RadioSongsSetting() {
