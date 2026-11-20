@@ -3,6 +3,8 @@ package com.metrolist.music.recognition
 import android.app.Application
 import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.AudioProcessingPipeline
+import com.google.common.collect.ImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -73,9 +75,51 @@ class RadioRecognitionFallbackTest {
         repeat(12 * 8000) { assertEquals(((2 * 8000 + it) % 30000).toShort(), mono.short) }
         assertNull(capture.snapshot("another station"))
         ShadowSystemClock.advanceBy(Duration.ofSeconds(6))
+        capture.queueInput(AudioProcessor.EMPTY_BUFFER)
         assertNull(capture.snapshot("station"))
         capture.setStation("another station")
         assertNull(capture.snapshot("another station"))
+    }
+
+    @Test fun `shared empty drain input does not self copy or discard pending audio`() {
+        val capture = RadioAudioCapture()
+        capture.setStation("station")
+        capture.configure(AudioProcessor.AudioFormat(8000, 1, C.ENCODING_PCM_16BIT))
+        capture.flush()
+        repeat(3) { capture.queueInput(AudioProcessor.EMPTY_BUFFER) }
+        assertFalse(capture.output.hasRemaining())
+
+        val bytes = byteArrayOf(1, 2, 3, 4)
+        val input = ByteBuffer.allocateDirect(bytes.size).put(bytes)
+        input.flip()
+        capture.queueInput(input)
+        repeat(3) { capture.queueInput(AudioProcessor.EMPTY_BUFFER) }
+        val output = capture.output
+        val actual = ByteArray(output.remaining()).also { output.get(it) }
+        assertArrayEquals(bytes, actual)
+        assertFalse(input.hasRemaining())
+        capture.queueEndOfStream()
+        capture.queueInput(AudioProcessor.EMPTY_BUFFER)
+        assertTrue(capture.isEnded)
+    }
+
+    @Test fun `Media3 pipeline drains radio audio and end of stream without buffer aliasing`() {
+        val capture = RadioAudioCapture().apply { setStation("station") }
+        val pipeline = AudioProcessingPipeline(ImmutableList.of(capture))
+        pipeline.configure(AudioProcessor.AudioFormat(8000, 1, C.ENCODING_PCM_16BIT))
+        pipeline.flush()
+        val expected = byteArrayOf(1, 2, 3, 4)
+        val input = ByteBuffer.allocateDirect(expected.size).put(expected)
+        input.flip()
+        pipeline.queueInput(input)
+        pipeline.queueEndOfStream()
+        val actual = java.io.ByteArrayOutputStream()
+        repeat(10) {
+            val output = pipeline.output
+            while (output.hasRemaining()) actual.write(output.get().toInt())
+        }
+        assertArrayEquals(expected, actual.toByteArray())
+        assertTrue(pipeline.isEnded)
     }
 
     @Test fun `non radio short clips and reset never expose audio`() {

@@ -39,6 +39,7 @@ internal class RadioAudioCapture : BaseAudioProcessor() {
     }
 
     @Synchronized override fun queueInput(inputBuffer: ByteBuffer) {
+        if (!inputBuffer.hasRemaining()) return
         if (stationId != null && samples.isNotEmpty()) {
             val input = inputBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN)
             while (input.remaining() >= channels * 2) {
