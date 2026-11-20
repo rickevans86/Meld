@@ -61,7 +61,6 @@ import com.metrolist.music.constants.PersistentQueueKey
 import com.metrolist.music.constants.PersistentShuffleAcrossQueuesKey
 import com.metrolist.music.constants.PreventDuplicateTracksInQueueKey
 import com.metrolist.music.constants.RememberShuffleAndRepeatKey
-import com.metrolist.music.constants.ResumeOnBluetoothConnectKey
 import com.metrolist.music.constants.SeekExtraSeconds
 import com.metrolist.music.constants.ShufflePlaylistFirstKey
 import com.metrolist.music.constants.SimilarContent
@@ -215,10 +214,7 @@ fun PlayerSettings(
         PauseOnMute,
         defaultValue = false
     )
-    val (resumeOnBluetoothConnect, onResumeOnBluetoothConnectChange) = rememberPreference(
-        ResumeOnBluetoothConnectKey,
-        defaultValue = false
-    )
+
     val (keepScreenOn, onKeepScreenOnChange) = rememberPreference(
         KeepScreenOn,
         defaultValue = false
@@ -1069,26 +1065,6 @@ fun PlayerSettings(
                         )
                     },
                     onClick = { onPauseOnMuteChange(!pauseOnMute) }
-                ),
-                Material3SettingsItem(
-                    icon = painterResource(R.drawable.bluetooth),
-                    title = { Text(stringResource(R.string.resume_on_bluetooth_connect)) },
-                    trailingContent = {
-                        Switch(
-                            checked = resumeOnBluetoothConnect,
-                            onCheckedChange = onResumeOnBluetoothConnectChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (resumeOnBluetoothConnect) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            }
-                        )
-                    },
-                    onClick = { onResumeOnBluetoothConnectChange(!resumeOnBluetoothConnect) }
                 ),
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.screenshot),

@@ -1,5 +1,9 @@
 # Decisions
 
+## In progress — AUDIO-OUTPUT-PAUSE, ChatGPT Codex, 2026-11-20
+
+Branch fix/pause-on-output-change from remote main 8d3ea41a; no open PR overlap, latest release 0.9.2.101. GitHub Issues disabled, temporary task ID only. User requests playback pause on audio output change. Reserve MusicService, new AudioOutputChangeMonitor and its regression tests, PlayerSettings (remove conflicting Bluetooth auto-resume control), and shared AI records/task. Use native output-device and selected-route callbacks, ignore initial snapshots/input-only changes/volume changes; pause main and crossfade players without clearing the queue or seeking, cancel pending automatic resume. Scope all local playback sources and Android Auto's shared player. No schema/manual version/signing changes. Two Robolectric regression tests passed and FOSS debug APK built; diff checked. Tests exercise initial/input-only changes, output connection/removal, actual selected route changes, volume changes, callback cleanup, retained queue/position and pending play intent. Full PR CI and standing main/build/release workflow pending; physical Bluetooth/headphone/Android Auto checks remain necessary.
+
 ## Current — 0.9.2.101, ChatGPT Codex, 2026-11-19
 
 PODCAST-PLAYLIST-ROWS completed in [PR #22](https://github.com/rickevans86/Meld/pull/22), feature c5130beda66f24b6e69c726b1b9fba8ca250dca2, main/tag `b02af0eba20a9c60f1ee3e3990a455d453a77a9c`. [Wavelength 0.9.2.101](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.101) published by signed workflow `44528629336`. Full CI `44526413518` passed app/innertube tests, APK build/upload and lint. Two targeted local regression tests and FOSS debug APK passed; diff checked. Release audiobook playback regression also passed.
