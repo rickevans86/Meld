@@ -498,6 +498,12 @@ class MusicService :
 
     private var isAudioEffectSessionOpened = false
     private var openedAudioEffectSessionId: Int = C.AUDIO_SESSION_ID_UNSET
+    private val radioCaptures = HashMap<Player, com.metrolist.music.recognition.RadioAudioCapture>()
+    private val radioResolveMutex = kotlinx.coroutines.sync.Mutex()
+    private var radioResolvedKey: Pair<String, String?>? = null
+    private var radioResolvedAt = 0L
+    private var radioResolvedSong: SongItem? = null
+
     private val playerNormalizationProcessors = HashMap<Player, VolumeNormalizationAudioProcessor>()
     private val playerEqualizerProcessors = HashMap<Player, CustomEqualizerAudioProcessor>()
 
@@ -1128,7 +1134,7 @@ class MusicService :
             if (crossfadeEnabled) false else offloadPref
         }.distinctUntilChanged()
             .collectLatest(scope) { useOffload ->
-                player.setOffloadEnabled(useOffload)
+                player.setOffloadEnabled(useOffload && !com.metrolist.music.constants.isRadioId(player.currentMediaItem?.mediaId))
                 secondaryPlayer?.setOffloadEnabled(useOffload)
             }
 
@@ -1174,6 +1180,9 @@ class MusicService :
                 }
 
                 newPlayer.setMediaItems(mediaItems, currentIndex, currentPosition)
+                val restoredRadioId = newPlayer.currentMediaItem?.mediaId?.takeIf { com.metrolist.music.constants.isRadioId(it) }
+                radioCaptures[newPlayer]?.setStation(restoredRadioId)
+                if (restoredRadioId != null) newPlayer.setOffloadEnabled(false)
                 newPlayer.repeatMode = repeatMode
                 newPlayer.shuffleModeEnabled = shuffleModeEnabled
                 newPlayer.playbackParameters = playbackParameters
@@ -1592,6 +1601,7 @@ class MusicService :
 
     private fun createExoPlayer(prefs: Preferences? = null): ExoPlayer {
         val normalizationProcessor = VolumeNormalizationAudioProcessor()
+        val radioCapture = com.metrolist.music.recognition.RadioAudioCapture()
         val eqProcessor = CustomEqualizerAudioProcessor()
 
         val silenceProcessor = SilenceDetectorAudioProcessor { handleLongSilenceDetected() }
@@ -1618,7 +1628,7 @@ class MusicService :
                 .setMediaSourceFactory(
                     createMediaSourceFactory(normalizationProcessor) { createdPlayer },
                 )
-                .setRenderersFactory(createRenderersFactory(normalizationProcessor, eqProcessor, silenceProcessor, useAudioTrackPlaybackParams))
+                .setRenderersFactory(createRenderersFactory(normalizationProcessor, eqProcessor, silenceProcessor, useAudioTrackPlaybackParams, radioCapture))
                 .setLoadControl(
                     PodcastLoadControl(
                         isPodcast = { item ->
@@ -1650,6 +1660,7 @@ class MusicService :
                 .build()
         createdPlayer = player
 
+        radioCaptures[player] = radioCapture
         playerNormalizationProcessors[player] = normalizationProcessor
         playerSilenceProcessors[player] = silenceProcessor
         playerEqualizerProcessors[player] = eqProcessor
@@ -2738,12 +2749,58 @@ class MusicService :
         }
     }
 
+    private suspend fun resolveCurrentRadioSong(): SongItem? = withContext(Dispatchers.Main) {
+        if (dataStore[com.metrolist.music.constants.OfflineModeKey] == true) return@withContext null
+        radioResolveMutex.lock()
+        try {
+            val id = player.currentMediaItem?.mediaId?.takeIf { com.metrolist.music.constants.isRadioId(it) }
+                ?: return@withContext null
+            val title = radioDirectory.nowPlaying.value?.takeIf { it.first == id }?.second
+                ?.takeUnless { it.equals(player.currentMediaItem?.mediaMetadata?.title?.toString(), ignoreCase = true) }
+            val key = id to title
+            if (radioResolvedKey == key && android.os.SystemClock.elapsedRealtime() - radioResolvedAt < 10_000) {
+                radioResolvedSong?.let { return@withContext it }
+            }
+            val capture = radioCaptures[player]
+            val song = withContext(Dispatchers.IO) {
+                com.metrolist.music.recognition.RecognisedSongs.findRadioSong(title) {
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(this@MusicService, R.string.radio_song_recognising, Toast.LENGTH_LONG).show()
+                    }
+                    val audio = kotlinx.coroutines.withTimeoutOrNull(12_000) {
+                        var sample = capture?.snapshot(id)
+                        while (sample == null && currentMediaMetadata.value?.id == id) {
+                            delay(250)
+                            sample = capture?.snapshot(id)
+                        }
+                        sample
+                    } ?: return@findRadioSong null
+                    com.metrolist.music.recognition.MusicRecognitionService.recognizeRadioAudio(this@MusicService, audio)
+                }
+            }
+            if (player.currentMediaItem?.mediaId != id) return@withContext null
+            if (song != null) {
+                radioResolvedKey = key
+                radioResolvedAt = android.os.SystemClock.elapsedRealtime()
+                radioResolvedSong = song
+            }
+            song
+        } finally {
+            radioResolveMutex.unlock()
+        }
+    }
+
+    suspend fun resolveRadioSongForPlaylist(): String? {
+        val song = resolveCurrentRadioSong() ?: return null
+        withContext(Dispatchers.IO) { database.insert(song.toMediaMetadata()) }
+        return song.id
+    }
+
     fun addToTargetPlaylist() {
-        // Live radio: add the song the station says is playing to the radio songs playlist
+        // Live radio resolves the current song from metadata or recognition.
         val radioId = player.currentMediaItem?.mediaId
         if (com.metrolist.music.constants.isRadioId(radioId)) {
-            val title = radioDirectory.nowPlaying.value?.takeIf { it.first == radioId }?.second
-            com.metrolist.music.recognition.RecognisedSongs.addRadioSong(this, title)
+            com.metrolist.music.recognition.RecognisedSongs.addRadioSong(this) { resolveCurrentRadioSong() }
             return
         }
         scope.launch {
@@ -3141,6 +3198,12 @@ class MusicService :
         mediaItem: MediaItem?,
         reason: Int,
     ) {
+        val radioId = mediaItem?.mediaId?.takeIf { com.metrolist.music.constants.isRadioId(it) }
+        radioCaptures[player]?.setStation(radioId)
+        radioResolvedKey = null
+        radioResolvedSong = null
+        // Recognition needs decoded PCM; restore the user's offload preference when leaving radio.
+        player.setOffloadEnabled(radioId == null && dataStore.get(AudioOffload, false) && !crossfadeEnabled)
         onWavelengthTransition(mediaItem)
         // Only natural completion transitions mark the previous track as fully cached,
         // never a manual skip or seek. Read lastTransitionedMediaId before replacing it.
@@ -5383,6 +5446,7 @@ class MusicService :
         eqProcessor: CustomEqualizerAudioProcessor,
         silenceProcessor: SilenceDetectorAudioProcessor,
         useAudioTrackPlaybackParams: Boolean,
+        radioCapture: com.metrolist.music.recognition.RadioAudioCapture,
     ) = object : DefaultRenderersFactory(this) {
         override fun buildAudioRenderers(
             context: Context,
@@ -5439,6 +5503,7 @@ class MusicService :
             .setAudioProcessorChain(
                 DefaultAudioSink.DefaultAudioProcessorChain(
                     arrayOf(
+                        radioCapture,
                         normalizationProcessor,
                         eqProcessor,
                         silenceProcessor,
@@ -5663,6 +5728,8 @@ class MusicService :
 
     override fun onDestroy() {
         isRunning = false
+        radioCaptures.values.forEach { it.setStation(null) }
+        radioCaptures.clear()
         audioOutputChangeMonitor?.stop()
         audioOutputChangeMonitor = null
         preCacheJob?.cancel()
@@ -6590,6 +6657,7 @@ class MusicService :
     }
 
     private fun releaseExoPlayer(player: ExoPlayer) {
+        radioCaptures.remove(player)?.setStation(null)
         playerNormalizationProcessors.remove(player)
         playerSilenceProcessors.remove(player)
         playerEqualizerProcessors.remove(player)?.let(equalizerService::removeAudioProcessor)

@@ -1,5 +1,9 @@
 # Project state
 
+## In progress — RADIO-RECOGNITION-FALLBACK, ChatGPT Codex, 2026-11-20
+
+From main 3d4b2dd0, no open PR overlap. Issues disabled; temporary task ID, no remote claim. User requests recognising the radio song as fallback when metadata is missing/unusable. Reserve RecognisedSongs, MusicRecognitionService, MusicService, PlayerMenu, new bounded radio PCM capture/tests, default English strings and AI records. Reuse fingerprint/AudD pipeline on radio audio without microphone permission; metadata first, recognition only on missing/unmatched metadata; same radio playlist and phone chooser, no arbitrary unrelated search result. Four targeted Robolectric tests and FOSS debug build passed on final source; diff and default English XML checked. Tests cover fallback order/failures/cancellation, strict match rejection, pass-through/downmix, bounded rolling capture, stale/cross-station/non-radio isolation and reset. Recognition failure guard verified after an initial error-path test failure. Full PR CI/main/release pending under standing authorization; live matching and physical phone/Auto untested. No schema/manual version/signing changes.
+
 ## Current — 0.9.2.102, ChatGPT Codex, 2026-11-20
 
 AUDIO-OUTPUT-PAUSE completed in [PR #23](https://github.com/rickevans86/Meld/pull/23), feature `a2c877d7c9cbcb6d445928762ad0bb7f05258964`, main/tag `b2c5d663ec13557e5d8f084e4fb145a822e8248c`. [Wavelength 0.9.2.102](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.102) published by signed workflow `44705949219`. Full PR CI `44704044233` passed app/innertube tests, APK build/upload and lint. Two targeted local Robolectric tests and FOSS debug APK passed; diff checked. Release audiobook playback regression also passed.

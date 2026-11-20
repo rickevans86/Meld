@@ -148,18 +148,13 @@ fun PlayerMenu(
     val radioSavedIds by (radioDirectory?.favourites ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList<com.metrolist.music.radio.RadioStation>()))
         .collectAsStateWithLifecycle()
     val radioSaved = radioSavedIds.any { it.songId == mediaMetadata.id }
-    val radioSongCache = remember(mediaMetadata.id) { mutableMapOf<String, String?>() }
     suspend fun radioSongIds(): List<String> {
-        val title = com.metrolist.music.radio.RadioDirectory.nowPlayingTitle.value
-            ?.takeIf { it.first == mediaMetadata.id }?.second
-        val key = title.orEmpty()
-        val id = if (radioSongCache.containsKey(key)) radioSongCache[key] else
-            com.metrolist.music.recognition.RecognisedSongs.resolveRadioSong(context, title).also { radioSongCache[key] = it }
+        val id = playerConnection.service.resolveRadioSongForPlaylist()
         if (id == null) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 Toast.makeText(
                     context,
-                    if (title.isNullOrBlank()) R.string.radio_song_unknown else R.string.radio_song_not_found,
+                    R.string.radio_song_not_found,
                     Toast.LENGTH_LONG,
                 ).show()
             }

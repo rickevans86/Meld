@@ -68,41 +68,64 @@ object RecognisedSongs {
         }
     }
 
-    /**
-     * The car's add button on a radio station: [streamTitle] is what the station says is playing,
-     * usually "Artist - Title". The song is found on YouTube Music and added to the radio songs
-     * playlist (Settings → Features → Radio songs), like a recognised song.
-     */
-    fun addRadioSong(context: Context, streamTitle: String?) {
+    /** The car's radio add action uses the same metadata/recognition resolver as the phone chooser. */
+    fun addRadioSong(context: Context, resolve: suspend () -> SongItem?) {
         val app = context.applicationContext
         scope.launch {
-            val text = streamTitle?.trim().orEmpty()
-            val message = if (text.isBlank()) {
-                app.getString(R.string.radio_song_unknown)
-            } else {
-                val (artist, title) = splitStreamTitle(text)
-                runCatching {
-                    addToPlaylist(app, RadioPlaylistKey, R.string.radio_song_playlist_missing, title, artist, null)
+            val message = try {
+                if (app.dataStore.data.first()[RadioPlaylistKey].isNullOrBlank()) {
+                    app.getString(R.string.radio_song_no_playlist)
+                } else {
+                    val song = resolve()
+                    if (song == null) app.getString(R.string.radio_song_not_found)
+                    else addToPlaylist(app, RadioPlaylistKey, R.string.radio_song_playlist_missing,
+                        song.title, song.artists.joinToString(" ") { it.name }, song.id, song)
                         ?: app.getString(R.string.radio_song_no_playlist)
                 }
-                    .onFailure { Timber.tag(TAG).w(it, "Couldn't add radio song") }
-                    .getOrElse { app.getString(R.string.recognised_add_failed, title) }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                Timber.tag(TAG).w(e, "Couldn't add radio song")
+                app.getString(R.string.radio_song_not_found)
             }
             Handler(Looper.getMainLooper()).post { Toast.makeText(app, message, Toast.LENGTH_LONG).show() }
         }
     }
 
-    /**
-     * The player menu's "Add to playlist" on a radio station: finds the song the station says is
-     * playing on YouTube Music, saves it to the database and returns its id (null if not found).
-     */
-    suspend fun resolveRadioSong(context: Context, streamTitle: String?): String? {
-        val text = streamTitle?.trim().orEmpty().ifBlank { return null }
-        val (artist, title) = splitStreamTitle(text)
-        val song = runCatching { findOnYouTube(SongQuery(title, artist, null)) }.getOrNull() ?: return null
-        val database = EntryPointAccessors.fromApplication(context.applicationContext, Access::class.java).database()
-        database.insert(song.toMediaMetadata())
-        return song.id
+    internal suspend fun findRadioSong(streamTitle: String?, recognize: suspend () -> RecognitionResult?): SongItem? =
+        radioSongWithFallback(streamTitle,
+            metadata = { text ->
+                val (artist, title) = splitStreamTitle(text)
+                findOnYouTube(SongQuery(title, artist, null), requireMatch = true)
+            },
+            recognize = {
+                val result = recognize() ?: return@radioSongWithFallback null
+                findOnYouTube(SongQuery(result.title, result.artist, result.youtubeVideoId), requireMatch = true)
+            })
+
+    internal suspend fun <T> radioSongWithFallback(
+        streamTitle: String?,
+        metadata: suspend (String) -> T?,
+        recognize: suspend () -> T?,
+    ): T? {
+        val text = streamTitle?.trim().orEmpty()
+        if (text.isNotEmpty() && text.lowercase(Locale.ROOT) !in setOf("unknown", "unknown artist", "unknown title", "unknown - unknown")) {
+            try {
+                metadata(text)?.let { return it }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                Timber.tag(TAG).w(e, "Radio metadata lookup failed; trying recognition")
+            }
+        }
+        return try {
+            recognize()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Radio recognition failed")
+            null
+        }
     }
 
     /** "Artist - Title" → (artist, title). Without a dash the whole text is the title. */
@@ -121,6 +144,7 @@ object RecognisedSongs {
         title: String,
         artist: String,
         youtubeVideoId: String?,
+        resolvedSong: SongItem? = null,
     ): String? {
         val result = SongQuery(title, artist, youtubeVideoId)
         val playlistId = context.dataStore.data.first()[key]?.takeIf { it.isNotBlank() } ?: return null
@@ -133,7 +157,7 @@ object RecognisedSongs {
         if (existing.any { sameSong(it.song.title, it.song.artists.map { a -> a.name }, result.title, result.artist) }) {
             return context.getString(R.string.recognised_already_in, result.title, playlist.playlist.name)
         }
-        val song = findOnYouTube(result)
+        val song = resolvedSong ?: findOnYouTube(result)
             ?: return context.getString(R.string.recognised_not_found, result.title)
         database.insert(song.toMediaMetadata())
         if (database.playlistDuplicates(playlist.id, listOf(song.id)).isNotEmpty() ||
@@ -152,7 +176,7 @@ object RecognisedSongs {
      * Same song by name and artist, ignoring case, punctuation and extras like "(Official Video)" or
      * "- Remastered": the core titles must match and at least one artist must overlap.
      */
-    private fun sameSong(titleA: String, artistsA: List<String>, titleB: String, artistB: String): Boolean {
+    internal fun sameSong(titleA: String, artistsA: List<String>, titleB: String, artistB: String): Boolean {
         fun core(title: String) = title.lowercase(Locale.ROOT)
             .replace(Regex("\\(.*?\\)|\\[.*?\\]"), " ")
             .substringBefore(" - ")
@@ -166,13 +190,16 @@ object RecognisedSongs {
     private class SongQuery(val title: String, val artist: String, val youtubeVideoId: String?)
 
     /** The song on YouTube Music: Shazam's own video if it gave one, else the best song match. */
-    private suspend fun findOnYouTube(result: SongQuery): SongItem? {
+    private suspend fun findOnYouTube(result: SongQuery, requireMatch: Boolean = false): SongItem? {
         val songs = YouTube.search("${result.title} ${result.artist}".trim(), YouTube.SearchFilter.FILTER_SONG)
             .getOrNull()?.items.orEmpty().filterIsInstance<SongItem>()
         result.youtubeVideoId?.let { id -> songs.firstOrNull { it.id == id }?.let { return it } }
         fun norm(text: String) = text.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }
         val title = norm(result.title)
         val artist = norm(result.artist)
+        if (requireMatch) return songs.firstOrNull {
+            sameSong(it.title, it.artists.map { artist -> artist.name }, result.title, result.artist)
+        }
         return songs.firstOrNull { song ->
             norm(song.title).contains(title) && song.artists.any { a -> artist.contains(norm(a.name)) || norm(a.name).contains(artist) }
         } ?: songs.firstOrNull { norm(it.title).contains(title) } ?: songs.firstOrNull()
