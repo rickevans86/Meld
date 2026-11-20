@@ -1506,7 +1506,7 @@
     <string name="podcast_skip_back_by">Back %1$d seconds</string>
     <string name="radio_songs_section">Radio songs</string>
     <string name="radio_songs_setting">Add radio songs to</string>
-    <string name="radio_songs_desc">In Android Auto, the add button on a radio station finds the song that\'s playing on YouTube Music and adds it to this playlist.</string>
+    <string name="radio_songs_desc">On your phone and in Android Auto, the radio add button finds the current song on YouTube Music and saves it to this playlist without asking.</string>
     <string name="radio_songs_default_playlist">Radio songs</string>
     <string name="radio_song_add">Add this song to your radio songs playlist</string>
     <string name="radio_song_recognising">Identifying the song from the radio audio…</string>
