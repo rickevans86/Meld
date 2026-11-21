@@ -6,7 +6,7 @@ the update in or to rebuild these features on top of the new code.
 
 - **Fork:** `rickevans86/Meld`, branch `feat/local-folders`
 - **Upstream:** `FrancescoGrazioso/Meld`, branch `main`
-- **Last upstream commit this is based on:** `13effd9cc37d7e4831b1359cc3531519dba4418c`
+- **Last upstream commit this is based on:** `dba03d19caaade6d22383c5cbf7e7c59efb3cff9`
 
 > Keep this file up to date: every change to Wavelength should update the matching section below
 > and add a line to the change log at the end.
@@ -704,3 +704,4 @@ To see the exact diff at any time:
 - 2026-11-13: Merged Meld upstream 6d741bc3 (four automated Spotify GQL hash updates in `docs/spotify-gql-hashes.json`).
 - 2026-11-14: Merged Meld upstream 4c8da937 (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
 - 2026-11-15: Merged Meld upstream 13effd9c (automated Spotify GQL hash update in `docs/spotify-gql-hashes.json`).
+- 2026-11-22: Merged Meld upstream dba03d19 (six automated Spotify GQL hash updates in `docs/spotify-gql-hashes.json`).
