@@ -9,7 +9,7 @@ internal object RadioMediaButtons {
 
     fun order(buttons: List<CommandButton>, isRadio: Boolean, addSongFirst: Boolean): List<CommandButton> =
         if (isRadio && addSongFirst) {
-            // Legacy compact hosts use the first custom action; keep the others available in full controls.
+            // Prefer Add in the compact slot freed by RadioMetadataPlayer; retain Favourite in full controls.
             buttons.sortedBy { if (it.sessionCommand == CommandAddToTargetPlaylist) 0 else 1 }
         } else {
             buttons

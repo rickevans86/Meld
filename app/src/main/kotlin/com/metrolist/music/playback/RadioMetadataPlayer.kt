@@ -8,6 +8,7 @@ package com.metrolist.music.playback
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import com.metrolist.music.constants.isRadioId
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -120,15 +121,24 @@ class RadioMetadataPlayer(
         Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
     )
 
-    private fun filter(commands: Player.Commands): Player.Commands =
-        if (skip() == null) commands else commands.buildUpon().removeAll(*trackCommands).build()
+    private fun hidesTrackCommand(command: Int): Boolean =
+        (skip() != null && command in trackCommands) ||
+            (isRadioId(currentMediaItem?.mediaId) &&
+                (command == Player.COMMAND_SEEK_TO_PREVIOUS || command == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM))
+
+    private fun filter(commands: Player.Commands): Player.Commands {
+        // Auto fills compact slots with track actions before custom actions; radio keeps Next only.
+        val filtered = commands.buildUpon()
+        trackCommands.filter(::hidesTrackCommand).forEach(filtered::remove)
+        return filtered.build()
+    }
 
     override fun getAvailableCommands(): Player.Commands = filter(super.getAvailableCommands())
 
     override fun isCommandAvailable(command: Int): Boolean =
-        if (skip() != null && command in trackCommands) false else super.isCommandAvailable(command)
+        if (hidesTrackCommand(command)) false else super.isCommandAvailable(command)
 
-    /** Call on the main thread when the skip buttons start or stop applying (new track, setting changed). */
+    /** Call on the main thread when radio or skip controls change (new track, setting changed). */
     fun notifyAvailableCommandsChanged() {
         val commands = availableCommands
         listeners.keys.forEach { it.onAvailableCommandsChanged(commands) }
