@@ -714,6 +714,7 @@ class MusicService :
         // never calls dataStore.get() (which does runBlocking internally).
         // This consolidates ~15 main-thread-blocking DataStore reads into 1.
         startupPrefs = runBlocking(Dispatchers.IO) { dataStore.data.first() }
+        radioMiniAddSong = startupPrefs!![RadioMediaButtons.AddSongInMiniPlayerKey] ?: false
 
         // 3. Connect the processor to the service
         // handled in createExoPlayer
@@ -1196,6 +1197,13 @@ class MusicService :
                 Timber.tag("MusicService").i("Player recreated with AudioTrackPlaybackParams: $useAudioTrackParams")
             }
 
+        scope.launch {
+            dataStore.data.map { it[RadioMediaButtons.AddSongInMiniPlayerKey] ?: false }
+                .distinctUntilChanged().collect {
+                    radioMiniAddSong = it
+                    updateNotification()
+                }
+        }
         // Radio "now playing" titles: refresh the notification and Android Auto when they change
         scope.launch {
             radioDirectory.nowPlaying.collect { sessionPlayer?.notifyMetadataChanged() }
@@ -1905,6 +1913,8 @@ class MusicService :
         player.pause()
     }
 
+    private var radioMiniAddSong = false
+
     /**
      * Wavelength: which of the car/notification buttons make sense for what's playing.
      * Live radio: the heart (puts the station at the top of your stations) and the add button (adds the
@@ -2075,7 +2085,7 @@ class MusicService :
                     .build()
                     .takeIf { set == ButtonSet.MUSIC },
                 CommandButton
-                    .Builder()
+                    .Builder(if (set == ButtonSet.LIVE_RADIO) CommandButton.ICON_PLAYLIST_ADD else CommandButton.ICON_UNDEFINED)
                     .setDisplayName(
                         getString(if (set == ButtonSet.LIVE_RADIO) R.string.radio_song_add else R.string.android_auto_target_playlist),
                     )
@@ -2084,7 +2094,7 @@ class MusicService :
                     .setEnabled(set == ButtonSet.LIVE_RADIO || currentSong.value != null)
                     .build()
                     .takeIf { set != ButtonSet.SPOKEN },
-            ),
+            ).let { RadioMediaButtons.order(it, radioId != null, radioMiniAddSong) },
         )
     }
 

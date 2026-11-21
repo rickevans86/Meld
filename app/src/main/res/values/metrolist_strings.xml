@@ -1507,6 +1507,8 @@
     <string name="radio_songs_section">Radio songs</string>
     <string name="radio_songs_setting">Add radio songs to</string>
     <string name="radio_songs_desc">On your phone and in Android Auto, the radio add button finds the current song on YouTube Music and saves it to this playlist without asking.</string>
+    <string name="radio_auto_mini_add_song">Add song in Android Auto mini player</string>
+    <string name="radio_auto_mini_add_song_desc">Prioritise Add song to playlist instead of Favourite station for radio. Uses the playlist selected above.</string>
     <string name="radio_songs_default_playlist">Radio songs</string>
     <string name="radio_song_add">Add this song to your radio songs playlist</string>
     <string name="radio_song_recognising">Identifying the song from the radio audio…</string>
