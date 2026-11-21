@@ -441,6 +441,9 @@ private fun AudDFallbackSetting() {
  */
 @Composable
 private fun RadioSongsSetting() {
+    val (addSongInMiniPlayer, onAddSongInMiniPlayer) = com.metrolist.music.utils.rememberPreference(
+        com.metrolist.music.playback.RadioMediaButtons.AddSongInMiniPlayerKey, false,
+    )
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val database = com.metrolist.music.LocalDatabase.current
@@ -470,6 +473,15 @@ private fun RadioSongsSetting() {
                     )
                 },
                 onClick = { choosing = true },
+            ),
+            Material3SettingsItem(
+                icon = painterResource(R.drawable.playlist_add),
+                title = { Text(stringResource(R.string.radio_auto_mini_add_song)) },
+                description = { Text(stringResource(R.string.radio_auto_mini_add_song_desc)) },
+                trailingContent = {
+                    Switch(checked = addSongInMiniPlayer, onCheckedChange = onAddSongInMiniPlayer)
+                },
+                onClick = { onAddSongInMiniPlayer(!addSongInMiniPlayer) },
             ),
         ),
     )
