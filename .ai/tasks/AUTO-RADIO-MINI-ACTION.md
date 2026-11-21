@@ -1,6 +1,10 @@
 # AUTO-RADIO-MINI-ACTION
 
-## Current — 0.9.2.106, ChatGPT Codex, 2026-11-21
+## Owner follow-up — 2026-11-21, ChatGPT Codex
+
+Owner screenshot showed Previous/Next despite switch enabled in 106. Custom ordering alone was insufficient. Follow-up RADIO-COMPACT-PREVIOUS / PR #28 / release 0.9.2.108 filters radio Previous commands, retains Next and preferred Add/Favourite. Full CI and signed release passed; public APK verified. Physical head-unit confirmation still required. Original release record below is history, not confirmation that its layout worked.
+
+## Previous release — 0.9.2.106, ChatGPT Codex, 2026-11-21
 
 AUTO-RADIO-MINI-ACTION completed in [PR #27](https://github.com/rickevans86/Meld/pull/27), feature `15fca426c8aaff0ab68bbef91215d51cc9b8e5c1`, main/tag `8fc79839ac7b9a4d82173a06d36fdeec7ae0095e`. [Wavelength 0.9.2.106](https://github.com/rickevans86/Meld/releases/tag/v0.9.2.106) published by signed workflow `44901945660`. Full PR CI `44900422682` passed app/innertube tests, APK build/upload and lint. Eight local tests (two new typed CommandButton priority tests and six existing radio PCM/recognition regressions) and FOSS debug APK passed on final source; diff/default English XML checked. Release audiobook playback regression passed.
 
