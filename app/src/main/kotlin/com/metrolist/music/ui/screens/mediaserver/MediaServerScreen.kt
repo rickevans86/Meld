@@ -439,11 +439,11 @@ private fun LazyListScope.playAllRow(songs: List<Song>, title: String, playerCon
                 Text(stringResource(R.string.subsonic_shuffle))
             }
             TextButton(
-                enabled = !allDownloaded,
+                enabled = !downloading,
                 onClick = {
-                    val missing = songs.filter { downloads[it.id]?.state != Download.STATE_COMPLETED }
-                    missing.forEach { downloadUtil.download(it) }
-                    Toast.makeText(context, context.getString(R.string.subsonic_downloading_count, missing.size), Toast.LENGTH_SHORT).show()
+                    val missing = songs
+                    missing.forEach { downloadUtil.download(it, exportFolder = com.metrolist.music.mediaserver.MediaServerRepository.from(context).folderPrefix + title) }
+                    Toast.makeText(context, context.getString(R.string.export_preparing_songs, missing.size), Toast.LENGTH_SHORT).show()
                 },
             ) {
                 when {
@@ -455,7 +455,7 @@ private fun LazyListScope.playAllRow(songs: List<Song>, title: String, playerCon
                 Text(
                     stringResource(
                         when {
-                            allDownloaded -> R.string.subsonic_downloaded
+                            allDownloaded -> R.string.export_playlist_files
                             downloading -> R.string.downloading
                             else -> R.string.subsonic_download_all
                         },

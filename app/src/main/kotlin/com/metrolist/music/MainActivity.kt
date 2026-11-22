@@ -737,6 +737,8 @@ class MainActivity : FragmentActivity() {
 
                 val navController = rememberNavController()
 
+                com.metrolist.music.ui.component.PlaylistExportCleanup()
+
                 // Wavelength: guide for moving from the old com.meld.app.debug app to the new app ID
                 com.metrolist.music.ui.component.WavelengthMove.Dialog(
                     onOpenBackup = { runCatching { navController.navigate(com.metrolist.music.ui.component.WavelengthMove.BACKUP_ROUTE) } },

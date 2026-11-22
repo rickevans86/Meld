@@ -975,10 +975,13 @@ private fun AutoPlaylistHeader(
                                     }
 
                                     else -> {
-                                        songs.forEach { downloadUtil.download(it) }
+                                        songs.forEach { downloadUtil.download(it, exportFolder = if (playlistId == "liked") "YouTube - Liked songs" else name) }
                                     }
                                 }
                             },
+                            onExport = if (downloadUtil.exporter.folderUri() != null) {
+                                { songs.forEach { downloadUtil.download(it, exportFolder = if (playlistId == "liked") "YouTube - Liked songs" else name) } }
+                            } else null,
                             onDismiss = { menuState.dismiss() },
                             songs = songs,
                             playlistName = name,

@@ -103,8 +103,6 @@ import com.metrolist.music.viewmodels.SpotifyPlaylistViewModel
 import com.metrolist.spotify.SpotifyMapper
 import com.metrolist.spotify.models.SpotifyPlaylistTrack
 
-import androidx.core.net.toUri
-import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import com.metrolist.music.playback.ExoDownloadService
 import kotlinx.coroutines.Dispatchers
@@ -123,6 +121,7 @@ fun SpotifyPlaylistScreen(
     viewModel: SpotifyPlaylistViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val downloadUtil = com.metrolist.music.LocalDownloadUtil.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val database = LocalDatabase.current
     val menuState = LocalMenuState.current
@@ -674,17 +673,7 @@ fun SpotifyPlaylistScreen(
                                             }
                                             resolved++
                                             Timber.d("SpotifyPlaylistDownload: queuing '${track.name}' -> yt:${metadata.id}")
-                                            val downloadRequest = DownloadRequest
-                                                .Builder(metadata.id, metadata.id.toUri())
-                                                .setCustomCacheKey(metadata.id)
-                                                .setData(metadata.title.toByteArray())
-                                                .build()
-                                            DownloadService.sendAddDownload(
-                                                context,
-                                                ExoDownloadService::class.java,
-                                                downloadRequest,
-                                                false,
-                                            )
+                                            downloadUtil.download(metadata, exportFolder = "Spotify - ${playlist?.name ?: "Playlist"}")
                                         }
                                         Timber.d("SpotifyPlaylistDownload: done — $resolved queued, $skipped skipped")
                                     }

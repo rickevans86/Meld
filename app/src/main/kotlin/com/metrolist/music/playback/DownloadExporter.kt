@@ -9,17 +9,15 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.core.net.toUri
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.media3.datasource.DataSourceInputStream
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
 import com.metrolist.music.constants.DownloadExportFolderKey
 import com.metrolist.music.constants.DownloadPlaylistFoldersKey
-import com.metrolist.music.constants.InnerTubeCookieKey
 import com.metrolist.music.db.MusicDatabase
-import com.metrolist.music.db.entities.Song
-import com.metrolist.music.utils.SpotifyTokenManager
-import com.metrolist.spotify.Spotify
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.get
 import kotlinx.coroutines.Dispatchers
@@ -45,135 +43,96 @@ class DownloadExporter(
     fun folderUri(): Uri? =
         context.dataStore[DownloadExportFolderKey]?.takeIf { it.isNotBlank() }?.toUri()
 
-    /** Whether saved files go into one folder per playlist (a copy in each playlist the song is in). */
+    /** Playlist names are captured when Download is requested, never inferred from membership. */
     fun sortsByPlaylist(): Boolean = context.dataStore[DownloadPlaylistFoldersKey] ?: true
+
+    suspend fun request(songId: String, folder: String?) {
+        context.dataStore.edit { prefs ->
+            val key = targetsKey(songId)
+            prefs[key] = prefs[key].orEmpty() + (folder?.let { sanitizeFileName(it, "Playlist") } ?: "")
+        }
+    }
 
     suspend fun export(songId: String): Boolean = withContext(Dispatchers.IO) {
         val treeUri = folderUri() ?: return@withContext false
-        lock.withLock {
-            if (sortsByPlaylist()) refreshSpotifyFolders(force = false)
-            exportTo(songId, FolderCache(treeUri))
-        }
+        lock.withLock { exportPending(songId, FolderCache(treeUri)) }
     }
 
-    /** Returns how many songs are now present in the folder. */
     suspend fun exportAll(songIds: Collection<String>): Int = withContext(Dispatchers.IO) {
         val treeUri = folderUri() ?: return@withContext 0
         lock.withLock {
-            if (sortsByPlaylist()) refreshSpotifyFolders(force = true)
-            val cache = FolderCache(treeUri)
-            songIds.count { exportTo(it, cache) }
+            val folders = FolderCache(treeUri)
+            songIds.count {
+                if (requestedFolders(it).isEmpty()) request(it, null)
+                exportPending(it, folders)
+            }
         }
     }
 
-    /**
-     * Folder names for a song: its playlists ("YouTube - " for ones synced from YouTube Music,
-     * plain for ones made in Meld, "Spotify - " for Spotify's), plus a liked-songs folder.
-     * An empty list entry means the main folder.
-     */
-    private fun folderNamesFor(song: Song): List<String> {
-        if (!sortsByPlaylist()) return listOf("")
-        val names = LinkedHashSet<String>()
-        database.playlistFoldersForSong(song.id).forEach { playlist ->
-            names += if (playlist.browseId != null) "YouTube - ${playlist.name}" else playlist.name
-        }
-        if (com.metrolist.music.constants.isSubsonicId(song.id)) {
-            // Navidrome songs: their album / playlist folders, starred songs, else the album
-            names += com.metrolist.music.subsonic.SubsonicRepository.from(context).exportFolders(song.id)
-            if (song.song.liked) names += "${com.metrolist.music.subsonic.SubsonicRepository.FOLDER_PREFIX}Starred"
-            if (names.isEmpty()) {
-                names += com.metrolist.music.subsonic.SubsonicRepository.FOLDER_PREFIX + (song.song.albumName ?: "Songs")
-            }
-        } else if (com.metrolist.music.constants.isMediaServerId(song.id)) {
-            // Jellyfin / Plex songs: "Jellyfin - <album or playlist>" / "Plex - …"
-            val server = com.metrolist.music.mediaserver.MediaServerRepository.from(context)
-            names += server.exportFolders(song.id)
-            if (names.isEmpty()) names += server.folderPrefix + (song.song.albumName ?: "Songs")
-        } else if (song.song.liked) {
-            names += if (youTubeSignedIn()) "YouTube - Liked songs" else "Liked songs"
-        }
-        names += spotifyFolders[song.id].orEmpty()
-        return names.map { sanitizeFileName(it, "Playlist") }.distinct().ifEmpty { listOf("") }
+    internal fun requestedFolders(songId: String): List<String> {
+        val pending = context.dataStore[targetsKey(songId)]?.toList() ?: listOf("")
+        return if (pending.isEmpty() || sortsByPlaylist()) pending else listOf("")
     }
 
-    private fun youTubeSignedIn(): Boolean =
-        context.dataStore[InnerTubeCookieKey]?.contains("SAPISID") == true
-
-    /** YouTube song id -> "Spotify - …" folders, from the user's Spotify playlists and liked songs. */
-    @Volatile
-    private var spotifyFolders: Map<String, Set<String>> = emptyMap()
-    private var spotifyFoldersAt = 0L
-
-    private suspend fun refreshSpotifyFolders(force: Boolean) {
-        if (!force && System.currentTimeMillis() - spotifyFoldersAt < SPOTIFY_REFRESH_MS) return
-        runCatching { buildSpotifyFolders() }
-            .onSuccess {
-                spotifyFolders = it
-                spotifyFoldersAt = System.currentTimeMillis()
-            }
-            .onFailure { Timber.tag(TAG).w(it, "Could not read Spotify playlists") }
+    private suspend fun completeRequest(songId: String, folders: List<String>) {
+        context.dataStore.edit { prefs ->
+            val key = targetsKey(songId)
+            prefs[key] = prefs[key].orEmpty() - folders.toSet()
+        }
     }
 
-    private suspend fun buildSpotifyFolders(): Map<String, Set<String>> {
-        if (!SpotifyTokenManager.ensureAuthenticated()) return emptyMap()
-        val folders = HashMap<String, MutableSet<String>>()
-        fun add(spotifyTrackId: String?, folder: String) {
-            val youtubeId = spotifyTrackId?.takeIf { it.isNotBlank() }
-                ?.let { database.getSpotifyMatch(it)?.youtubeId } ?: return
-            folders.getOrPut(youtubeId) { HashSet() }.add(folder)
+    private fun targetsKey(songId: String) = stringSetPreferencesKey("downloadExportTargets:$songId")
+    private fun copiesKey(songId: String) = stringSetPreferencesKey("downloadExportCopies:$songId")
+
+    private fun existingCopy(songId: String): Uri? =
+        context.dataStore[copiesKey(songId)].orEmpty().firstNotNullOfOrNull { raw ->
+            runCatching {
+                raw.toUri().takeIf { uri -> context.contentResolver.openInputStream(uri)?.use { it.read() >= 0 } == true }
+            }.getOrNull()
         }
 
-        var playlistOffset = 0
-        while (playlistOffset < MAX_SPOTIFY_PLAYLISTS) {
-            val page = Spotify.myPlaylists(limit = 50, offset = playlistOffset).getOrNull() ?: break
-            for (playlist in page.items) {
-                var trackOffset = 0
-                while (trackOffset < MAX_SPOTIFY_TRACKS) {
-                    val tracks = Spotify.playlistTracks(playlist.id, limit = 100, offset = trackOffset).getOrNull() ?: break
-                    tracks.items.filterNot { it.isLocal }.forEach { add(it.track?.id, "Spotify - ${playlist.name}") }
-                    trackOffset += 100
-                    if (tracks.items.size < 100) break
-                }
-            }
-            playlistOffset += 50
-            if (page.items.size < 50) break
-        }
+    private fun openSource(songId: String, copy: Uri?) =
+        copy?.let { runCatching { context.contentResolver.openInputStream(it) }.getOrNull() } ?: openCache(songId)
 
-        var likedOffset = 0
-        while (likedOffset < MAX_SPOTIFY_TRACKS) {
-            val page = Spotify.likedSongs(limit = 50, offset = likedOffset).getOrNull() ?: break
-            page.items.forEach { add(it.track.id, "Spotify - Liked songs") }
-            likedOffset += 50
-            if (page.items.size < 50) break
-        }
-        return folders
+    private suspend fun exportPending(songId: String, folders: FolderCache): Boolean {
+        do {
+            if (!exportTo(songId, folders)) return false
+        } while (requestedFolders(songId).isNotEmpty())
+        return true
     }
 
     private suspend fun exportTo(songId: String, folders: FolderCache): Boolean {
         val song = database.getSongByIdBlocking(songId) ?: return false
         val resolver = context.contentResolver
         return try {
-            val sourceExtension = sniffExtension(songId)
+            val pending = context.dataStore[targetsKey(songId)]?.toList() ?: listOf("")
+            val requested = if (sortsByPlaylist()) pending else pending.takeIf { it.isNotEmpty() }?.let { listOf("") }.orEmpty()
+            if (requested.isEmpty()) return true
+            val copy = existingCopy(songId)
+            val sourceExtension = sniffExtension(songId, copy)
                 ?: downloadFileExtension(database.format(songId).first()?.mimeType)
             val artist = song.artists.joinToString(", ") { it.name }
             val title = if (artist.isBlank()) song.song.title else "$artist - ${song.song.title}"
             val baseName = sanitizeFileName(title, songId)
             val m4aName = "$baseName.m4a"
 
-            val targets = folderNamesFor(song)
-                .mapNotNull(folders::directoryId)
+            val targets = requested
+                .map { folders.directoryId(it) ?: return false }
                 .filter { dirId ->
                     val names = folders.names(dirId)
                     m4aName !in names && "$baseName.$sourceExtension" !in names
                 }
-            if (targets.isEmpty()) return true
+            if (targets.isEmpty()) {
+                completeRequest(songId, pending)
+                return true
+            }
 
             val workDir = File(context.cacheDir, "download_export").apply { mkdirs() }
             val safeId = songId.replace(Regex("[^A-Za-z0-9_-]"), "_")
             val source = File(workDir, "$safeId.$sourceExtension")
             val converted = File(workDir, "$safeId.m4a.tmp")
             try {
-                openCache(songId).use { input -> source.outputStream().use { input.copyTo(it) } }
+                openSource(songId, copy).use { input -> source.outputStream().use { input.copyTo(it) } }
                 val (fileToSave, displayName) = if (sourceExtension == "m4a") {
                     source to m4aName
                 } else {
@@ -191,7 +150,7 @@ class DownloadExporter(
                     // octet-stream stops providers from appending their own extension to the name
                     val target = DocumentsContract.createDocument(
                         resolver, parent, "application/octet-stream", displayName,
-                    ) ?: continue
+                    ) ?: throw IOException("Could not create exported audio file")
                     try {
                         val output = resolver.openOutputStream(target)
                             ?: throw IOException("Could not open $target for writing")
@@ -201,7 +160,12 @@ class DownloadExporter(
                         throw e
                     }
                     folders.names(dirId).add(displayName)
+                    context.dataStore.edit { prefs ->
+                        val key = copiesKey(songId)
+                        prefs[key] = prefs[key].orEmpty() + target.toString()
+                    }
                 }
+                completeRequest(songId, pending)
                 true
             } finally {
                 source.delete()
@@ -270,17 +234,14 @@ class DownloadExporter(
             DataSpec.Builder().setUri(songId).setKey(songId).build(),
         )
 
-    private fun sniffExtension(songId: String): String? = runCatching {
+    private fun sniffExtension(songId: String, copy: Uri?): String? = runCatching {
         val header = ByteArray(12)
-        val read = openCache(songId).use { it.read(header) }
+        val read = openSource(songId, copy).use { it.read(header) }
         if (read < 4) null else audioExtensionFromHeader(header)
     }.getOrNull()
 
     private companion object {
         const val TAG = "DownloadExporter"
-        const val SPOTIFY_REFRESH_MS = 30 * 60 * 1000L
-        const val MAX_SPOTIFY_PLAYLISTS = 500
-        const val MAX_SPOTIFY_TRACKS = 5000
     }
 }
 
