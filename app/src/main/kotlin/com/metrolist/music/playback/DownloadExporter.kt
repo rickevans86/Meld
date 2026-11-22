@@ -18,6 +18,7 @@ import androidx.media3.datasource.cache.CacheDataSource
 import com.metrolist.music.constants.DownloadExportFolderKey
 import com.metrolist.music.constants.DownloadPlaylistFoldersKey
 import com.metrolist.music.db.MusicDatabase
+import com.metrolist.music.podcasts.PodcastDownloadStorage
 import com.metrolist.music.utils.dataStore
 import com.metrolist.music.utils.get
 import kotlinx.coroutines.Dispatchers
@@ -46,10 +47,17 @@ class DownloadExporter(
     /** Playlist names are captured when Download is requested, never inferred from membership. */
     fun sortsByPlaylist(): Boolean = context.dataStore[DownloadPlaylistFoldersKey] ?: true
 
-    suspend fun request(songId: String, folder: String?) {
+    suspend fun request(songId: String, folder: String?, sourcePlaylistId: String? = null, episodeHint: Boolean = false) {
+        if (PodcastDownloadStorage.isPrivate(context, database, songId, episodeHint, sourcePlaylistId)) {
+            PodcastDownloadStorage.remember(context, songId)
+            context.dataStore.edit { it[targetsKey(songId)] = emptySet() }
+            return
+        }
+        val destination = folder?.let { sanitizeFileName(it, "Playlist") }
+            ?: if (database.playlistFoldersForSong(songId).isEmpty()) "No Playlist" else ""
         context.dataStore.edit { prefs ->
             val key = targetsKey(songId)
-            prefs[key] = prefs[key].orEmpty() + (folder?.let { sanitizeFileName(it, "Playlist") } ?: "")
+            prefs[key] = prefs[key].orEmpty() + destination
         }
     }
 
@@ -63,8 +71,10 @@ class DownloadExporter(
         lock.withLock {
             val folders = FolderCache(treeUri)
             songIds.count {
-                if (requestedFolders(it).isEmpty()) request(it, null)
-                exportPending(it, folders)
+                if (PodcastDownloadStorage.isPrivate(context, database, it)) false else {
+                    if (context.dataStore[targetsKey(it)] == null || requestedFolders(it).isEmpty()) request(it, null)
+                    exportPending(it, folders)
+                }
             }
         }
     }
@@ -103,6 +113,11 @@ class DownloadExporter(
 
     private suspend fun exportTo(songId: String, folders: FolderCache): Boolean {
         val song = database.getSongByIdBlocking(songId) ?: return false
+        if (PodcastDownloadStorage.isPrivate(context, database, songId)) {
+            PodcastDownloadStorage.remember(context, songId)
+            context.dataStore.edit { it[targetsKey(songId)] = emptySet() }
+            return true
+        }
         val resolver = context.contentResolver
         return try {
             val pending = context.dataStore[targetsKey(songId)]?.toList() ?: listOf("")

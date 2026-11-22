@@ -270,6 +270,8 @@ fun PrivacySettings(
                 )
             )
         )
+        Spacer(modifier = Modifier.height(27.dp))
+        SavedErrorLogSettings()
         Spacer(modifier = Modifier.height(16.dp))
     }
 

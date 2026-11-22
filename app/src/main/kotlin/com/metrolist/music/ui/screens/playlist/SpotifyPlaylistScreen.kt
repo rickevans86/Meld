@@ -127,6 +127,8 @@ fun SpotifyPlaylistScreen(
     val menuState = LocalMenuState.current
 
     val playlist by viewModel.playlist.collectAsState()
+    val autoDownloadIds = com.metrolist.music.playback.PlaylistAutoDownload.rememberEnabledIds()
+
     val tracks by viewModel.tracks.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
@@ -648,6 +650,23 @@ fun SpotifyPlaylistScreen(
                                 onClick = {
                                     showOverflowMenu = false
                                     showRenameDialog = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    val id = com.metrolist.music.playback.PlaylistAutoDownload.SPOTIFY_PREFIX + playlist?.id.orEmpty()
+                                    Text(stringResource(if (id in autoDownloadIds) R.string.playlist_auto_download_off else R.string.playlist_auto_download_on))
+                                },
+                                leadingIcon = { Icon(painterResource(R.drawable.download), contentDescription = null) },
+                                enabled = !playlist?.id.isNullOrBlank(),
+                                onClick = {
+                                    showOverflowMenu = false
+                                    playlist?.let { list ->
+                                        val id = com.metrolist.music.playback.PlaylistAutoDownload.SPOTIFY_PREFIX + list.id
+                                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                                            com.metrolist.music.playback.PlaylistAutoDownload.setEnabled(context.applicationContext, id, id !in autoDownloadIds)
+                                        }
+                                    }
                                 },
                             )
                             DropdownMenuItem(

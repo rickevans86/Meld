@@ -1313,7 +1313,11 @@ class MusicService :
         com.metrolist.music.podcasts.PlayedEpisodes.init(this@MusicService)
         if (podcastDirectory.followed.value.any { it.autoDownload }) {
             com.metrolist.music.podcasts.PodcastAutoDownload.schedule(this@MusicService)
-            com.metrolist.music.playback.PlaylistAutoDownload.schedule(this@MusicService)
+        }
+        scope.launch {
+            if (dataStore.data.first()[PlaylistAutoDownload.AutoDownloadPlaylistsKey].orEmpty().isNotEmpty()) {
+                PlaylistAutoDownload.schedule(this@MusicService)
+            }
         }
 
         // Wavelength: Discord, Last.fm and Listen Together are switched off; clear any saved sign-ins
@@ -3906,6 +3910,13 @@ class MusicService :
 
         val mediaId = player.currentMediaItem?.mediaId
         val failedStreamClient = mediaId?.let(songUrlCache::clientName)
+        com.metrolist.music.utils.SavedErrorLogs.record("Playback error", error, buildString {
+            appendLine("Code: ${error.errorCodeName} (${error.errorCode})")
+            appendLine("Title: ${currentMediaMetadata.value?.title ?: "Unknown"}")
+            appendLine("Media ID: $mediaId")
+            appendLine("Stream client: ${failedStreamClient ?: "Not resolved"}")
+            appendLine("Position: ${player.currentPosition} ms")
+        })
         Timber
             .tag(TAG)
             .w(error, "Player error occurred for $mediaId: errorCode=${error.errorCode}, message=${error.message}")

@@ -103,6 +103,7 @@ private fun SpotifyPlaylistMenuContent(
     Material3MenuGroup(
         items = listOf(
             libraryPin,
+            playlistAutoDownloadMenuItem(speedDialId, onDismiss = onDismiss),
             Material3MenuItemData(
                 title = {
                     Text(

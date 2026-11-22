@@ -1414,7 +1414,7 @@ fun LocalPlaylistHeader(
 
                                     else -> {
                                         songs.forEach { song ->
-                                            downloadUtil.download(song.song, exportFolder = if (playlist.playlist.browseId != null) "YouTube - ${playlist.playlist.name}" else playlist.playlist.name)
+                                            downloadUtil.download(song.song, exportFolder = if (playlist.playlist.browseId != null) "YouTube - ${playlist.playlist.name}" else playlist.playlist.name, sourcePlaylistId = playlist.id)
                                         }
                                     }
                                 }

@@ -356,14 +356,14 @@ constructor(
 
     fun getDownload(songId: String): Flow<Download?> = downloads.map { it[songId] }
 
-    fun download(song: Song, exportFolder: String? = null) = download(song.toMediaMetadata(), exportFolder)
+    fun download(song: Song, exportFolder: String? = null, sourcePlaylistId: String? = null) = download(song.toMediaMetadata(), exportFolder, sourcePlaylistId)
 
-    fun download(song: SongItem, exportFolder: String? = null) = download(song.toMediaMetadata(), exportFolder)
+    fun download(song: SongItem, exportFolder: String? = null, sourcePlaylistId: String? = null) = download(song.toMediaMetadata(), exportFolder, sourcePlaylistId)
 
-    fun download(mediaMetadata: MediaMetadata, exportFolder: String? = null) {
+    fun download(mediaMetadata: MediaMetadata, exportFolder: String? = null, sourcePlaylistId: String? = null) {
         scope.launch {
             downloadPreparations.withPermit {
-                exporter.request(mediaMetadata.id, exportFolder)
+                exporter.request(mediaMetadata.id, exportFolder, sourcePlaylistId, mediaMetadata.isEpisode)
                 val state = downloadManager.downloadIndex.getDownload(mediaMetadata.id)?.state
                     ?: downloads.value[mediaMetadata.id]?.state
                 if (state == Download.STATE_COMPLETED) {
@@ -437,8 +437,8 @@ constructor(
      * Downloads without starting the download service (which Android blocks from the background),
      * for scheduled auto-downloads. The download runs while the app's process is alive.
      */
-    suspend fun downloadInBackground(song: Song, exportFolder: String? = null) {
-        exporter.request(song.id, exportFolder)
+    suspend fun downloadInBackground(song: Song, exportFolder: String? = null, sourcePlaylistId: String? = null) {
+        exporter.request(song.id, exportFolder, sourcePlaylistId, song.song.isEpisode)
         val state = downloadManager.downloadIndex.getDownload(song.id)?.state ?: downloads.value[song.id]?.state
         if (state == Download.STATE_COMPLETED) {
             exporter.export(song.id)

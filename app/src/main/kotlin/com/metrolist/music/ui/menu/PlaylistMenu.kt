@@ -87,6 +87,8 @@ fun PlaylistMenu(
     val context = LocalContext.current
     val database = LocalDatabase.current
     val downloadUtil = LocalDownloadUtil.current
+    val podcastSelections = com.metrolist.music.constants.rememberPodcastPlaylistIds()
+    val privatePodcast = com.metrolist.music.podcasts.markedPodcastPlaylist(podcastSelections, playlist.id, playlist.playlist.browseId)
     val playerConnection = LocalPlayerConnection.current ?: return
     val listenTogetherManager = LocalListenTogetherManager.current
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
@@ -475,22 +477,9 @@ fun PlaylistMenu(
         item {
             // Pins this playlist to the top of the Library
             val libraryPin = libraryPinMenuItem("playlist:${playlist.id}", onDismiss)
-            // Auto-download new songs (checked every few hours; switching on downloads what's there now)
-            val autoDownloadIds = com.metrolist.music.playback.PlaylistAutoDownload.rememberEnabledIds()
-            val autoDownloadOn = playlist.id in autoDownloadIds
-            val autoDownloadContext = androidx.compose.ui.platform.LocalContext.current
-            val autoDownloadItem = Material3MenuItemData(
-                title = {
-                    Text(stringResource(if (autoDownloadOn) R.string.playlist_auto_download_off else R.string.playlist_auto_download_on))
-                },
-                icon = { Icon(painter = painterResource(R.drawable.download), contentDescription = null) },
-                onClick = {
-                    val app = autoDownloadContext.applicationContext
-                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                        com.metrolist.music.playback.PlaylistAutoDownload.setEnabled(app, playlist.id, !autoDownloadOn)
-                    }
-                    onDismiss()
-                },
+            val autoDownloadItem = playlistAutoDownloadMenuItem(
+                com.metrolist.music.playback.PlaylistAutoDownload.sourceId(playlist.id, playlist.playlist.browseId),
+                aliases = setOf(playlist.id), podcast = privatePodcast, onDismiss = onDismiss,
             )
             Material3MenuGroup(
                 items =
@@ -548,12 +537,12 @@ fun PlaylistMenu(
                                 },
                             ),
                         )
-                        if (downloadState == Download.STATE_COMPLETED && downloadUtil.exporter.folderUri() != null) {
+                        if (downloadState == Download.STATE_COMPLETED && downloadUtil.exporter.folderUri() != null && !privatePodcast) {
                             add(Material3MenuItemData(
                                 title = { Text(stringResource(R.string.export_playlist_files)) },
                                 icon = { Icon(painterResource(R.drawable.download), contentDescription = null) },
                                 onClick = {
-                                    songs.forEach { downloadUtil.download(it, exportFolder = if (playlist.playlist.browseId != null) "YouTube - ${playlist.playlist.name}" else playlist.playlist.name) }
+                                    songs.forEach { downloadUtil.download(it, exportFolder = if (playlist.playlist.browseId != null) "YouTube - ${playlist.playlist.name}" else playlist.playlist.name, sourcePlaylistId = playlist.id) }
                                     onDismiss()
                                 },
                             ))
@@ -606,7 +595,7 @@ fun PlaylistMenu(
                                                 )
                                             },
                                             onClick = {
-                                                songs.forEach { downloadUtil.download(it, exportFolder = if (playlist.playlist.browseId != null) "YouTube - ${playlist.playlist.name}" else playlist.playlist.name) }
+                                                songs.forEach { downloadUtil.download(it, exportFolder = if (playlist.playlist.browseId != null) "YouTube - ${playlist.playlist.name}" else playlist.playlist.name, sourcePlaylistId = playlist.id) }
                                             },
                                         )
                                     }

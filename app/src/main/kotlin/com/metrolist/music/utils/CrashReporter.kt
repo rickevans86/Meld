@@ -61,6 +61,7 @@ object CrashReporter {
      * unavailable, etc.) are swallowed — the original throwable always wins.
      */
     fun reportFatal(throwable: Throwable) {
+        SavedErrorLogs.record("Crash", throwable, fatal = true)
         try {
             val ctx = appContext ?: return
             if (!isEnabledSafe(ctx)) return
@@ -79,6 +80,9 @@ object CrashReporter {
      * Asynchronously posts a non-fatal exception report. Safe to call from any thread.
      */
     fun reportNonFatal(throwable: Throwable) {
+        if (!isBenignCancellation(throwable) && throwable !is androidx.media3.common.PlaybackException) {
+            SavedErrorLogs.record("Error", throwable)
+        }
         val ctx = appContext ?: return
         if (!isEnabledSafe(ctx)) return
         // Coroutine cancellation is control flow, not a crash (issue #144: Ktor's
@@ -104,6 +108,7 @@ object CrashReporter {
      * moment the watchdog detected the block.
      */
     fun reportAnr(mainThreadStack: Array<StackTraceElement>, blockedMs: Long) {
+        SavedErrorLogs.record("App unresponsive", AnrException(blockedMs).apply { stackTrace = mainThreadStack })
         val ctx = appContext ?: return
         if (!isEnabledSafe(ctx)) return
         ioScope.launch {

@@ -110,10 +110,16 @@ fun YouTubePlaylistMenu(
     val context = LocalContext.current
     val database = LocalDatabase.current
     val downloadUtil = LocalDownloadUtil.current
+    val podcastSelections = com.metrolist.music.constants.rememberPodcastPlaylistIds()
     val playerConnection = LocalPlayerConnection.current ?: return
     val listenTogetherManager = LocalListenTogetherManager.current
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
     val dbPlaylist by database.playlistByBrowseId(playlist.id).collectAsStateWithLifecycle(initialValue = null)
+    val privatePodcast = com.metrolist.music.podcasts.markedPodcastPlaylist(podcastSelections, dbPlaylist?.id, playlist.id)
+    val autoDownloadItem = playlistAutoDownloadMenuItem(
+        com.metrolist.music.playback.PlaylistAutoDownload.sourceId(null, playlist.id),
+        aliases = setOfNotNull(dbPlaylist?.id), podcast = privatePodcast, onDismiss = onDismiss,
+    )
     val isPinned by database.speedDialDao.isPinned(playlist.id).collectAsStateWithLifecycle(initialValue = false)
     val artistNameAliases = LocalArtistNameAliases.current
 
@@ -592,13 +598,14 @@ fun YouTubePlaylistMenu(
             Material3MenuGroup(
                 items =
                     buildList {
+                        add(autoDownloadItem)
                         if (songs.isNotEmpty()) {
-                            if (downloadState == Download.STATE_COMPLETED && downloadUtil.exporter.folderUri() != null) {
+                            if (downloadState == Download.STATE_COMPLETED && downloadUtil.exporter.folderUri() != null && !privatePodcast) {
                                 add(Material3MenuItemData(
                                     title = { Text(stringResource(R.string.export_playlist_files)) },
                                     icon = { Icon(painterResource(R.drawable.download), contentDescription = null) },
                                     onClick = {
-                                        songs.forEach { downloadUtil.download(it, exportFolder = "YouTube - ${playlist.title}") }
+                                        songs.forEach { downloadUtil.download(it, exportFolder = "YouTube - ${playlist.title}", sourcePlaylistId = "youtube:${playlist.id}") }
                                         onDismiss()
                                     },
                                 ))
@@ -650,7 +657,7 @@ fun YouTubePlaylistMenu(
                                                 )
                                             },
                                             onClick = {
-                                                songs.forEach { downloadUtil.download(it, exportFolder = "YouTube - ${playlist.title}") }
+                                                songs.forEach { downloadUtil.download(it, exportFolder = "YouTube - ${playlist.title}", sourcePlaylistId = "youtube:${playlist.id}") }
                                             },
                                         )
                                     }
