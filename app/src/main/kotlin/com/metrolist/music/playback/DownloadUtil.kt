@@ -44,11 +44,7 @@ import com.metrolist.music.utils.enumPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.SupervisorJob
@@ -355,32 +351,26 @@ constructor(
                 .filter { it.state == Download.STATE_COMPLETED }
                 .forEach { removeFromPlayerCache(it.request.id) }
         }
-        // When downloaded songs are added to playlists or liked, copy them into the matching folders
-        scope.launch {
-            @OptIn(FlowPreview::class)
-            combine(database.playlistSongMapCount(), database.likedSongsCount()) { playlists, liked -> playlists to liked }
-                .distinctUntilChanged()
-                .drop(1)
-                .debounce(15_000)
-                .collect {
-                    if (exporter.folderUri() != null && exporter.sortsByPlaylist()) {
-                        val completed = downloads.value.filterValues { it.state == Download.STATE_COMPLETED }.keys
-                        exporter.exportAll(completed)
-                    }
-                }
-        }
+
     }
 
     fun getDownload(songId: String): Flow<Download?> = downloads.map { it[songId] }
 
-    fun download(song: Song) = download(song.toMediaMetadata())
+    fun download(song: Song, exportFolder: String? = null) = download(song.toMediaMetadata(), exportFolder)
 
-    fun download(song: SongItem) = download(song.toMediaMetadata())
+    fun download(song: SongItem, exportFolder: String? = null) = download(song.toMediaMetadata(), exportFolder)
 
-    fun download(mediaMetadata: MediaMetadata) {
+    fun download(mediaMetadata: MediaMetadata, exportFolder: String? = null) {
         scope.launch {
             downloadPreparations.withPermit {
-                if (!shouldPrepareDownload(downloads.value[mediaMetadata.id]?.state)) return@withPermit
+                exporter.request(mediaMetadata.id, exportFolder)
+                val state = downloadManager.downloadIndex.getDownload(mediaMetadata.id)?.state
+                    ?: downloads.value[mediaMetadata.id]?.state
+                if (state == Download.STATE_COMPLETED) {
+                    exporter.export(mediaMetadata.id)
+                    return@withPermit
+                }
+                if (!shouldPrepareDownload(state)) return@withPermit
 
                 mediaMetadata.album?.let { album ->
                     if (database.albumEntity(album.id) == null) {
@@ -447,7 +437,14 @@ constructor(
      * Downloads without starting the download service (which Android blocks from the background),
      * for scheduled auto-downloads. The download runs while the app's process is alive.
      */
-    suspend fun downloadInBackground(song: Song) {
+    suspend fun downloadInBackground(song: Song, exportFolder: String? = null) {
+        exporter.request(song.id, exportFolder)
+        val state = downloadManager.downloadIndex.getDownload(song.id)?.state ?: downloads.value[song.id]?.state
+        if (state == Download.STATE_COMPLETED) {
+            exporter.export(song.id)
+            return
+        }
+        if (!shouldPrepareDownload(state)) return
         val metadata = song.toMediaMetadata()
         val request = DownloadRequest
             .Builder(metadata.id, metadata.id.toUri())
@@ -492,7 +489,10 @@ constructor(
     }
 }
 
-internal fun shouldPrepareDownload(downloadState: Int?): Boolean = downloadState != Download.STATE_COMPLETED
+internal fun shouldPrepareDownload(downloadState: Int?): Boolean = when (downloadState) {
+    Download.STATE_COMPLETED, Download.STATE_QUEUED, Download.STATE_DOWNLOADING, Download.STATE_RESTARTING -> false
+    else -> true
+}
 
 internal fun downloadArtworkUrls(
     songArtwork: String?,

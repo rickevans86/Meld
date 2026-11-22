@@ -677,10 +677,13 @@ private fun TopPlaylistHeader(
                                         }
                                     }
                                     else -> {
-                                        songs.forEach { downloadUtil.download(it) }
+                                        songs.forEach { downloadUtil.download(it, exportFolder = name) }
                                     }
                                 }
                             },
+                            onExport = if (downloadUtil.exporter.folderUri() != null) {
+                                { songs.forEach { downloadUtil.download(it, exportFolder = name) } }
+                            } else null,
                             onDismiss = { menuState.dismiss() }
                         )
                     }

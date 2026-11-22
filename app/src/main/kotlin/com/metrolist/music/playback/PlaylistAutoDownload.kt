@@ -69,10 +69,8 @@ class PlaylistAutoDownload(context: Context, params: WorkerParameters) : Corouti
                         .onFailure { Timber.tag(TAG).w(it, "Couldn't refresh liked songs") }
                     database.likedSongs(com.metrolist.music.constants.SongSortType.CREATE_DATE, true).first().forEach { song ->
                         val state = downloads.downloads.value[song.id]?.state
-                        if (state != Download.STATE_COMPLETED && state != Download.STATE_QUEUED && state != Download.STATE_DOWNLOADING) {
-                            downloads.downloadInBackground(song)
-                            started += song.id
-                        }
+                        downloads.downloadInBackground(song, exportFolder = "YouTube - Liked songs")
+                        if (shouldPrepareDownload(state)) started += song.id
                     }
                 }.onFailure { Timber.tag(TAG).w(it, "Auto-download failed for liked songs") }
                 continue
@@ -86,10 +84,8 @@ class PlaylistAutoDownload(context: Context, params: WorkerParameters) : Corouti
                 }
                 database.playlistSongs(playlist.id).first().map { it.song }.forEach { song ->
                     val state = downloads.downloads.value[song.id]?.state
-                    if (state != Download.STATE_COMPLETED && state != Download.STATE_QUEUED && state != Download.STATE_DOWNLOADING) {
-                        downloads.downloadInBackground(song)
-                        started += song.id
-                    }
+                    downloads.downloadInBackground(song, exportFolder = if (playlist.playlist.browseId != null) "YouTube - ${playlist.playlist.name}" else playlist.playlist.name)
+                    if (shouldPrepareDownload(state)) started += song.id
                 }
             }.onFailure { Timber.tag(TAG).w(it, "Auto-download failed for playlist $id") }
         }

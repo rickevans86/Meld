@@ -523,13 +523,13 @@ private fun LazyListScope.playAllRow(
             }
             // Downloads the whole album or playlist; files go to "Navidrome - <name>" folders
             TextButton(
-                enabled = !allDownloaded,
+                enabled = !downloading,
                 onClick = {
-                    val missing = songs.filter { downloads[it.id]?.state != Download.STATE_COMPLETED }
-                    missing.forEach { downloadUtil.download(it) }
+                    val missing = songs
+                    missing.forEach { downloadUtil.download(it, exportFolder = "Navidrome - $title") }
                     Toast.makeText(
                         context,
-                        context.getString(R.string.subsonic_downloading_count, missing.size),
+                        context.getString(R.string.export_preparing_songs, missing.size),
                         Toast.LENGTH_SHORT,
                     ).show()
                 },
@@ -543,7 +543,7 @@ private fun LazyListScope.playAllRow(
                 Text(
                     stringResource(
                         when {
-                            allDownloaded -> R.string.subsonic_downloaded
+                            allDownloaded -> R.string.export_playlist_files
                             downloading -> R.string.downloading
                             else -> R.string.subsonic_download_all
                         },

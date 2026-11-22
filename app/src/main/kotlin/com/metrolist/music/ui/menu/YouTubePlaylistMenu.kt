@@ -593,6 +593,16 @@ fun YouTubePlaylistMenu(
                 items =
                     buildList {
                         if (songs.isNotEmpty()) {
+                            if (downloadState == Download.STATE_COMPLETED && downloadUtil.exporter.folderUri() != null) {
+                                add(Material3MenuItemData(
+                                    title = { Text(stringResource(R.string.export_playlist_files)) },
+                                    icon = { Icon(painterResource(R.drawable.download), contentDescription = null) },
+                                    onClick = {
+                                        songs.forEach { downloadUtil.download(it, exportFolder = "YouTube - ${playlist.title}") }
+                                        onDismiss()
+                                    },
+                                ))
+                            }
                             add(
                                 when (downloadState) {
                                     Download.STATE_COMPLETED -> {
@@ -640,7 +650,7 @@ fun YouTubePlaylistMenu(
                                                 )
                                             },
                                             onClick = {
-                                                songs.forEach { downloadUtil.download(it) }
+                                                songs.forEach { downloadUtil.download(it, exportFolder = "YouTube - ${playlist.title}") }
                                             },
                                         )
                                     }

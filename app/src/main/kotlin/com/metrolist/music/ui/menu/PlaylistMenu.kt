@@ -548,6 +548,16 @@ fun PlaylistMenu(
                                 },
                             ),
                         )
+                        if (downloadState == Download.STATE_COMPLETED && downloadUtil.exporter.folderUri() != null) {
+                            add(Material3MenuItemData(
+                                title = { Text(stringResource(R.string.export_playlist_files)) },
+                                icon = { Icon(painterResource(R.drawable.download), contentDescription = null) },
+                                onClick = {
+                                    songs.forEach { downloadUtil.download(it, exportFolder = if (playlist.playlist.browseId != null) "YouTube - ${playlist.playlist.name}" else playlist.playlist.name) }
+                                    onDismiss()
+                                },
+                            ))
+                        }
                         if (downloadPlaylist != true) {
                             add(
                                 when (downloadState) {
@@ -596,7 +606,7 @@ fun PlaylistMenu(
                                                 )
                                             },
                                             onClick = {
-                                                songs.forEach { downloadUtil.download(it) }
+                                                songs.forEach { downloadUtil.download(it, exportFolder = if (playlist.playlist.browseId != null) "YouTube - ${playlist.playlist.name}" else playlist.playlist.name) }
                                             },
                                         )
                                     }

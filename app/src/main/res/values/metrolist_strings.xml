@@ -1310,7 +1310,7 @@
     <string name="download_folder_off">Off. Tap to choose a folder; new downloads are also saved there as .m4a audio files</string>
     <string name="download_folder_save_existing">Save existing downloads to folder</string>
     <string name="download_folder_by_playlist">Sort into playlist folders</string>
-    <string name="download_folder_by_playlist_desc">Each playlist gets its own folder (named \"YouTube - …\" or \"Spotify - …\" for synced ones), plus folders for liked songs. A song is copied into every folder it belongs to; songs in none go in the main folder.</string>
+    <string name="download_folder_by_playlist_desc">Downloading a playlist saves files only to that playlist’s folder. Already downloaded audio is reused when you download another playlist. Individual songs go in the main folder. Existing files are kept.</string>
     <string name="download_folder_saving">Saving downloads…</string>
     <string name="download_folder_stop">Stop saving to folder</string>
     <string name="download_folder_stop_desc">Files already saved stay in the folder</string>
@@ -1703,4 +1703,14 @@
     <string name="wavelength_additions_updates_desc">• Check for Wavelength releases from this project and download updates in the app.\n• Use Wavelength branding in the main app and recognition actions, with original Meld and Metrolist credits retained.\n• Compatible updates retain existing settings and library data.</string>
     <string name="wavelength_additions_integrations_title">A simpler set of integrations</string>
     <string name="wavelength_additions_integrations_desc">• Discord, Last.fm and Listen Together integrations are hidden and disabled in this Wavelength build.\n• Features can be enabled selectively so the phone and car interfaces focus on the sources you use.</string>
+    <string name="export_playlist_files">Save to playlist folder</string>
+    <string name="export_cleanup_title">Review old playlist folders</string>
+    <string name="export_cleanup_desc">Earlier releases could copy a song into folders for other playlists. Select only folders you do not want in your download export location. Nothing is selected automatically. This review is offered once in this release; keeping folders will not change your playlists.</string>
+    <string name="export_cleanup_confirm_title">Remove selected folders?</string>
+    <string name="export_cleanup_confirm_desc">The folders listed below and all their contents will be permanently deleted from your export location. Check that they contain nothing you want to keep. Your playlists and private in-app downloads are not removed.</string>
+    <string name="export_cleanup_review">Review selected</string>
+    <string name="export_cleanup_remove">Remove folders</string>
+    <string name="export_cleanup_keep">Keep folders</string>
+    <string name="export_cleanup_failed">Some folders could not be removed. Check access to the export folder and try again, or keep the remaining folders.</string>
+    <string name="export_preparing_songs">Preparing %1$d songs</string>
 </resources>

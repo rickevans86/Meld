@@ -327,6 +327,7 @@ fun AutoPlaylistMenu(
     onQueue: () -> Unit,
     onDownload: () -> Unit,
     onDismiss: () -> Unit,
+    onExport: (() -> Unit)? = null,
     songs: List<Song> = emptyList(),
     playlistName: String = "Playlist",
     /** Wavelength: "liked", "downloaded", ... — Liked songs can be pinned and auto-downloaded. */
@@ -436,6 +437,13 @@ fun AutoPlaylistMenu(
                     null
                 },
                 downloadMenuItem,
+                onExport?.takeIf { downloadState == Download.STATE_COMPLETED }?.let { export ->
+                    Material3MenuItemData(
+                        title = { Text(stringResource(R.string.export_playlist_files)) },
+                        icon = { Icon(painterResource(R.drawable.download), contentDescription = null) },
+                        onClick = { export(); onDismiss() },
+                    )
+                },
             ),
     )
 
@@ -522,6 +530,7 @@ fun TopPlaylistMenu(
     onQueue: () -> Unit,
     onDownload: () -> Unit,
     onDismiss: () -> Unit,
+    onExport: (() -> Unit)? = null,
 ) {
     val listenTogetherManager = LocalListenTogetherManager.current
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
@@ -602,6 +611,13 @@ fun TopPlaylistMenu(
                     null
                 },
                 downloadMenuItem,
+                onExport?.takeIf { downloadState == Download.STATE_COMPLETED }?.let { export ->
+                    Material3MenuItemData(
+                        title = { Text(stringResource(R.string.export_playlist_files)) },
+                        icon = { Icon(painterResource(R.drawable.download), contentDescription = null) },
+                        onClick = { export(); onDismiss() },
+                    )
+                },
             ),
     )
 }

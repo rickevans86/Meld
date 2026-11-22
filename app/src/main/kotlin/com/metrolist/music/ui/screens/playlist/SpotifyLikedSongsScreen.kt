@@ -52,8 +52,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.net.toUri
-import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -104,6 +102,7 @@ fun SpotifyLikedSongsScreen(
     viewModel: SpotifyLikedSongsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val downloadUtil = com.metrolist.music.LocalDownloadUtil.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val database = LocalDatabase.current
     val menuState = LocalMenuState.current
@@ -482,17 +481,7 @@ fun SpotifyLikedSongsScreen(
                                             }
                                             resolved++
                                             Timber.d("SpotifyLikedDownload: queuing '${track.name}' -> yt:${metadata.id}")
-                                            val downloadRequest = DownloadRequest
-                                                .Builder(metadata.id, metadata.id.toUri())
-                                                .setCustomCacheKey(metadata.id)
-                                                .setData(metadata.title.toByteArray())
-                                                .build()
-                                            DownloadService.sendAddDownload(
-                                                context,
-                                                ExoDownloadService::class.java,
-                                                downloadRequest,
-                                                false,
-                                            )
+                                            downloadUtil.download(metadata, exportFolder = "Spotify - Liked songs")
                                         }
                                         Timber.d("SpotifyLikedDownload: done — $resolved queued, $skipped skipped")
                                     }

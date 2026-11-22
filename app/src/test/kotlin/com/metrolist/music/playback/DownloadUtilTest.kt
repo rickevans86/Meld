@@ -10,6 +10,9 @@ class DownloadUtilTest {
     @Test
     fun `completed downloads are not prepared again`() {
         assertFalse(shouldPrepareDownload(Download.STATE_COMPLETED))
+        assertFalse(shouldPrepareDownload(Download.STATE_QUEUED))
+        assertFalse(shouldPrepareDownload(Download.STATE_DOWNLOADING))
+        assertFalse(shouldPrepareDownload(Download.STATE_RESTARTING))
         assertTrue(shouldPrepareDownload(Download.STATE_FAILED))
         assertTrue(shouldPrepareDownload(null))
     }
