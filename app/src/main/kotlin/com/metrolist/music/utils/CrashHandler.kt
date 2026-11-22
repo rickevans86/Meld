@@ -42,8 +42,7 @@ class CrashHandler private constructor(
             val crashLog = buildCrashLog(throwable)
             Timber.e(throwable, "App crashed")
 
-            // Best-effort upload to the project's Issues tracker. Bounded by an internal
-            // timeout so a slow network never delays the crash dialog.
+            // Save locally before process termination when the user has enabled error logs.
             CrashReporter.reportFatal(throwable)
 
             // Launch crash activity

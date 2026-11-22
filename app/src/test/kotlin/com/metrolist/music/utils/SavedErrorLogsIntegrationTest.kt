@@ -44,4 +44,18 @@ class SavedErrorLogsIntegrationTest {
         assertFalse(SavedErrorLogs.enabled())
         assertEquals(1, SavedErrorLogs.reports().size)
     }
+
+    @Test fun `crash entry point only saves when local logging is enabled`() {
+        CrashReporter.reportFatal(IllegalStateException("disabled"))
+        assertTrue(SavedErrorLogs.reports().isEmpty())
+        SavedErrorLogs.setEnabled(true)
+        CrashReporter.reportFatal(IllegalStateException("local diagnostic"))
+        assertTrue(SavedErrorLogs.reports().single().text.contains("local diagnostic"))
+        CrashReporter.reportNonFatal(RuntimeException(java.util.concurrent.CancellationException("normal cancellation")))
+        assertEquals(1, SavedErrorLogs.reports().size)
+        SavedErrorLogs.setEnabled(false)
+        CrashReporter.reportFatal(IllegalStateException("disabled again"))
+        assertEquals(1, SavedErrorLogs.reports().size)
+    }
+
 }

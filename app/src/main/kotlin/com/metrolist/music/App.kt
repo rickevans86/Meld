@@ -43,7 +43,6 @@ import com.metrolist.music.utils.AnrWatchdog
 import com.metrolist.music.utils.CrashHandler
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.utils.ArtistNameAliases
-import com.metrolist.music.utils.CrashReporter
 import com.metrolist.music.utils.InnerTubeXPlayer
 import com.metrolist.music.utils.SpotifyHashSync
 import com.metrolist.music.utils.SpotifyTokenManager
@@ -115,10 +114,8 @@ class App :
             )
         }
 
-        // Install crash handler first. CrashReporter must be initialized before
-        // CrashHandler so the uncaught-exception path can post to GitHub Issues.
+        // Initialize local error storage before installing the crash handler.
         com.metrolist.music.utils.SavedErrorLogs.init(this)
-        CrashReporter.init(this)
         CrashHandler.install(this)
         AnrWatchdog.start()
         ArtistNameAliases.initialize(this)
