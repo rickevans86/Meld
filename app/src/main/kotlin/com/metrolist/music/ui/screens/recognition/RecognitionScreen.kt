@@ -285,14 +285,16 @@ fun RecognitionScreen(
                             onCancel = {
                                 // Cancel also switches Keep listening off
                                 if (AutoRecognitionService.running.value) AutoRecognitionService.stop(context)
-                                com.metrolist.music.recognition.MusicRecognitionService
-                                    .reset()
+                                MusicRecognitionService.cancel()
                             },
                         )
                     }
 
                     is RecognitionStatus.Processing -> {
-                        ProcessingState()
+                        ProcessingState(onCancel = {
+                            if (AutoRecognitionService.running.value) AutoRecognitionService.stop(context)
+                            MusicRecognitionService.cancel()
+                        })
                     }
 
                     is RecognitionStatus.Success -> {
@@ -495,7 +497,7 @@ private fun ListeningState(onCancel: () -> Unit) {
 }
 
 @Composable
-private fun ProcessingState() {
+private fun ProcessingState(onCancel: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -550,6 +552,10 @@ private fun ProcessingState() {
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
+        OutlinedButton(onClick = onCancel) {
+            Text(stringResource(R.string.cancel))
+        }
+
     }
 }
 

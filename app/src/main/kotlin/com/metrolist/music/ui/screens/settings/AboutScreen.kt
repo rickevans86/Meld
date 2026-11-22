@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,12 +41,16 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -121,9 +126,8 @@ private val upstreamCollaborators = listOf(
 )
 
 private val communityLinks = listOf(
-    CommunityLink(R.string.credits_discord, R.drawable.discord, "https://discord.gg/sAErRUVbsK"),
-    CommunityLink(R.string.credits_view_repo, R.drawable.github, "https://github.com/FrancescoGrazioso/Meld"),
-    CommunityLink(R.string.credits_license_name, R.drawable.info, "https://github.com/FrancescoGrazioso/Meld/blob/main/LICENSE")
+    CommunityLink(R.string.credits_view_repo, R.drawable.github, "https://github.com/rickevans86/Meld"),
+    CommunityLink(R.string.credits_license_name, R.drawable.info, "https://github.com/rickevans86/Meld/blob/main/LICENSE")
 )
 
 private fun handleEasterEggClick(
@@ -294,6 +298,40 @@ fun AboutScreen(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
+    var showWavelengthFeatures by rememberSaveable { mutableStateOf(false) }
+    if (showWavelengthFeatures) {
+        AlertDialog(
+            onDismissRequest = { showWavelengthFeatures = false },
+            title = { Text(stringResource(R.string.wavelength_additions_title)) },
+            text = {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text(stringResource(R.string.wavelength_additions_intro))
+                    listOf(
+                        R.string.wavelength_additions_offline_title to R.string.wavelength_additions_offline_desc,
+                        R.string.wavelength_additions_books_title to R.string.wavelength_additions_books_desc,
+                        R.string.wavelength_additions_podcasts_title to R.string.wavelength_additions_podcasts_desc,
+                        R.string.wavelength_additions_radio_title to R.string.wavelength_additions_radio_desc,
+                        R.string.wavelength_additions_auto_title to R.string.wavelength_additions_auto_desc,
+                        R.string.wavelength_additions_layout_title to R.string.wavelength_additions_layout_desc,
+                        R.string.wavelength_additions_output_title to R.string.wavelength_additions_output_desc,
+                    ).forEach { (title, description) ->
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(stringResource(title), style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(description))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWavelengthFeatures = false }) {
+                    Text(stringResource(R.string.close))
+                }
+            },
+        )
+    }
     val uriHandler = LocalUriHandler.current
     val playerConnection = LocalPlayerConnection.current
     val coroutineScope = rememberCoroutineScope()
@@ -398,6 +436,30 @@ fun AboutScreen(
     
             Spacer(Modifier.height(32.dp))
     
+            Button(
+                onClick = { showWavelengthFeatures = true },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            ) {
+                Text(stringResource(R.string.wavelength_additions_title))
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            SectionHeader(stringResource(R.string.credits_original_project))
+
+            Text(
+                text = stringResource(R.string.credits_based_on_metrolist),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 12.dp),
+                textAlign = TextAlign.Start
+            )
+
+            Spacer(Modifier.height(16.dp))
+
             SectionHeader(stringResource(R.string.credits_developer))
     
             // Meld developer
@@ -437,19 +499,6 @@ fun AboutScreen(
             }
     
             Spacer(Modifier.height(48.dp))
-    
-            SectionHeader(stringResource(R.string.credits_original_project))
-    
-            Text(
-                text = stringResource(R.string.credits_based_on_metrolist),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 12.dp),
-                textAlign = TextAlign.Start
-            )
     
             Surface(
                 shape = RoundedCornerShape(24.dp),
@@ -544,15 +593,6 @@ fun AboutScreen(
                 }
             }
     
-            Spacer(Modifier.height(32.dp))
-            
-            Text(
-                text = stringResource(R.string.stands_with_palestine),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            
             Spacer(Modifier.height(40.dp))
         }
 
