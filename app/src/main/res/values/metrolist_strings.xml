@@ -373,7 +373,7 @@
     <string name="check_for_updates">Automatically check for updates</string>
     <string name="update_notifications">Enable update notifications</string>
     <string name="update_available_title">New update available</string>
-    <string name="update_available_message">Meld %s is ready to download.</string>
+    <string name="update_available_message">Wavelength %s is ready to download.</string>
     <string name="update_action">Update</string>
     <string name="update_channel_name">App updates</string>
     <string name="update_channel_desc">Notifications about new app versions</string>
@@ -411,7 +411,7 @@
     <string name="enable_scrobbling">Enable scrobbling</string>
     <string name="lastfm_now_playing">Send Now Playing status</string>
     <string name="last_fm_send_likes">Sync Loved and Unloved</string>
-    <string name="last_fm_send_likes_description">Love or unlove songs in Last.fm when you like or unlike them in Meld</string>
+    <string name="last_fm_send_likes_description">Love or unlove songs in Last.fm when you like or unlike them in Wavelength</string>
     <string name="logging_in">Logging in…</string>
 
     <string name="scrobbling_configuration">Scrobbling configuration</string>
@@ -466,10 +466,10 @@
     <string name="wrapped_total_artists_subtitle">unique artists!</string>
     <string name="wrapped_total_songs_title">You\'ve listened to</string>
     <string name="wrapped_total_songs_subtitle">unique songs!</string>
-    <string name="wrapped_intro_title">MELD</string>
+    <string name="wrapped_intro_title">WAVELENGTH</string>
     <string name="wrapped_intro_subtitle">it\'s time to see what you\'ve been listening to all this year…</string>
     <string name="wrapped_intro_button">let\'s go!</string>
-    <string name="wrapped_logo_content_description">Meld Logo</string>
+    <string name="wrapped_logo_content_description">Wavelength Logo</string>
     <string name="wrapped_year">2025</string>
     <string name="wrapped_ready_title">YOUR WRAPPED IS READY!</string>
     <string name="wrapped_ready_subtitle">Time to see what you loved all this year…</string>
@@ -542,13 +542,13 @@
     <!-- Widget strings -->
     <string name="album_art">Album art</string>
     <string name="no_song_playing">No song playing</string>
-    <string name="tap_to_open">Tap to open Meld</string>
+    <string name="tap_to_open">Tap to open Wavelength</string>
     <string name="previous">Previous</string>
     <string name="play_pause">Play/Pause</string>
     <string name="next">Next</string>
     <string name="like">Like</string>
     <string name="not_playing">No song playing</string>
-    <string name="tap_to_play">Tap to open Meld</string>
+    <string name="tap_to_play">Tap to open Wavelength</string>
     <string name="widget_description">Music player widget with playback controls</string>
     <string name="turntable_widget_description">Circular music widget with play and like controls</string>
     <string name="widget_music_player">Music Player</string>
@@ -711,7 +711,7 @@
     <string name="crash_description">An unexpected error occurred. Please share the crash report to help us fix the issue</string>
     <string name="crash_share_logs">Share logs</string>
     <string name="crash_share_title">Share crash report</string>
-    <string name="crash_report_subject">Meld crash report</string>
+    <string name="crash_report_subject">Wavelength crash report</string>
     <string name="crash_close">Close</string>
     <string name="crash_no_log">No crash log available</string>
 
@@ -763,7 +763,7 @@
     <string name="clear_recognition_history_confirm">Are you sure you want to clear all recognition history?</string>
     <string name="delete_from_history">Delete from history</string>
     <string name="re_listen">Re-listen</string>
-    <string name="play_on_app">Play on Meld</string>
+    <string name="play_on_app">Play on Wavelength</string>
     <string name="qs_tile_music_recognizer">Recognize music</string>
     <string name="recognition_notification_channel_name">Music recognition</string>
     <string name="recognition_notification_channel_desc">Shows a notification while identifying a song from quick settings</string>
@@ -771,7 +771,7 @@
     <string name="recognition_notification_processing">Identifying…</string>
     <string name="recognition_notification_no_match">No match found</string>
     <string name="recognition_notification_failed">Recognition failed</string>
-    <string name="listen_on_metrolist">Listen on Meld</string>
+    <string name="listen_on_metrolist">Listen on Wavelength</string>
 
     <!-- CSV Import Strings -->
     <string name="map_csv_columns">Map CSV columns</string>
@@ -858,7 +858,7 @@
     <string name="credits_view_repo">View repository</string>
     <string name="buy_mo_a_coffee">Buy me a coffee!</string>
     <string name="community_and_info">Community &amp; Info</string>
-    <string name="metrolist">MELD</string>
+    <string name="metrolist">WAVELENGTH</string>
     <string name="wanna_play_favorite_song">Want to play their favorite song?</string>
     <string name="yeah">Yeah!</string>
     <string name="stands_with_palestine">This project stands with Palestine 🇵🇸</string>
@@ -1023,16 +1023,16 @@
         <item quantity="one">%d profile</item>
         <item quantity="other">%d profiles</item>
     </plurals>
-    <string name="listening_to_metrolist">Listening to Meld</string>
+    <string name="listening_to_metrolist">Listening to Wavelength</string>
     <string name="copy_all_lyrics">Copy all lyrics</string>
     <string name="ai_error_unexpected">Unexpected translation result</string>
     <string name="ai_system_prompt_desc">Custom instructions sent to the AI model. Leave empty to use the default prompt</string>
     <string name="ai_system_prompt_placeholder">Use {lineCount} as a placeholder for the number of lines to translate</string>
     <string name="login_successful">Login successful!</string>
     <string name="discord_button_text_variables">Variables: {song_name}, {artist_name}, {album_name}</string>
-    <string name="discord_playing_metrolist">Playing Meld</string>
-    <string name="discord_watching_metrolist">Watching Meld</string>
-    <string name="discord_competing_metrolist">Competing in Meld</string>
+    <string name="discord_playing_metrolist">Playing Wavelength</string>
+    <string name="discord_watching_metrolist">Watching Wavelength</string>
+    <string name="discord_competing_metrolist">Competing in Wavelength</string>
     <string name="discord_activity_name_description">Custom name for the activity. Leave empty to use the default</string>
     <string name="credits_website">Website</string>
     <string name="credits_instagram">Instagram</string>
@@ -1169,12 +1169,12 @@
     <string name="added_to_play_next">Added to play next</string>
     <string name="added_to_queue">Added to the queue</string>
 
-    <string name="wrapped_end_thanks">Thanks for listening with Meld!</string>
+    <string name="wrapped_end_thanks">Thanks for listening with Wavelength!</string>
     <string name="wrapped_end_create_playlist">Create Your Wrapped Playlist</string>
     <string name="wrapped_end_creating_playlist">Creating...</string>
     <string name="wrapped_end_playlist_saved">Playlist Saved</string>
     <string name="listen_on_youtube_music">Listen on YouTube Music</string>
-    <string name="visit_metrolist">Visit Meld</string>
+    <string name="visit_metrolist">Visit Wavelength</string>
     <string name="error_restricted_not_logged_in">Some tracks may not play due to age or country restrictions. Try logging into YouTube in Settings to resolve this issue.</string>
     <string name="error_restricted_logged_in">This track is restricted (age or country) and cannot be played at this time.</string>
     <string name="subscribed_to_channel">Subscribed to channel</string>
@@ -1185,11 +1185,11 @@
     <string name="discord_button_1_url">Button 1 URL</string>
     <string name="discord_button_1_url_default">Default: current song on YouTube Music</string>
     <string name="discord_button_2_url">Button 2 URL</string>
-    <string name="discord_button_2_url_default">Default: Meld on GitHub</string>
+    <string name="discord_button_2_url_default">Default: project on GitHub</string>
     <string name="discord_button_url_description">Destination link opened when someone clicks the button. Must start with http:// or https://. Supports {song_name}, {artist_name}, {album_name}.</string>
     <string name="credits_developer">Developer</string>
     <string name="credits_original_project">Original Project</string>
-    <string name="credits_based_on_metrolist">Meld is based on Metrolist, an open-source YouTube Music client.</string>
+    <string name="credits_based_on_metrolist">Wavelength is based on Meld, which is based on Metrolist, an open-source YouTube Music client.</string>
     <string name="filter_local_files">Local files</string>
     <string name="local_files">Local files</string>
     <string name="scan_local_files">Scan for local files</string>
@@ -1280,7 +1280,7 @@
     <string name="music_folders_intro">Ticked folders show up in Local files. Folders with songs are ticked to start with; tick any other folder to add it.</string>
     <string name="music_folders_none">Your phone hasn\'t listed any folders with audio files yet.</string>
     <string name="music_folders_added_title">Folders your phone doesn\'t list</string>
-    <string name="music_folders_added_desc">If a folder is missing above (for example one with a .nomedia file), add it here and Meld will read it directly.</string>
+    <string name="music_folders_added_desc">If a folder is missing above (for example one with a .nomedia file), add it here and Wavelength will read it directly.</string>
     <string name="music_folders_add">Add a folder</string>
     <string name="music_folders_remove">Remove folder</string>
     <string name="audiobooks_setup_title">Listen to audiobooks on your phone</string>
@@ -1328,7 +1328,7 @@
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>
     </plurals>
-    <string name="discord_information_warning">Meld uses Discord\'s public OAuth2 and Gateway APIs to share what you\'re listening to. Authorization happens through a local browser session that closes itself after capturing the code — nothing is sent to third-party servers. Your token is stored on this device in encrypted preferences and is never shared. Meld connects directly to wss://gateway.discord.gg to publish your activity, and only requests the minimum scope required (sdk.social_layer_presence).</string>
+    <string name="discord_information_warning">Wavelength uses Discord\'s public OAuth2 and Gateway APIs to share what you\'re listening to. Authorization happens through a local browser session that closes itself after capturing the code — nothing is sent to third-party servers. Your token is stored on this device in encrypted preferences and is never shared. Wavelength connects directly to wss://gateway.discord.gg to publish your activity, and only requests the minimum scope required (sdk.social_layer_presence).</string>
     <!-- Wavelength: side menu, News tab, internet radio, Navidrome / Subsonic -->
     <string name="open_menu">Open menu</string>
     <string name="features">Features</string>
@@ -1660,4 +1660,22 @@
     <string name="offline_mode_stream_unavailable">Offline mode is on. Choose downloaded content or a local file.</string>
     <string name="podcast_startup_buffer">Podcast startup buffer</string>
     <string name="podcast_buffer_minutes">%1$d minutes</string>
+
+    <!-- Wavelength additions shown from About. -->
+    <string name="wavelength_additions_title">What’s different in Wavelength</string>
+    <string name="wavelength_additions_intro">Wavelength builds on Meld and Metrolist with these additions and customisations. Some features need to be enabled in Settings → Features.</string>
+    <string name="wavelength_additions_offline_title">Offline mode</string>
+    <string name="wavelength_additions_offline_desc">A shared phone and Android Auto offline switch hides online sources and focuses podcasts and audiobooks on downloads. Audiobookshelf listening progress syncs when you reconnect.</string>
+    <string name="wavelength_additions_books_title">Audiobooks and Audiobookshelf</string>
+    <string name="wavelength_additions_books_desc">Audiobook playback with downloads, chapter navigation, bookmarks, sleep timer, playback speed and adjustable rewind and skip times.</string>
+    <string name="wavelength_additions_podcasts_title">Podcast improvements</string>
+    <string name="wavelength_additions_podcasts_desc">Favourite channels appear first on the phone and in Android Auto. YouTube podcast playlists join the podcast library, with downloaded episodes and an adjustable startup buffer.</string>
+    <string name="wavelength_additions_radio_title">Radio songs to playlists</string>
+    <string name="wavelength_additions_radio_desc">Save the current radio song to your selected playlist from the phone or Android Auto. If station song metadata is missing or cannot be matched, recognition can use the playing radio audio as a fallback.</string>
+    <string name="wavelength_additions_auto_title">Android Auto controls</string>
+    <string name="wavelength_additions_auto_desc">Source-specific browsing and downloads, audiobook and podcast skip controls, channel favourites and a radio setting that prefers Add song over Favourite in compact controls. Final button placement depends on Android Auto.</string>
+    <string name="wavelength_additions_layout_title">Personalise your library</string>
+    <string name="wavelength_additions_layout_desc">Choose enabled sources and arrange audiobook Library, Downloaded and Listening tabs in settings, with sorting options for browsing books.</string>
+    <string name="wavelength_additions_output_title">Pause when audio output changes</string>
+    <string name="wavelength_additions_output_desc">Playback pauses when an audio output connects, disconnects or changes, retaining your queue and position for manual resume.</string>
 </resources>

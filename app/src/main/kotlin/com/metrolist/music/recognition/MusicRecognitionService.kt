@@ -23,6 +23,8 @@ import com.metrolist.shazamkit.Shazam
 import com.metrolist.shazamkit.models.RecognitionResult
 import com.metrolist.shazamkit.models.RecognitionStatus
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +59,8 @@ object MusicRecognitionService {
     private val QUERY_CHECKPOINTS_MS = longArrayOf(5_000, 8_000, 12_000, 16_000, 20_000)
     private const val MAX_LISTEN_MS = 20_000L
 
+    private val attempt = RecognitionAttempt()
+
     private val _recognitionStatus = MutableStateFlow<RecognitionStatus>(RecognitionStatus.Ready)
     val recognitionStatus: StateFlow<RecognitionStatus> = _recognitionStatus.asStateFlow()
 
@@ -74,8 +78,10 @@ object MusicRecognitionService {
      * Records audio and identifies the track, re-querying as more audio arrives and, if enabled,
      * falling back to AudD. Updates [recognitionStatus] throughout and returns the final status.
      */
+    suspend fun recognize(context: Context): RecognitionStatus = attempt.run { recognizeOnce(context) }
+
     @SuppressLint("MissingPermission")
-    suspend fun recognize(context: Context): RecognitionStatus = withContext(Dispatchers.IO) {
+    private suspend fun recognizeOnce(context: Context): RecognitionStatus = withContext(Dispatchers.IO) {
         if (!hasRecordPermission(context)) {
             Timber.tag(TAG).w("Microphone permission not granted, aborting recognition")
             return@withContext RecognitionStatus.Error("Microphone permission not granted")
@@ -99,12 +105,14 @@ object MusicRecognitionService {
                     val elapsed = System.currentTimeMillis() - startTime
                     if (elapsed >= MAX_LISTEN_MS) break
                     val read = audioRecord.read(buffer, 0, bufferSize)
+                    currentCoroutineContext().ensureActive()
                     if (read > 0) pcm.write(buffer, 0, read)
 
                     if (nextCheckpoint < QUERY_CHECKPOINTS_MS.size && elapsed >= QUERY_CHECKPOINTS_MS[nextCheckpoint]) {
                         nextCheckpoint++
                         _recognitionStatus.value = RecognitionStatus.Processing
                         matched = fingerprintAndQuery(pcm.toByteArray())
+                        currentCoroutineContext().ensureActive()
                         if (matched != null) break
                         _recognitionStatus.value = RecognitionStatus.Listening
                     }
@@ -125,6 +133,7 @@ object MusicRecognitionService {
                 matched = tryAudDFallback(context, pcm.toByteArray())
             }
 
+            currentCoroutineContext().ensureActive()
             if (matched != null) {
                 val result = matched
                 Timber.tag(TAG).i("Recognition successful: '%s' by %s", result.title, result.artist)
@@ -137,10 +146,16 @@ object MusicRecognitionService {
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
             Timber.tag(TAG).e(e, "Recognition failed with exception")
             _recognitionStatus.value = RecognitionStatus.Error(e.message ?: "Recognition failed")
             _recognitionStatus.value
         }
+    }
+
+    fun cancel() {
+        attempt.cancel()
+        reset()
     }
 
     /** Radio fallback uses decoded stream audio, without microphone access or recognition-playlist side effects. */
