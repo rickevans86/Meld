@@ -1,5 +1,9 @@
 # AI activity log
 
+## Release in progress — 0.9.2.113, ChatGPT Codex, 2026-11-22
+
+User explicitly requested publication. PR #32 https://github.com/rickevans86/Meld/pull/32 merged to main as 477d5b0772568ec4210e476b46ec92ac8f01e53b after full CI 45078259216 passed unit tests, APK build/upload and lint. Tested feature source 833571451c5161616a43655087ab3494ebe99abc; final PR head 2192df51a3ce620611502c367408c2d6ed17a440 adds only AI records. Remote main refreshed before merge; no overlap. Automatic signed release workflow 45079630464 is running on the merged SHA, run number 113 (expected version 0.9.2.113). No duplicate manual dispatch or version changes. Release publication and APK identity/signature verification pending. Saved-error logging and playlist/storage task details below remain implementation history. AI: ChatGPT Codex. Next: await workflow, verify public APK/update compatibility, finalize shared records and PR.
+
 ## Pushed for review — SAVED-ERROR-LOGS, ChatGPT Codex, 2026-11-22
 
 Implemented optional Settings → Privacy → Saved error logs, disabled by default. Stores the newest 20 bounded reports in noBackupFilesDir/error_reports (32,000 characters each) with wall-clock time, app/device details, full exception/cause stack within the size limit, and media title/ID, stream client, position and error code for playback failures. Main-player errors are captured before recovery, covering phone and Android Auto. CrashReporter hooks capture crashes synchronously before process death, reported nonfatal exceptions and detected ANRs independently of online crash-report consent. Normal coroutine cancellation is excluded. Existing online reporting behavior is unchanged; local saving itself makes no uploads. Common URL/authorization/cookie/token/password fields are redacted; reports still contain media/device details for user review.

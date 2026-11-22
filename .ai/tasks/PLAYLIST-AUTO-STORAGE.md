@@ -1,5 +1,9 @@
 # PLAYLIST-AUTO-STORAGE
 
+## Release in progress — 0.9.2.113, ChatGPT Codex, 2026-11-22
+
+User explicitly requested publication. PR #32 https://github.com/rickevans86/Meld/pull/32 merged to main as 477d5b0772568ec4210e476b46ec92ac8f01e53b after full CI 45078259216 passed unit tests, APK build/upload and lint. Tested feature source 833571451c5161616a43655087ab3494ebe99abc; final PR head 2192df51a3ce620611502c367408c2d6ed17a440 adds only AI records. Remote main refreshed before merge; no overlap. Automatic signed release workflow 45079630464 is running on the merged SHA, run number 113 (expected version 0.9.2.113). No duplicate manual dispatch or version changes. Release publication and APK identity/signature verification pending. Saved-error logging and playlist/storage task details below remain implementation history. AI: ChatGPT Codex. Next: await workflow, verify public APK/update compatibility, finalize shared records and PR.
+
 ## Implemented locally — PLAYLIST-AUTO-STORAGE, ChatGPT Codex, 2026-11-22
 
 Implemented on feat/playlist-auto-download-storage (base main 3ac8c581). Local/YouTube/Spotify playlist menus now expose auto-download, with canonical source IDs and compatibility for saved local selections. Enabling queues current contents; the existing six-hour worker refreshes enabled sources, respects offline mode and download-manager Wi-Fi requirements, and is restored independently of podcast auto-download settings. Android may delay background work. Songs with no playlist membership export to No Playlist when playlist folders are enabled; explicit playlist destinations and cached-file reuse remain intact.
