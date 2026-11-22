@@ -1,6 +1,16 @@
 # Task board
 
-## Current — 0.9.2.110, ChatGPT Codex, 2026-11-22
+## In progress — ABOUT-FEATURE-DETAILS, ChatGPT Codex, 2026-11-22
+
+Owner confirmed 0.9.2.110 About layout looks better on device (not recognition-cancel/popup correctness confirmation), requested Francesco match other developer rows, reviewed expanded differences copy, then explicitly authorized changes/main/release. Main 0f72a91a refreshed; no open PRs/overlap, Issues disabled (temporary ID). Branch fix/about-feature-details. Files reserved: AboutScreen, default English metrolist_strings.xml, six shared records/task. No unrelated code/schema/version/signing/dependency changes.
+
+Francesco is now first in the existing shared contributor card using the exact common 56dp avatar, name, supporting role and GitHub icon/click behavior; role says Meld developer. Removed the separate 180dp avatar/name/GitHub block and Developer heading. Retained original-project ancestry, all names, contributor profile URLs/easter eggs, repository/licence links and current branding.
+
+Expanded the scrollable differences dialog from seven brief paragraphs to 19 grouped sections with bullets: layout/source switches, separate homes/library shortcuts, offline, download exports, local folders, audiobook library, audiobook player, Audiobookshelf, podcast discovery/OPML, channels/episodes/downloads, podcast buffer/skip, radio, recognition/Keep listening, news briefings, music servers, Android Auto, audio-output pause, Wavelength updates and disabled integrations. Descriptions based on current code/settings plus WAVELENGTH_CHANGES as historical inventory only (its stale deployment instructions not followed). Copy notes inherited functionality, required features/accounts/servers/downloads and Auto placement. Title styling strengthened for scanning. Existing dialog state/scroll/Close/Back/outside behavior unchanged. Preview supplied before explicit publication authorization.
+
+Validation: FOSS debug APK passed on final source (28s); XML parsed, unique resource names/existing keys/format arguments checked, all 19 title/description pairs resolve, compact contributor list/role and removed large avatar asserted, git diff --check clean. No new tests merely mirror reversible static copy/layout edits. Device popup scrolling/large-font readability and compact avatar appearance remain untested. Protected translations unchanged. Full CI/main merge/signed publication pending. Next: commit/push PR, wait tests/build/lint, merge main, automatic signed release, verify public APK ID/version/cert/tag and finalize records. AI: ChatGPT Codex; preserve prior records/history.
+
+## Previous release — 0.9.2.110, ChatGPT Codex, 2026-11-22
 
 WAVELENGTH-VISIBLE-BRANDING completed in PR #29 https://github.com/rickevans86/Meld/pull/29. Feature 0f708c9c48a1296e8464df082a884b69e0c80ec7; tested main/tag 5002389ab707a9218fe57f79cb99fde72e9bb873. Public release https://github.com/rickevans86/Meld/releases/tag/v0.9.2.110 published by signed workflow 45008514952 (completed success). Full CI 45007464475 passed app/innertube tests, FOSS debug APK/upload and lint in 12m20s. Release audiobook regression passed. Eight targeted local tests (two new cancellation/late-result/replacement isolation tests, six existing radio PCM/recognition regressions) and final debug build passed. XML/format/popup-resource/About-order/project-link/protected-file checks and diff passed. Interim shared records synced on main in 5009dabe [skip ci].
 

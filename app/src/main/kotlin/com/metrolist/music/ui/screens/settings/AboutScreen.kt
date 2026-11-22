@@ -106,7 +106,7 @@ private data class CommunityLink(
 
 private val meldDeveloper = Contributor(
     name = "Francesco Grazioso",
-    roleRes = R.string.credits_developer,
+    roleRes = R.string.credits_meld_developer,
     githubHandle = "FrancescoGrazioso",
 )
 
@@ -310,16 +310,28 @@ fun AboutScreen(
                 ) {
                     Text(stringResource(R.string.wavelength_additions_intro))
                     listOf(
-                        R.string.wavelength_additions_offline_title to R.string.wavelength_additions_offline_desc,
-                        R.string.wavelength_additions_books_title to R.string.wavelength_additions_books_desc,
-                        R.string.wavelength_additions_podcasts_title to R.string.wavelength_additions_podcasts_desc,
-                        R.string.wavelength_additions_radio_title to R.string.wavelength_additions_radio_desc,
-                        R.string.wavelength_additions_auto_title to R.string.wavelength_additions_auto_desc,
                         R.string.wavelength_additions_layout_title to R.string.wavelength_additions_layout_desc,
+                        R.string.wavelength_additions_homes_title to R.string.wavelength_additions_homes_desc,
+                        R.string.wavelength_additions_offline_title to R.string.wavelength_additions_offline_desc,
+                        R.string.wavelength_additions_downloads_title to R.string.wavelength_additions_downloads_desc,
+                        R.string.wavelength_additions_local_title to R.string.wavelength_additions_local_desc,
+                        R.string.wavelength_additions_books_title to R.string.wavelength_additions_books_desc,
+                        R.string.wavelength_additions_book_player_title to R.string.wavelength_additions_book_player_desc,
+                        R.string.wavelength_additions_abs_title to R.string.wavelength_additions_abs_desc,
+                        R.string.wavelength_additions_podcasts_title to R.string.wavelength_additions_podcasts_desc,
+                        R.string.wavelength_additions_episodes_title to R.string.wavelength_additions_episodes_desc,
+                        R.string.wavelength_additions_podcast_controls_title to R.string.wavelength_additions_podcast_controls_desc,
+                        R.string.wavelength_additions_radio_title to R.string.wavelength_additions_radio_desc,
+                        R.string.wavelength_additions_recognition_title to R.string.wavelength_additions_recognition_desc,
+                        R.string.wavelength_additions_news_title to R.string.wavelength_additions_news_desc,
+                        R.string.wavelength_additions_servers_title to R.string.wavelength_additions_servers_desc,
+                        R.string.wavelength_additions_auto_title to R.string.wavelength_additions_auto_desc,
                         R.string.wavelength_additions_output_title to R.string.wavelength_additions_output_desc,
+                        R.string.wavelength_additions_updates_title to R.string.wavelength_additions_updates_desc,
+                        R.string.wavelength_additions_integrations_title to R.string.wavelength_additions_integrations_desc,
                     ).forEach { (title, description) ->
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(stringResource(title), style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(stringResource(description))
                         }
                     }
@@ -460,46 +472,6 @@ fun AboutScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            SectionHeader(stringResource(R.string.credits_developer))
-    
-            // Meld developer
-            ContributorAvatar(
-                avatarUrl = meldDeveloper.avatarUrl,
-                sizeDp = 180,
-                shape = CircleShape,
-                contentDescription = meldDeveloper.name,
-            )
-    
-            Spacer(Modifier.height(24.dp))
-    
-            Text(
-                text = meldDeveloper.name,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-    
-            Spacer(Modifier.height(32.dp))
-    
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-            ) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedActionButton(
-                        label = stringResource(R.string.credits_github),
-                        iconRes = R.drawable.github,
-                        iconSize = 24.dp,
-                        onClick = { uriHandler.openUri(meldDeveloper.githubUrl) }
-                    )
-                }
-            }
-    
-            Spacer(Modifier.height(48.dp))
-    
             Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -507,7 +479,7 @@ fun AboutScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
             ) {
-                val allUpstreamContributors = listOf(upstreamLeadDeveloper) + upstreamCollaborators
+                val allUpstreamContributors = listOf(meldDeveloper, upstreamLeadDeveloper) + upstreamCollaborators
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     allUpstreamContributors.forEachIndexed { index, contributor ->
                         var clickCount by remember(contributor.name) { mutableIntStateOf(0) }
