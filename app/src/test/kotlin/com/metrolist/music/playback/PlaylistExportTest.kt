@@ -139,6 +139,60 @@ class PlaylistExportTest {
         assertTrue(exporter.requestedFolders("song").isEmpty())
     }
 
+    private fun saveTrack(id: String, title: String, episode: Boolean = false) {
+        db.dao.insert(SongEntity(id = id, title = title, duration = 20, isEpisode = episode))
+        val hole = cache.startReadWrite(id, 0, bytes.size.toLong())
+        val file = cache.startFile(id, 0, bytes.size.toLong()); file.writeBytes(bytes)
+        cache.commitFile(file, bytes.size.toLong()); cache.releaseHoleSpan(hole)
+        val length = ContentMetadataMutations()
+        ContentMetadataMutations.setContentLength(length, bytes.size.toLong())
+        cache.applyContentMetadataMutations(id, length)
+    }
+
+    @Test fun `unassigned music goes to No Playlist and an explicit playlist still wins`() = runBlocking {
+        saveTrack("unassigned", "Alone")
+        exporter.request("unassigned", null)
+        assertTrue(exporter.export("unassigned"))
+        assertArrayEquals(bytes, File(provider.root, "No Playlist/Alone.m4a").readBytes())
+        exporter.request("unassigned", "Chosen")
+        assertTrue(exporter.export("unassigned"))
+        assertArrayEquals(bytes, File(provider.root, "Chosen/Alone.m4a").readBytes())
+    }
+
+    @Test fun `unscoped music with playlist membership keeps root rather than inventing a playlist`() = runBlocking {
+        exporter.request("song", null)
+        assertTrue(exporter.export("song"))
+        assertTrue(File(provider.root, "Shared song.m4a").exists())
+        assertFalse(File(provider.root, "No Playlist").exists())
+    }
+
+    @Test fun `feed podcast download remains cached and is excluded from music exports`() = runBlocking {
+        saveTrack("podcast:episode", "Feed episode", episode = true)
+        exporter.request("podcast:episode", "Not music")
+        assertTrue(exporter.export("podcast:episode"))
+        assertEquals(0, exporter.exportAll(listOf("podcast:episode")))
+        assertTrue(cache.isCached("podcast:episode", 0, bytes.size.toLong()))
+        assertTrue(provider.root.list()!!.isEmpty())
+    }
+
+    @Test fun `first download from marked YouTube podcast stays private without cached remote membership`() = runBlocking {
+        saveTrack("yt-episode", "YouTube episode")
+        context.dataStore.edit { it[com.metrolist.music.constants.PodcastPlaylistsKey] = "yt:VLshow-list\tShow\t" }
+        exporter.request("yt-episode", "YouTube - Show", sourcePlaylistId = "youtube:show-list")
+        assertTrue(exporter.export("yt-episode"))
+        val restarted = DownloadExporter(context, MusicDatabase(db), cache)
+        assertEquals(0, restarted.exportAll(listOf("yt-episode")))
+        assertTrue(cache.isCached("yt-episode", 0, bytes.size.toLong()))
+        assertTrue(provider.root.list()!!.isEmpty())
+    }
+
+    @Test fun `a marked local podcast playlist also prevents export from a music playlist`() = runBlocking {
+        context.dataStore.edit { it[com.metrolist.music.constants.PodcastPlaylistsKey] = "A" }
+        exporter.request("song", "B", sourcePlaylistId = "B")
+        assertTrue(exporter.export("song"))
+        assertTrue(provider.root.list()!!.isEmpty())
+    }
+
     @Test fun `cleanup is next release only reviewed selection only and never deletes root files`() = runBlocking {
         assertTrue(offerPlaylistCleanup(280112, false, true))
         assertFalse(offerPlaylistCleanup(280111, false, true))

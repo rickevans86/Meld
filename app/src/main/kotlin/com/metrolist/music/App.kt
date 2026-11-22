@@ -117,6 +117,7 @@ class App :
 
         // Install crash handler first. CrashReporter must be initialized before
         // CrashHandler so the uncaught-exception path can post to GitHub Issues.
+        com.metrolist.music.utils.SavedErrorLogs.init(this)
         CrashReporter.init(this)
         CrashHandler.install(this)
         AnrWatchdog.start()

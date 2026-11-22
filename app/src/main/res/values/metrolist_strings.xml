@@ -1310,7 +1310,7 @@
     <string name="download_folder_off">Off. Tap to choose a folder; new downloads are also saved there as .m4a audio files</string>
     <string name="download_folder_save_existing">Save existing downloads to folder</string>
     <string name="download_folder_by_playlist">Sort into playlist folders</string>
-    <string name="download_folder_by_playlist_desc">Downloading a playlist saves files only to that playlist’s folder. Already downloaded audio is reused when you download another playlist. Individual songs go in the main folder. Existing files are kept.</string>
+    <string name="download_folder_by_playlist_desc">Downloading a playlist saves files only to that playlist’s folder. Already downloaded audio is reused when you download another playlist. Music without a playlist goes in No Playlist. Podcast downloads, including marked YouTube podcasts, stay in private app storage. Existing exported files are kept.</string>
     <string name="download_folder_saving">Saving downloads…</string>
     <string name="download_folder_stop">Stop saving to folder</string>
     <string name="download_folder_stop_desc">Files already saved stay in the folder</string>
@@ -1680,9 +1680,9 @@
     <string name="wavelength_additions_output_desc">• Pause playback when an audio output connects, disconnects or changes, including relevant Bluetooth, wired and car connections.\n• Keep your queue and playback position, then press Play when you are ready to resume.</string>
     <string name="credits_meld_developer">Meld developer</string>
     <string name="wavelength_additions_homes_title">Separate music homes and library shortcuts</string>
-    <string name="wavelength_additions_homes_desc">• Keep YouTube and Spotify in separate home pages and choose which is the default.\n• Use source-specific search and library shortcuts instead of mixing every source into one home.\n• Pin supported playlists to speed dial and use playlist menus to manage library and download actions.</string>
+    <string name="wavelength_additions_homes_desc">• Keep YouTube and Spotify in separate home pages and choose which is the default.\n• Use source-specific search and library shortcuts instead of mixing every source into one home.\n• Pin supported playlists to speed dial and use playlist menus to manage library and download actions.\n• Use Auto-download new songs on local, YouTube or Spotify playlists to check periodically for new additions.</string>
     <string name="wavelength_additions_downloads_title">Downloads and files you can keep</string>
-    <string name="wavelength_additions_downloads_desc">• Choose a device folder for supported music downloads to be exported as ordinary audio files.\n• Optionally organise exported tracks into playlist folders, including source-labelled YouTube and Spotify playlist folders.\n• Use download and storage settings, including Wi-Fi-only downloading. Exported files can be opened by other audio apps.</string>
+    <string name="wavelength_additions_downloads_desc">• Choose a device folder for supported music downloads to be exported as ordinary audio files.\n• Optionally organise exported tracks into playlist folders, including source-labelled YouTube and Spotify playlist folders.\n• Use download and storage settings, including Wi-Fi-only downloading. Exported files can be opened by other audio apps.\n• Music without playlist membership is saved in No Playlist when playlist folders are enabled.</string>
     <string name="wavelength_additions_local_title">Local music folders</string>
     <string name="wavelength_additions_local_desc">• Browse audio stored on your phone through a dedicated Local files screen.\n• Choose music folders and add folders directly when normal scanning misses them, including folders hidden by a .nomedia file.\n• Keep local playback available without a music-service connection.</string>
     <string name="wavelength_additions_book_player_title">Audiobook player controls</string>
@@ -1690,7 +1690,7 @@
     <string name="wavelength_additions_abs_title">Audiobookshelf downloads and progress</string>
     <string name="wavelength_additions_abs_desc">• Download supported books for playback when the server is offline or the phone has no connection.\n• Retain local listening progress while offline and send pending progress back to Audiobookshelf when a connection is restored.\n• Browse available library, series and collection information, with book details and chapter navigation.</string>
     <string name="wavelength_additions_episodes_title">Podcast channels, episodes and downloads</string>
-    <string name="wavelength_additions_episodes_desc">• Favourite channels on the phone or in Android Auto; both use the same saved favourites and place them higher in the channel list.\n• Browse new episodes, Episodes for later, channels and downloaded episodes, with sorting and played-state controls.\n• Use per-show options, including playback speed and automatic downloads where available.\n• Choose automatic download on playback and deletion of completed episode downloads.</string>
+    <string name="wavelength_additions_episodes_desc">• Favourite channels on the phone or in Android Auto; both use the same saved favourites and place them higher in the channel list.\n• Browse new episodes, Episodes for later, channels and downloaded episodes, with sorting and played-state controls.\n• Use per-show options, including playback speed and automatic downloads where available.\n• Choose automatic download on playback and deletion of completed episode downloads.\n• Podcast audio, including marked YouTube podcast playlists, stays in private app storage rather than being exported to the music folder.</string>
     <string name="wavelength_additions_podcast_controls_title">Podcast buffering and skip controls</string>
     <string name="wavelength_additions_podcast_controls_desc">• Choose a startup buffer before streamed podcast playback begins: the default is two minutes, adjustable in two-minute steps.\n• The buffer preference also applies to configured YouTube podcast playlists.\n• Configure podcast rewind and fast-forward amounts, including the dedicated buttons and optional next/previous-button skipping behavior.</string>
     <string name="wavelength_additions_recognition_title">Song recognition and Keep listening</string>
@@ -1713,4 +1713,15 @@
     <string name="export_cleanup_keep">Keep folders</string>
     <string name="export_cleanup_failed">Some folders could not be removed. Check access to the export folder and try again, or keep the remaining folders.</string>
     <string name="export_preparing_songs">Preparing %1$d songs</string>
+    <string name="playlist_auto_download_details">Downloads the current contents, then checks for additions about every six hours when online. Follows your Wi-Fi-only download setting. Android may delay background checks.</string>
+    <string name="playlist_auto_episodes_on">Auto-download new episodes</string>
+    <string name="playlist_auto_episodes_off">Stop auto-downloading new episodes</string>
+    <string name="saved_error_logs">Saved error logs</string>
+    <string name="save_error_logs">Save error logs on this device</string>
+    <string name="save_error_logs_desc">Keep the latest 20 playback, crash and reported app errors privately for review, including playback failures that recover. Off by default. Reports may contain media titles and device details; common URLs and credentials are removed. Nothing is uploaded by this setting. Turning it off stops saving; use Clear to delete saved reports.</string>
+    <string name="review_error_logs">Review and share saved reports</string>
+    <string name="no_saved_error_logs">No saved error reports. Enable saving to capture future errors.</string>
+    <string name="clear_saved_error_logs">Clear saved reports</string>
+    <string name="clear_saved_error_logs_confirm">Delete all saved error reports from this device?</string>
+    <string name="saved_error_logs_failure">Could not complete the error log action. Please try again.</string>
 </resources>

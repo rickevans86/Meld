@@ -1,0 +1,10 @@
+# PLAYLIST-AUTO-STORAGE
+
+## Implemented locally — PLAYLIST-AUTO-STORAGE, ChatGPT Codex, 2026-11-22
+
+Implemented on feat/playlist-auto-download-storage (base main 3ac8c581). Local/YouTube/Spotify playlist menus now expose auto-download, with canonical source IDs and compatibility for saved local selections. Enabling queues current contents; the existing six-hour worker refreshes enabled sources, respects offline mode and download-manager Wi-Fi requirements, and is restored independently of podcast auto-download settings. Android may delay background work. Songs with no playlist membership export to No Playlist when playlist folders are enabled; explicit playlist destinations and cached-file reuse remain intact.
+
+Feed episodes and marked YouTube podcast playlists remain in the app-private download cache and are excluded from music-folder export, including bulk export and first playlist downloads before membership is cached. Persisted private IDs preserve this classification across restarts. Public folder actions are hidden for marked podcasts. Existing public copies are not moved or deleted. Release-112 cleanup gate is unchanged. No schema, dependency, signing or version changes.
+
+Validation: 15 targeted export/privacy/identity/download-state tests and assembleFossDebug passed; full app testFossDebugUnitTest passed. English XML/unique resource keys and git diff --check passed. Debug APK: app/build/outputs/apk/foss/debug/app-foss-debug.apk. Logs outside repository: /workspace/work/playlist-auto-storage-tests.log and playlist-auto-storage-full-tests.log. Physical phone/provider and live YouTube/Spotify background refresh remain unverified. Source and records are local/uncommitted; no PR, main push or release was performed for this task. Issues are disabled; this remains a temporary local task, not a claimed Issue. Reservations released after local implementation; next action is review/publish when requested. AI: ChatGPT Codex.
+
