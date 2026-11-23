@@ -280,6 +280,9 @@ private fun DeviceAudiobooks(
                     viewModel.openBookId.value = it.book.id
                 }
             }
+            AudiobookTab.SERIES -> {
+                item(key = "local_series_info") { TabMessage(stringResource(R.string.audiobook_series_server_only)) }
+            }
             AudiobookTab.DOWNLOADED -> {
                 if (summaries.isNotEmpty()) item(key = "on_phone") { TabMessage(stringResource(R.string.audiobook_all_on_phone)) }
                 deviceGrid(AudiobookTabs.sortLocal(visible, tabs.sort, { it.book.title }, { it.book.author })) {

@@ -153,7 +153,10 @@ constructor(
                         File(raw).parent?.removePrefix(storageRoot)?.trim('/') ?: continue
                     }
                     val name = cursor.getString(nameCol) ?: if (useRelativePath) "" else File(raw).name
-                    entries += IndexedAudio(cursor.getLong(idCol), folder, cursor.getInt(musicCol) != 0, name)
+                    val id = cursor.getLong(idCol)
+                    val uri = android.content.ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+                    if (!localAudioStillExists(context, uri)) continue
+                    entries += IndexedAudio(id, folder, cursor.getInt(musicCol) != 0, name)
                 }
             }
         } catch (e: SecurityException) {
@@ -206,4 +209,15 @@ constructor(
             DocumentsContract.getTreeDocumentId(treeUri.toUri()).substringAfter(':', "")
         }.getOrDefault(treeUri)
     }
+}
+
+
+/** A stale MediaStore row can survive deletion; permission/provider failures do not prove deletion. */
+internal fun localAudioStillExists(context: Context, uri: Uri): Boolean = try {
+    context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { }
+    true
+} catch (_: java.io.FileNotFoundException) {
+    false
+} catch (_: Exception) {
+    true
 }

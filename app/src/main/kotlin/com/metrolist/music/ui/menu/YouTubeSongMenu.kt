@@ -98,7 +98,8 @@ import androidx.navigation.NavController
 fun YouTubeSongMenu(
     song: SongItem,
     onDismiss: () -> Unit,
-    onHistoryRemoved: () -> Unit = {}
+    onHistoryRemoved: () -> Unit = {},
+    onRemoveSavedEpisode: (() -> Unit)? = null
 ) {
     val navController = LocalNavController.current
     val context = LocalContext.current
@@ -452,8 +453,16 @@ fun YouTubeSongMenu(
         item {
             Material3MenuGroup(
                 items = buildList {
+                    onRemoveSavedEpisode?.let { remove ->
+                        add(Material3MenuItemData(
+                            title = { Text(stringResource(R.string.remove_from_episodes_for_later)) },
+                            icon = { Icon(painterResource(R.drawable.delete), null) },
+                            onClick = { remove(); onDismiss() },
+                        ))
+                    }
+
                     // Save/Remove for Later option for podcast episodes
-                    if (song.isEpisode) {
+                    if (song.isEpisode && onRemoveSavedEpisode == null) {
                         if (song.setVideoId != null) {
                             // Episode is saved - show remove option
                             add(

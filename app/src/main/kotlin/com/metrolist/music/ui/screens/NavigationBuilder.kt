@@ -561,6 +561,10 @@ fun NavGraphBuilder.navigationBuilder(
         SpotifyAlbumScreen(navController, scrollBehavior)
     }
 
+    composable("spotify_playlists") {
+        com.metrolist.music.ui.screens.library.SpotifyPlaylistsScreen(navController)
+    }
+
     composable("spotify_liked_songs") {
         SpotifyLikedSongsScreen(navController, scrollBehavior)
     }

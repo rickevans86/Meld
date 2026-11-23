@@ -1724,4 +1724,10 @@
     <string name="clear_saved_error_logs">Clear saved reports</string>
     <string name="clear_saved_error_logs_confirm">Delete all saved error reports from this device?</string>
     <string name="saved_error_logs_failure">Could not complete the error log action. Please try again.</string>
+    <string name="browse_refresh">Refresh</string>
+    <string name="remove_from_episodes_for_later">Remove from Episodes for Later</string>
+    <string name="audiobook_tab_series">Series</string>
+    <string name="audiobook_all_series">All series</string>
+    <string name="audiobook_no_series">No series found in this library.</string>
+    <string name="audiobook_series_server_only">Choose Audiobookshelf to browse series supplied by your server. Local books do not include series information.</string>
 </resources>

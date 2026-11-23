@@ -114,6 +114,15 @@ fun AudiobookshelfContent(
     val query = if (onAudiobooksTab) pageQuery else inlineQuery
     val listState = rememberLazyListState()
     val tabs = rememberAudiobookTabState()
+    val series by viewModel.series.collectAsState()
+    val seriesLoading by viewModel.seriesLoading.collectAsState()
+    val seriesTotal by viewModel.seriesTotal.collectAsState()
+    var openSeriesId by rememberSaveable(libraryId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(tabs.selected, libraryId) {
+        if (tabs.selected == AudiobookTab.SERIES) viewModel.loadSeries(reset = true)
+    }
+    BackHandler(enabled = tabs.selected == AudiobookTab.SERIES && openSeriesId != null && openBookId == null) { openSeriesId = null }
+
     val online by playerConnection.service.connectivityObserver.networkStatus.collectAsState()
     LaunchedEffect(online, session, downloadedBooks.isNotEmpty()) {
         if (!online || (session == null && downloadedBooks.isNotEmpty())) tabs.select(AudiobookTab.DOWNLOADED)
@@ -126,7 +135,7 @@ fun AudiobookshelfContent(
 
     val playingItemId = mediaMetadata?.id?.takeIf(::isAbsTrackId)?.removePrefix("audiobook:abs:")?.substringBeforeLast(':')
 
-    LaunchedEffect(openBookId) { listState.scrollToItem(0) }
+    LaunchedEffect(openBookId, openSeriesId) { listState.scrollToItem(0) }
     // The server's progress changes while a book plays, so re-read it when playback pauses or the book changes
     LaunchedEffect(playingItemId, isPlaying) { if (session != null && !isPlaying) viewModel.refreshProgress() }
     BackHandler(enabled = openBookId != null) { viewModel.close() }
@@ -352,6 +361,33 @@ fun AudiobookshelfContent(
                             OutlinedButton(onClick = viewModel::loadMore, enabled = !loading) {
                                 Text(stringResource(R.string.abs_load_more))
                             }
+                        }
+                    }
+                }
+            }
+            AudiobookTab.SERIES -> {
+                val group = series.find { it.id == openSeriesId }
+                if (group != null) {
+                    item(key = "series_back") {
+                        TextButton(onClick = { openSeriesId = null }) { Text(stringResource(R.string.audiobook_all_series)) }
+                    }
+                    item(key = "series_name") { Text(group.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp)) }
+                    if (group.books.isEmpty()) item(key = "series_empty") { TabMessage(stringResource(R.string.abs_no_books)) }
+                    grid(group.books, "series_book")
+                } else {
+                    items(series.sortedBy { it.name.lowercase() }, key = { "series_${it.id}" }) { group ->
+                        androidx.compose.material3.ListItem(
+                            headlineContent = { Text(group.name) },
+                            supportingContent = { Text(pluralStringResource(R.plurals.n_audiobook, group.books.size, group.books.size)) },
+                            leadingContent = { AsyncImage(group.books.firstOrNull()?.let { viewModel.coverUrl(it.id) }, null, Modifier.size(64.dp)) },
+                            modifier = Modifier.clickable { openSeriesId = group.id },
+                        )
+                    }
+                    if (series.isEmpty() && !seriesLoading) item(key = "no_series") { TabMessage(stringResource(R.string.audiobook_no_series)) }
+                    if (seriesLoading) item(key = "series_loading") { LoadingRow() }
+                    else item(key = "series_more") {
+                        OutlinedButton(onClick = { viewModel.loadSeries(reset = series.size >= seriesTotal) }, modifier = Modifier.padding(16.dp)) {
+                            Text(stringResource(if (series.size < seriesTotal) R.string.abs_load_more else R.string.browse_refresh))
                         }
                     }
                 }

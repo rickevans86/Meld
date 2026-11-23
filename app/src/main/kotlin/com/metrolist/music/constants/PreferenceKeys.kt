@@ -175,7 +175,6 @@ val DownloadWifiOnlyKey = booleanPreferencesKey("downloadWifiOnly")
 val PauseListenHistoryKey = booleanPreferencesKey("pauseListenHistory")
 val PauseSearchHistoryKey = booleanPreferencesKey("pauseSearchHistory")
 val DisableScreenshotKey = booleanPreferencesKey("disableScreenshot")
-val CrashReportingEnabledKey = booleanPreferencesKey("crashReportingEnabled")
 
 val EnableDynamicIconKey = booleanPreferencesKey("enableDynamicIcon")
 

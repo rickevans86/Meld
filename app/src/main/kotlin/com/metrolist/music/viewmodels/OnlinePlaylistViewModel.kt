@@ -64,6 +64,34 @@ class OnlinePlaylistViewModel @Inject constructor(
     var continuation: String? = null
         private set
 
+    val isSavedEpisodes = normalizedPlaylistId == "SE"
+    private var removingSavedEpisodes = false
+
+    fun removeSavedEpisodes(ids: Set<String>) {
+        if (!isSavedEpisodes || removingSavedEpisodes || ids.isEmpty()) return
+        removingSavedEpisodes = true
+        viewModelScope.launch(Dispatchers.IO) {
+            _error.value = null
+            try {
+                val selected = playlistSongs.value.filter { it.id in ids }
+                com.metrolist.music.podcasts.removeSavedEpisodes(
+                    episodes = selected,
+                    refreshTokens = { YouTube.episodesForLater().getOrThrow() },
+                    removeRemote = { id, token -> YouTube.removeEpisodeFromSavedEpisodes(id, token).getOrThrow() },
+                    onRemoved = { song ->
+                        database.transaction {
+                            getSongByIdBlocking(song.id)?.song?.let { update(it.copy(inLibrary = null)) }
+                        }
+                        playlistSongs.value = playlistSongs.value.filterNot { it.id == song.id }
+                        playlist.value = playlist.value?.copy(songCountText = "${playlistSongs.value.size} episodes")
+                    },
+                )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (error: Exception) { _error.value = context.getString(com.metrolist.music.R.string.error_episode_remove); reportException(error) }
+            finally { removingSavedEpisodes = false }
+        }
+    }
+
     private var proactiveLoadJob: Job? = null
 
     init {

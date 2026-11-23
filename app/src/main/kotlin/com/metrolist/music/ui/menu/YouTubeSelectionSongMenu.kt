@@ -56,6 +56,7 @@ fun YouTubeSelectionSongMenu(
     songSelection: List<SongItem>,
     onDismiss: () -> Unit,
     clearAction: () -> Unit,
+    onRemoveSavedEpisodes: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val database = LocalDatabase.current
@@ -223,6 +224,13 @@ fun YouTubeSelectionSongMenu(
         item {
             Material3MenuGroup(
                 listOfNotNull(
+                    onRemoveSavedEpisodes?.let { remove ->
+                        Material3MenuItemData(
+                            title = { Text(stringResource(R.string.remove_from_episodes_for_later)) },
+                            icon = { Icon(painterResource(R.drawable.delete), null) },
+                            onClick = { remove(); clearAction(); onDismiss() },
+                        )
+                    },
                     if (!isGuest) {
                         Material3MenuItemData(
                             icon = { Icon(painterResource(R.drawable.play), null) },

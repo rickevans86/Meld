@@ -118,6 +118,14 @@ internal fun buildSpeedDialItems(
 internal fun com.metrolist.innertube.pages.HomePage.Section.sectionKey(): String =
     "$title|${items.firstOrNull()?.id.orEmpty()}"
 
+internal fun appendHomeSections(
+    previous: List<com.metrolist.innertube.pages.HomePage.Section>,
+    next: List<com.metrolist.innertube.pages.HomePage.Section>,
+): List<com.metrolist.innertube.pages.HomePage.Section> {
+    val seen = previous.mapTo(mutableSetOf()) { it.sectionKey() }
+    return previous + next.filter { seen.add(it.sectionKey()) }
+}
+
 /** Podcast shows, podcast episodes and audiobook chapters (all of which have their own tabs). */
 internal fun YTItem.isPodcastLike(): Boolean =
     this is com.metrolist.innertube.models.PodcastItem ||
@@ -883,17 +891,17 @@ class HomeViewModel @Inject constructor(
         val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
         val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
 
+        _isLoadingMore.value = true
         viewModelScope.launch(Dispatchers.IO) {
-            _isLoadingMore.value = true
             val nextSections = YouTube.home(continuation).getOrNull() ?: run {
                 _isLoadingMore.value = false
                 return@launch
             }
 
-            val existingKeys = homePage.value?.sections.orEmpty().map { it.sectionKey() }.toMutableSet()
+            val previousSections = homePage.value?.sections.orEmpty()
             homePage.value = nextSections.copy(
                 chips = homePage.value?.chips,
-                sections = (homePage.value?.sections.orEmpty() + nextSections.sections).mapNotNull { section ->
+                sections = appendHomeSections(previousSections, nextSections.sections.mapNotNull { section ->
                     val filteredItems = section.items
                         .filterOutNulls()
                         .filterExplicit(hideExplicit)
@@ -901,8 +909,7 @@ class HomeViewModel @Inject constructor(
                         .filterYoutubeShorts(hideYoutubeShorts)
                     if (filteredItems.isEmpty()) null else section.copy(items = filteredItems)
                 }
-                    // Drop sections the feed repeats across continuations (same title + first item)
-                    .filter { existingKeys.add(it.sectionKey()) }
+                )
             )
             _isLoadingMore.value = false
         }

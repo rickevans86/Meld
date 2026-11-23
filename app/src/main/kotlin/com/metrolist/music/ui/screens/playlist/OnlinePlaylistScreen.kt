@@ -117,6 +117,7 @@ fun OnlinePlaylistScreen(
     navController: NavController,
     viewModel: OnlinePlaylistViewModel = hiltViewModel(),
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val menuState = LocalMenuState.current
     val database = LocalDatabase.current
     val haptic = LocalHapticFeedback.current
@@ -134,6 +135,9 @@ fun OnlinePlaylistScreen(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    LaunchedEffect(error) {
+        if (error != null && songs.isNotEmpty()) android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_LONG).show()
+    }
     val isPodcastPlaylist = viewModel.isPodcastPlaylist
 
     val hideExplicit by rememberPreference(key = HideExplicitKey, defaultValue = false)
@@ -314,7 +318,8 @@ fun OnlinePlaylistScreen(
                                 } else {
                                     IconButton(onClick = {
                                         menuState.show {
-                                            YouTubeSongMenu(songItem, menuState::dismiss)
+                                            YouTubeSongMenu(songItem, menuState::dismiss,
+                                                onRemoveSavedEpisode = if (viewModel.isSavedEpisodes) ({ viewModel.removeSavedEpisodes(setOf(songItem.id)) }) else null)
                                         }
                                     }) {
                                         Icon(painterResource(R.drawable.more_vert), null)
@@ -434,6 +439,9 @@ fun OnlinePlaylistScreen(
                                             .map { it.second },
                                     onDismiss = menuState::dismiss,
                                     clearAction = onExitSelectionMode,
+                                    onRemoveSavedEpisodes = if (viewModel.isSavedEpisodes) ({
+                                        viewModel.removeSavedEpisodes(selection.toSet())
+                                    }) else null,
                                 )
                             }
                         },

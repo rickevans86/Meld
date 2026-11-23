@@ -117,7 +117,20 @@ internal fun parseAbsGroups(value: JsonElement, kind: AbsBrowseKind): AbsGroupPa
         val id = group.string("id")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         val books = if (kind == AbsBrowseKind.PLAYLISTS) {
             group.array("items").orEmpty().mapNotNull { it.obj?.obj("libraryItem")?.toSummary() }
-        } else group.array("books").orEmpty().mapNotNull { it.obj?.toSummary() }
+        } else {
+            val items = group.array("books").orEmpty()
+            val ordered = if (kind == AbsBrowseKind.SERIES) items.sortedWith(
+                compareBy<JsonElement> { book ->
+                    val metadata = book.obj?.obj("media")?.obj("metadata")
+                    val series = metadata?.array("series")?.firstOrNull {
+                        it.obj?.string("id") == id || it.obj?.string("name") == group.string("name")
+                    }?.obj
+                    (series?.get("sequence")?.primitive?.content ?: book.obj?.get("sequence")?.primitive?.content ?: book.obj?.get("seriesSequence")?.primitive?.content ?: metadata?.get("seriesSequence")?.primitive?.content)?.toDoubleOrNull()
+                        ?: Double.MAX_VALUE
+                },
+            ) else items
+            ordered.mapNotNull { it.obj?.toSummary() }
+        }
         AbsBookGroup(id, group.string("name").orEmpty(), books.distinctBy { it.id })
     }
     return AbsGroupPage(groups, root?.get("total")?.primitive?.intOrNull ?: groups.size)

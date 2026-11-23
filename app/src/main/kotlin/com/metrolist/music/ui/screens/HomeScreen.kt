@@ -1127,7 +1127,7 @@ fun HomeScreen(
         )
     }
 
-    val homeSections =
+    val proposedSections =
         remember(
             randomizeHomeOrder,
             randomSeed,
@@ -1240,6 +1240,10 @@ fun HomeScreen(
             }
         }
 
+    val stableHomeOrder = remember(randomSeed, selectedChip?.title, randomizeHomeOrder, isSpotifyHome) {
+        com.metrolist.music.utils.StableHomeOrder()
+    }
+    val homeSections = stableHomeOrder.arrange(proposedSections) { it.id }
 
     LaunchedEffect(quickPicks) {
         quickPicksLazyGridState.scrollToItem(0)
@@ -2689,7 +2693,9 @@ fun HomeScreen(
                         item(key = "spotify_section_title_$index") {
                             NavigationTitle(
                                 title = resolveSpotifySectionTitle(section),
-                                onClick = if (section.title == "spotify_new_releases") {
+                                onClick = if (section.title == "spotify_your_playlists") {
+                                    { navController.navigate("spotify_playlists") }
+                                } else if (section.title == "spotify_new_releases") {
                                     { navController.navigate("new_release") }
                                 } else null,
                                 modifier = Modifier.animateItem()
