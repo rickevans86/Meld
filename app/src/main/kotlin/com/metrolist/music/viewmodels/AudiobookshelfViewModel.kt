@@ -79,6 +79,36 @@ constructor(
     private val _downloadedBooks = MutableStateFlow<List<AbsBookSummary>>(emptyList())
     val downloadedBooks = _downloadedBooks.asStateFlow()
 
+    private val _series = MutableStateFlow<List<com.metrolist.music.audiobooks.abs.AbsBookGroup>>(emptyList())
+    val series = _series.asStateFlow()
+    val seriesLoading = MutableStateFlow(false)
+    val seriesTotal = MutableStateFlow(0)
+    private var seriesPage = -1
+    private var seriesLibrary: String? = null
+
+    fun loadSeries(reset: Boolean = false) {
+        val library = _libraryId.value ?: return
+        if (seriesLoading.value || !connectivity.isCurrentlyConnected()) return
+        if (!reset && seriesLibrary == library && _series.value.size >= seriesTotal.value && seriesPage >= 0) return
+        if (reset || seriesLibrary != library) {
+            _series.value = emptyList(); seriesPage = -1; seriesTotal.value = 0
+        }
+        seriesLibrary = library
+        seriesLoading.value = true
+        viewModelScope.launch {
+            try {
+                val next = repository.groups(library, com.metrolist.music.audiobooks.abs.AbsBrowseKind.SERIES, seriesPage + 1, PAGE_SIZE)
+                if (_libraryId.value == library) {
+                    _series.value = (_series.value + next.groups).distinctBy { it.id }
+                    seriesPage++
+                    seriesTotal.value = next.total
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (e: Exception) { _error.value = describe(e) }
+            finally { seriesLoading.value = false }
+        }
+    }
+
     private var page = 0
     private var searchJob: Job? = null
 
@@ -109,6 +139,7 @@ constructor(
     fun signOut() {
         viewModelScope.launch {
             repository.signOut()
+            _series.value = emptyList(); seriesPage = -1; seriesLibrary = null
             _libraries.value = emptyList()
             _books.value = emptyList()
             _inProgress.value = emptyList()

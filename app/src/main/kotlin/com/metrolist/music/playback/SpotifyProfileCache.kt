@@ -106,7 +106,7 @@ object SpotifyProfileCache {
         limit: Int = 50,
     ): List<SpotifyTrack> {
         ensureLoaded(context, database)
-        return cachedTracks.take(limit)
+        return cachedTracks.filter(::isSpotifyMusicTrack).take(limit)
     }
 
     /**
@@ -491,6 +491,7 @@ object SpotifyProfileCache {
                 // Upstream's DAO takes a LocalDateTime here; it used to take epoch millis.
                 val fromTimestamp = LocalDateTime.now().minusMonths(3)
                 val localSongs = database.mostPlayedSongs(fromTimestamp, limit = 100).first()
+                    .filter { it.id.startsWith("spotify:") && !it.song.isEpisode }
 
                 if (tracks.isEmpty() && localSongs.isNotEmpty()) {
                     Timber.d("$TAG: No GQL/REST data — using ${localSongs.size} local songs as sole source")
@@ -577,7 +578,7 @@ object SpotifyProfileCache {
             }
         }
 
-        cachedTracks = dedupedTracks
+        cachedTracks = dedupedTracks.filter(::isSpotifyMusicTrack)
         cachedArtists = enrichedArtists
         lastRefreshMs = System.currentTimeMillis()
         lastRefreshHadRest = restSucceeded
@@ -643,7 +644,7 @@ object SpotifyProfileCache {
             val parsedArtists = json.decodeFromString<CachedArtistList>(artistsJson)
 
             if (parsed.tracks.isNotEmpty()) {
-                cachedTracks = parsed.tracks
+                cachedTracks = parsed.tracks.filter(::isSpotifyMusicTrack)
                 cachedArtists = parsedArtists.artists
                 lastRefreshMs = timestamp
                 lastRefreshHadRest = hadRest
@@ -665,4 +666,11 @@ object SpotifyProfileCache {
         var genres: List<String> = emptyList(),
         var images: List<SpotifyImage> = emptyList(),
     )
+}
+
+
+internal fun isSpotifyMusicTrack(track: SpotifyTrack): Boolean {
+    val id = track.id.removePrefix("spotify:").removePrefix("track:")
+    return id.matches(Regex("[A-Za-z0-9]{22}")) &&
+        (track.uri == null || track.uri == "spotify:track:$id")
 }

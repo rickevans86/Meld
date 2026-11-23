@@ -33,4 +33,10 @@ class AbsBrowseTest {
         assertEquals(listOf("book-1"), page.groups.single().books.map { it.id })
         assertTrue(parseAbsShelves(Json.parseToJsonElement("{} ")).isEmpty())
     }
+    @Test fun `series books follow numeric series sequence rather than title order`() {
+        fun book(id: String, n: String) = """{"id":"$id","mediaType":"book","media":{"metadata":{"title":"$id","series":[{"id":"s","name":"Series","sequence":"$n"}]}}}"""
+        val value = Json.parseToJsonElement("""{"results":[{"id":"s","name":"Series","books":[${book("ten", "10")},${book("two", "2")},${book("one", "1")}]}]}""")
+        assertEquals(listOf("one", "two", "ten"), parseAbsGroups(value, AbsBrowseKind.SERIES).groups.single().books.map { it.id })
+    }
+
 }

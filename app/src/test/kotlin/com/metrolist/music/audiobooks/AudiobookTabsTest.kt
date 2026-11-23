@@ -9,15 +9,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AudiobookTabsTest {
-    @Test fun `default order is Library, Downloaded, Listening and a saved order round-trips`() {
-        assertEquals(listOf(AudiobookTab.LIBRARY, AudiobookTab.DOWNLOADED, AudiobookTab.LISTENING), AudiobookTabs.decode(""))
-        val custom = listOf(AudiobookTab.LISTENING, AudiobookTab.LIBRARY, AudiobookTab.DOWNLOADED)
+    @Test fun `default order is Library, Series, Downloaded, Listening and a saved order round-trips`() {
+        assertEquals(listOf(AudiobookTab.LIBRARY, AudiobookTab.SERIES, AudiobookTab.DOWNLOADED, AudiobookTab.LISTENING), AudiobookTabs.decode(""))
+        val custom = listOf(AudiobookTab.LISTENING, AudiobookTab.LIBRARY, AudiobookTab.SERIES, AudiobookTab.DOWNLOADED)
         assertEquals(custom, AudiobookTabs.decode(AudiobookTabs.encode(custom)))
     }
 
     @Test fun `malformed saved orders keep every tab exactly once`() {
         assertEquals(
-            listOf(AudiobookTab.DOWNLOADED, AudiobookTab.LIBRARY, AudiobookTab.LISTENING),
+            listOf(AudiobookTab.DOWNLOADED, AudiobookTab.LIBRARY, AudiobookTab.SERIES, AudiobookTab.LISTENING),
             AudiobookTabs.decode("downloaded, bogus,downloaded,,library"),
         )
     }
@@ -27,6 +27,12 @@ class AudiobookTabsTest {
         assertEquals(AudiobookTab.LISTENING, AudiobookTabs.selected("", order))
         assertEquals(AudiobookTab.LISTENING, AudiobookTabs.selected("removed", order))
         assertEquals(AudiobookTab.DOWNLOADED, AudiobookTabs.selected("downloaded", order))
+    }
+
+    @Test fun `existing tab order gains series beside library without losing customization`() {
+        assertEquals(listOf(AudiobookTab.LISTENING, AudiobookTab.LIBRARY, AudiobookTab.SERIES, AudiobookTab.DOWNLOADED),
+            AudiobookTabs.decode("listening,library,downloaded"))
+        assertEquals(AudiobookTab.SERIES, AudiobookTabs.selected("series", AudiobookTabs.decode("")))
     }
 
     @Test fun `unknown sort falls back to title`() {

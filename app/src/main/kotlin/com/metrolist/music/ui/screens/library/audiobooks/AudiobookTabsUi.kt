@@ -28,7 +28,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -83,7 +83,7 @@ internal fun rememberAudiobookTabState(): AudiobookTabState {
 
 @Composable
 internal fun AudiobookTabBar(order: List<AudiobookTab>, selected: AudiobookTab, onSelect: (AudiobookTab) -> Unit) {
-    PrimaryTabRow(
+    PrimaryScrollableTabRow(
         selectedTabIndex = order.indexOf(selected).coerceAtLeast(0),
         containerColor = MaterialTheme.colorScheme.surface,
         modifier = Modifier.padding(top = 4.dp),

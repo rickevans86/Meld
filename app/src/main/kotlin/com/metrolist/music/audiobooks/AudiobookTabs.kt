@@ -10,6 +10,7 @@ import com.metrolist.music.R
 /** Wavelength: the tabs on the phone Audiobooks screen, shown in the order saved in settings. */
 enum class AudiobookTab(val id: String, val titleRes: Int, val iconRes: Int) {
     LIBRARY("library", R.string.audiobook_tab_library, R.drawable.library_music_outlined),
+    SERIES("series", R.string.audiobook_tab_series, R.drawable.library_music_outlined),
     DOWNLOADED("downloaded", R.string.audiobook_tab_downloaded, R.drawable.download),
     LISTENING("listening", R.string.audiobook_tab_listening, R.drawable.audiobook),
 }
@@ -31,7 +32,11 @@ object AudiobookTabs {
     /** The saved order; unknown or repeated entries are dropped and missing tabs are added at the end. */
     fun decode(raw: String): List<AudiobookTab> {
         val saved = raw.split(',').mapNotNull { id -> AudiobookTab.entries.find { it.id == id.trim() } }.distinct()
-        return saved + AudiobookTab.entries.filter { it !in saved }
+        val migrated = saved.toMutableList()
+        if (migrated.isNotEmpty() && AudiobookTab.SERIES !in migrated) {
+            migrated.add((migrated.indexOf(AudiobookTab.LIBRARY) + 1).coerceAtLeast(0), AudiobookTab.SERIES)
+        }
+        return migrated + AudiobookTab.entries.filter { it !in migrated }
     }
 
     /** The open tab: the saved one if it still exists, otherwise the first in [order]. */

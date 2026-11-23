@@ -262,7 +262,7 @@ constructor(
             dataSourceFactory,
             Executor(Runnable::run)
         ).apply {
-            maxParallelDownloads = 3
+            maxParallelDownloads = 5
             addListener(
                 object : DownloadManager.Listener {
                     override fun onDownloadChanged(

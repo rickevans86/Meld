@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -63,6 +64,7 @@ constructor(
     private val _isScanning = MutableStateFlow(false)
     val isScanning = _isScanning.asStateFlow()
     private var rescanRequested = false
+    private val missingPickedIds = MutableStateFlow<Set<String>>(emptySet())
 
     private val allLocalSongs =
         context.dataStore.data
@@ -85,13 +87,13 @@ constructor(
         }
 
     val songs =
-        combine(allLocalSongs, folderPaths, musicFolders.choices, musicFolders.index) { songs, paths, choices, index ->
+        combine(allLocalSongs, folderPaths, musicFolders.choices, musicFolders.index, missingPickedIds) { songs, paths, choices, index, missing ->
             // A file in a hand-added folder that the phone also indexes would otherwise show twice
             val indexedPaths = index.orEmpty().mapTo(HashSet()) { it.path }
             songs.filter { song ->
                 val id = song.id
                 when {
-                    isAudiobookId(id) -> false
+                    id in missing || isAudiobookId(id) -> false
                     id.startsWith(PICKED_PREFIX) ->
                         choices.added.any { tree -> song.song.localPath?.startsWith(tree) == true } &&
                             song.song.localPath?.let(LocalMusicFolders::documentPath) !in indexedPaths
@@ -169,14 +171,17 @@ constructor(
             rescanRequested = true
             return
         }
+        _isScanning.value = true
         viewModelScope.launch(Dispatchers.IO) {
-            _isScanning.value = true
             try {
                 do {
                     rescanRequested = false
                     musicFolders.refreshIndex()
                     performScan()
                     scanPickedFolders()
+                    missingPickedIds.value = allLocalSongs.first().filter { it.id.startsWith(PICKED_PREFIX) }
+                        .filter { song -> song.song.localPath?.let { !com.metrolist.music.localfiles.localAudioStillExists(context, it.toUri()) } == true }
+                        .mapTo(mutableSetOf()) { it.id }
                 } while (rescanRequested)
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Error scanning local files")
