@@ -1,5 +1,9 @@
 # REMOVE-AUTO-CRASH-REPORTS
 
+## Release in progress — 0.9.2.114, ChatGPT Codex, 2026-11-23
+
+PR33 https://github.com/rickevans86/Meld/pull/33 merged to main 47892725b81e656341f12048f978d92dbcb4e68a after full CI 45187606991 passed tests/build/upload/lint on exact source head 5dc56e67cc93cbde20a7736f348211976e247268. Includes LIBRARY-BROWSE-FIXES and REMOVE-AUTO-CRASH-REPORTS plus user-requested parallel download increase 3→5. Local 330 app tests and debug build passed. Remote main refreshed before merge; no intervening source overlap. Automatic signed workflow 45189993127 is running on the merged main SHA; next version expected 0.9.2.114. No manual version/signing/schema/dependency changes or duplicate workflow dispatch. User explicitly authorized main merge/publication. Public release/identity/signature verification pending. AI: ChatGPT Codex. Next: await signed workflow, verify public APK versus 113, finalize all records and PR.
+
 ## Validated for next release — REMOVE-AUTO-CRASH-REPORTS, ChatGPT Codex, 2026-11-22
 
 Removed automatic Send crash reports from PrivacySettings and removed its unused preference key. Replaced the automatic GitHub issue uploader with local-only CrashReporter entry points, preserving fatal, nonfatal and ANR capture through SavedErrorLogs. Removed obsolete network-reporter initialization/comments. Playback diagnostics, private saved logs, their review/share/clear controls and the crash screen's manual sharing remain intact. Old automatic-report preferences and configured build credentials cannot reactivate sending because no uploader remains. No database/version/signing/dependency/resource/translation changes. Inherited build-time credential fields remain unused; no secret values were read or changed.

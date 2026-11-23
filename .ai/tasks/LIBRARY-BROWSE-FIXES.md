@@ -1,5 +1,9 @@
 # LIBRARY-BROWSE-FIXES
 
+## Release in progress — 0.9.2.114, ChatGPT Codex, 2026-11-23
+
+PR33 https://github.com/rickevans86/Meld/pull/33 merged to main 47892725b81e656341f12048f978d92dbcb4e68a after full CI 45187606991 passed tests/build/upload/lint on exact source head 5dc56e67cc93cbde20a7736f348211976e247268. Includes LIBRARY-BROWSE-FIXES and REMOVE-AUTO-CRASH-REPORTS plus user-requested parallel download increase 3→5. Local 330 app tests and debug build passed. Remote main refreshed before merge; no intervening source overlap. Automatic signed workflow 45189993127 is running on the merged main SHA; next version expected 0.9.2.114. No manual version/signing/schema/dependency changes or duplicate workflow dispatch. User explicitly authorized main merge/publication. Public release/identity/signature verification pending. AI: ChatGPT Codex. Next: await signed workflow, verify public APK versus 113, finalize all records and PR.
+
 ## Validated; publication authorized — LIBRARY-BROWSE-FIXES, ChatGPT Codex, 2026-11-23
 
 Implemented all six discussed requests plus subsequent song-download speed request on feat/remove-automatic-crash-reports, extending own PR33 to include REMOVE-AUTO-CRASH-REPORTS. LocalMusicFolders verifies MediaStore rows with an openable descriptor; missing files are excluded while permission/provider failures are not treated as deletion. Refresh also excludes missing hand-added files; empty folders disappear from derived lists, without deleting physical files, downloads, history or playlist memberships. SpotifyProfileCache excludes non-Spotify IDs/episode URIs across cache restore, return and history fallback; Start listening no longer borrows YouTube podcasts/radio/general history. Spotify Your Playlists arrow opens a full list backed by the existing paginated Spotify view model.
