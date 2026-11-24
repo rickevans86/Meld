@@ -1,5 +1,9 @@
 # Decisions
 
+## Release in progress — AUTO-RADIO-PREVIOUS, ChatGPT Codex, 2026-11-24
+
+User explicitly requested release. PR34 https://github.com/rickevans86/Meld/pull/34 merged to main 8c4a4753f6b1fa3532179af9085fa085de8db7ff after CI 45352588415 passed tests, APK build and lint. Tested source ee9fe84e0ecd9505d39e343500d0f6e9801b308e; final PR head 874e80ac385f61e75083dc4482ea85d1a3fe6480 differs only in AI records. Automated Spotify hash commit 826aa99b preserved; remote refs refreshed/no conflicting work. Signed main release workflow 45370296645 is running; publication and APK version/identity/certificate verification pending. No manual version/signing/schema/dependency changes or duplicate dispatch. AI: ChatGPT Codex. Next: await release workflow, verify public APK, finalize records and PR.
+
 ## Validated for next release — AUTO-RADIO-PREVIOUS, ChatGPT Codex, 2026-11-24
 
 Confirmed missing full-player Previous stems from intentional native radio Previous filtering in RadioMetadataPlayer to free Android Auto compact custom-action space. Added a separate Previous station session action at the end of radio custom controls, preserving preferred Add/Favourite first, Next, and existing music/spoken command behavior. Button/action use the underlying player, are radio-only, require an available previous queue item, and seek to that media item rather than restarting the current live stream. Disabled when no previous item is available; stale requests on music/nonradio are rejected. This navigates queued stations and does not replay a previous broadcast song. Added session permission/dispatch and default-English label; no change to global native filtering, settings/schema/version/signing/dependencies/translations.
