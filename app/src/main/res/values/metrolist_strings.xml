@@ -1730,4 +1730,5 @@
     <string name="audiobook_all_series">All series</string>
     <string name="audiobook_no_series">No series found in this library.</string>
     <string name="audiobook_series_server_only">Choose Audiobookshelf to browse series supplied by your server. Local books do not include series information.</string>
+    <string name="radio_previous_station">Previous station</string>
 </resources>

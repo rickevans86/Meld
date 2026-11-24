@@ -2098,7 +2098,10 @@ class MusicService :
                     .setEnabled(set == ButtonSet.LIVE_RADIO || currentSong.value != null)
                     .build()
                     .takeIf { set != ButtonSet.SPOKEN },
-            ).let { RadioMediaButtons.order(it, radioId != null, radioMiniAddSong) },
+            ).let { buttons ->
+                val previous = RadioMediaButtons.previousStationButton(player, getString(R.string.radio_previous_station))
+                RadioMediaButtons.order(buttons + listOfNotNull(previous), radioId != null, radioMiniAddSong)
+            },
         )
     }
 

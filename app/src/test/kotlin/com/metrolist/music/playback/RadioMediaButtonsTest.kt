@@ -41,4 +41,26 @@ class RadioMediaButtonsTest {
         assertEquals(listOf(favourite), RadioMediaButtons.order(listOf(favourite), true, true))
         assertTrue(RadioMediaButtons.order(emptyList(), true, true).isEmpty())
     }
+    @Test fun `custom previous changes station instead of restarting live stream and rejects stale music requests`() {
+        val player = androidx.media3.exoplayer.ExoPlayer.Builder(org.robolectric.RuntimeEnvironment.getApplication()).build()
+        try {
+            player.setMediaItems(listOf("radio:a", "radio:b", "radio:c").map {
+                androidx.media3.common.MediaItem.Builder().setMediaId(it).setUri("https://example.com/radio").build()
+            }, 1, 30_000)
+            val button = requireNotNull(RadioMediaButtons.previousStationButton(player, "Previous station"))
+            assertTrue(button.isEnabled)
+            assertEquals(com.metrolist.music.constants.MediaSessionConstants.CommandRadioPreviousStation, button.sessionCommand)
+            assertEquals(CommandButton.ICON_PREVIOUS, button.icon)
+            assertEquals(listOf(add, favourite, button), RadioMediaButtons.order(listOf(favourite, add, button), true, true))
+            assertTrue(RadioMediaButtons.previousStation(player))
+            assertEquals("radio:a", player.currentMediaItem?.mediaId)
+            assertEquals(0L, player.currentPosition)
+            assertFalse(requireNotNull(RadioMediaButtons.previousStationButton(player, "Previous station")).isEnabled)
+            assertFalse(RadioMediaButtons.previousStation(player))
+            player.setMediaItem(androidx.media3.common.MediaItem.Builder().setMediaId("music").setUri("https://example.com/music").build())
+            assertNull(RadioMediaButtons.previousStationButton(player, "Previous station"))
+            assertFalse(RadioMediaButtons.previousStation(player))
+        } finally { player.release() }
+    }
+
 }
