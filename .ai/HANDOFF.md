@@ -1,8 +1,14 @@
 # Handoff
 
-## Release in progress — AUTO-RADIO-PREVIOUS, ChatGPT Codex, 2026-11-24
+## Released — 0.9.2.115, ChatGPT Codex, 2026-11-24
 
-User explicitly requested release. PR34 https://github.com/rickevans86/Meld/pull/34 merged to main 8c4a4753f6b1fa3532179af9085fa085de8db7ff after CI 45352588415 passed tests, APK build and lint. Tested source ee9fe84e0ecd9505d39e343500d0f6e9801b308e; final PR head 874e80ac385f61e75083dc4482ea85d1a3fe6480 differs only in AI records. Automated Spotify hash commit 826aa99b preserved; remote refs refreshed/no conflicting work. Signed main release workflow 45370296645 is running; publication and APK version/identity/certificate verification pending. No manual version/signing/schema/dependency changes or duplicate dispatch. AI: ChatGPT Codex. Next: await release workflow, verify public APK, finalize records and PR.
+AUTO-RADIO-PREVIOUS completed in PR34 https://github.com/rickevans86/Meld/pull/34 and published at https://github.com/rickevans86/Meld/releases/tag/v0.9.2.115. User explicitly authorized release. Merged main/tag 8c4a4753f6b1fa3532179af9085fa085de8db7ff; feature source ee9fe84e0ecd9505d39e343500d0f6e9801b308e, final PR head 874e80ac385f61e75083dc4482ea85d1a3fe6480 adds only AI records. Full CI 45352588415 passed unit tests, APK build and lint. Automatic signed workflow 45370296645 (run number 115) passed audiobook regression, APK build and publication, then completed successfully. Interim main records 84a0b90b [skip ci]. Latest automated Spotify hash commit 826aa99b preserved; no overlapping AI source overwritten, duplicate workflow dispatch or manual version/schema/signing/dependency changes.
+
+Public Wavelength.apk downloaded to /workspace/work/wavelength-115-public/Wavelength.apk and verified: com.rickevans86.wavelength, 0.9.2.115/code280115, nondebuggable; valid apksigner certificate SHA-256 9056f5a0b0d6f4e2e44e2b1b75ece08ac761fa1dd6a3a8654e8c62cd47fb46f8 matches 114. APK SHA-256 62886a62f214d5a7fc052905d5f31d4df575e6eb6de419f015beb7d08b4881ab. Public, non-draft/non-prerelease release; tag matches tested merged source; app source matches final documentation head. Release notes updated around radio controls.
+
+Adds guarded Previous station as a separate radio custom action while preserving mini Add/Favourite priority, native Next and music/spoken controls. Enabled only when a previous queued item is available; changes queued station rather than replaying a past live broadcast. Four targeted radio/legacy session tests plus debug APK passed; full local app suite 331 tests, zero failures/errors/skips passed. English XML/unique-key/diff checks passed. Physical head-unit placement/overflow remains unverified; Android Auto controls the display. Owner should install over 114 and test Previous station with multiple stations queued, both mini-player preference modes, Next and full controls.
+
+AI: ChatGPT Codex. All six shared records and task finalized; no active reservation or release task remains. Issues disabled, temporary task ID only. Next work depends on owner head-unit feedback.
 
 ## Validated for next release — AUTO-RADIO-PREVIOUS, ChatGPT Codex, 2026-11-24
 
