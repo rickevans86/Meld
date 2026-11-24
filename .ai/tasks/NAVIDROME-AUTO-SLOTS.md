@@ -1,0 +1,8 @@
+# NAVIDROME-AUTO-SLOTS
+
+## Validated for next release — NAVIDROME-AUTO-SLOTS, ChatGPT Codex, 2026-11-24
+
+Implemented Navidrome-only native Previous/Next slot reservations using Media3 MediaConstants session extras, refreshed with MusicService's control layout. Native transport commands and existing full album/playlist queues already existed; no queue bug was established from the screenshot. Reservations prevent custom Favourite actions filling unavailable transport positions. Next remains genuinely unavailable at the last queue item; no fake tracks/actions/wrapping added. Clear only these reservation keys on other sources, preserving unrelated session extras and radio behavior. No settings, permissions, resources, schema, version/signing/dependency/translation changes.
+
+Full app testFossDebugUnitTest: 332 tests, zero failures/errors/skips; assembleFossDebug passed (2m27s), git diff --check passed. New real ExoPlayer/MediaSession test verifies native Previous/Next in a three-song Navidrome queue, next/previous navigation, unavailable Next at queue end while reserving the slot, unrelated extras retention and cleanup for radio/music/podcast/audiobook/null sources. Log: /workspace/work/navidrome-auto-slots-tests.log. Physical head-unit handling of reserved/disabled slots remains unverified; Android Auto determines final rendering. Branch fix/navidrome-auto-transport-slots based on latest main 9b429b65, preserving automated Spotify hash changes. Remote refs/open PRs checked; no overlap; Issues disabled temporary task. Next: push review PR for next update; no immediate main merge/publication requested. AI: ChatGPT Codex; reservations released after implementation.
+

@@ -2005,6 +2005,7 @@ class MusicService :
     }
 
     private fun updateNotification(isLiked: Boolean? = currentSong.value?.song?.let { if (it.isEpisode) it.inLibrary != null else it.liked }) {
+        mediaSession?.let { NavidromeTransportSlots.update(it, player.currentMediaItem?.mediaId) }
         val set = buttonSet()
         val radioId = player.currentMediaItem?.mediaId?.takeIf { set == ButtonSet.LIVE_RADIO }
         val seek = podcastSeekButtonAmounts()
