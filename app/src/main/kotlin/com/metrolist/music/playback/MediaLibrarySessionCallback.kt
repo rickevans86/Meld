@@ -127,6 +127,7 @@ constructor(
                 .add(MediaSessionConstants.CommandToggleShuffle)
                 .add(MediaSessionConstants.CommandToggleRepeatMode)
                 .add(MediaSessionConstants.CommandAddToTargetPlaylist)
+                .add(MediaSessionConstants.CommandRadioPreviousStation)
                 .add(MediaSessionConstants.CommandSkipBack)
                 .add(MediaSessionConstants.CommandSkipForward)
                 .add(MediaSessionConstants.CommandSeekBack)
@@ -162,6 +163,10 @@ constructor(
                 !session.player.shuffleModeEnabled
 
             MediaSessionConstants.ACTION_TOGGLE_REPEAT_MODE -> session.player.toggleRepeatMode()
+            MediaSessionConstants.ACTION_RADIO_PREVIOUS_STATION -> {
+                val result = if (RadioMediaButtons.previousStation(service.player)) SessionResult.RESULT_SUCCESS else SessionError.ERROR_BAD_VALUE
+                return Futures.immediateFuture(SessionResult(result))
+            }
             MediaSessionConstants.ACTION_ADD_TO_TARGET_PLAYLIST -> addToTargetPlaylist()
             MediaSessionConstants.ACTION_SKIP_BACK -> service.podcastSkip(forward = false)
             MediaSessionConstants.ACTION_SKIP_FORWARD -> service.podcastSkip(forward = true)

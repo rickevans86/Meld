@@ -15,6 +15,7 @@ object MediaSessionConstants {
     const val ACTION_TOGGLE_SHUFFLE = "TOGGLE_SHUFFLE"
     const val ACTION_TOGGLE_REPEAT_MODE = "TOGGLE_REPEAT_MODE"
     const val ACTION_ADD_TO_TARGET_PLAYLIST = "ADD_TO_TARGET_PLAYLIST"
+    const val ACTION_RADIO_PREVIOUS_STATION = "RADIO_PREVIOUS_STATION"
     const val ACTION_SKIP_BACK = "SKIP_BACK"
     const val ACTION_SKIP_FORWARD = "SKIP_FORWARD"
     // Dedicated podcast fast-forward / rewind buttons (shown alongside previous/next in Android Auto)
@@ -27,6 +28,7 @@ object MediaSessionConstants {
     val CommandToggleShuffle = SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY)
     val CommandToggleRepeatMode = SessionCommand(ACTION_TOGGLE_REPEAT_MODE, Bundle.EMPTY)
     val CommandAddToTargetPlaylist = SessionCommand(ACTION_ADD_TO_TARGET_PLAYLIST, Bundle.EMPTY)
+    val CommandRadioPreviousStation = SessionCommand(ACTION_RADIO_PREVIOUS_STATION, Bundle.EMPTY)
     val CommandSkipBack = SessionCommand(ACTION_SKIP_BACK, Bundle.EMPTY)
     val CommandSkipForward = SessionCommand(ACTION_SKIP_FORWARD, Bundle.EMPTY)
     val CommandSeekBack = SessionCommand(ACTION_SEEK_BACK, Bundle.EMPTY)
