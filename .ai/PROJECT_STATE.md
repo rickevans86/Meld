@@ -1,5 +1,13 @@
 # Project state
 
+## Released — 0.9.2.116 / FLOATING-RECOGNIZER, ChatGPT Codex, 2026-11-25
+
+User explicitly requested publication and AI-file updates. The main merge had already triggered the automatic signed release; verified and reused it without dispatching a duplicate build. Published https://github.com/rickevans86/Meld/releases/tag/v0.9.2.116, public Wavelength.apk, non-draft/non-prerelease, source/tag 41e7853c5a4e3a2b5412e119995c960aea662699. PR36 source 4225f94bac5c2fa88725e971cf50cb8cb9186740; interim main AI records 1c60fb3dc2527e84f01ddef57abaf54968c1f24d. Full GitHub PR CI 45599733613 now completed successfully (unit tests, APK build and lint). Signed release workflow 45602951916, run number 116, completed successfully including audiobook playback regression, release APK build/signing and publication. Local full suite previously passed 339 tests, zero failures/errors/skips, plus debug APK and lint task.
+
+Downloaded public APK to /workspace/work/wavelength-116-public/Wavelength.apk and verified signature, package com.rickevans86.wavelength, versionName 0.9.2.116, versionCode 280116 and existing signing certificate SHA256 9056f5a0b0d6f4e2e44e2b1b75ece08ac761fa1dd6a3a8654e8c62cd47fb46f8. APK SHA256 32ead95e854890251e6a8dde4b1023041a4417e59f41bb88d8d21460079eed64. Release notes updated to reflect the floating button and completed CI. No manual version/schema/signing/dependency changes.
+
+Enable Settings → Features → Floating recognise song button, allow Display over other apps, then grant microphone permission on first tap. Drag to move, tap to recognise/cancel, × or notification to hide, tap result for history. Enabling alone never records; this uses microphone audio rather than direct internal/headphone capture. Physical phone validation of overlay/drag/lock-screen/microphone/Android 14+ startup remains needed. Pending Navidrome PR35 is separate and not included in this release. Workspace recovered; main fetched/fast-forwarded with no local edits lost. Local docs-only d482039a remains superseded, not pushed. AI: ChatGPT Codex; ownership released.
+
 ## Merged to main — FLOATING-RECOGNIZER, ChatGPT Codex, 2026-11-25
 
 User requested a floating recognise-song button over other apps, then explicitly authorized push to main and AI-file updates. Implemented source 4225f94bac5c2fa88725e971cf50cb8cb9186740 in PR36 https://github.com/rickevans86/Meld/pull/36; merged main 41e7853c5a4e3a2b5412e119995c960aea662699. GitHub comparison confirms the merge has no file differences from tested source.
