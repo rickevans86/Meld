@@ -376,7 +376,9 @@ constructor(
                 .distinctUntilChanged()
                 .collect { paused ->
                     queuePaused = paused
+                    // id = null applies the stop reason to every download in the queue.
                     downloadManager.setStopReason(
+                        null,
                         if (paused) DOWNLOAD_STOP_REASON_PAUSE else Download.STOP_REASON_NONE,
                     )
                 }
