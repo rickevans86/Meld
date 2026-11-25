@@ -392,3 +392,7 @@ PHONE-PODCAST-FAVOURITES (Codex) is locally implemented on fix/shared-podcast-fa
 ## In progress — RECOG-FLOAT-TOGGLE, Claude, 2026-11-25
 
 Owner asked for the floating recognise-song button to be reachable from the Recognise song page. Claude added a top-bar icon toggle (RecognitionScreen actions, between Keep listening and History) that shows/hides the FloatingRecognitionService overlay and reuses its overlay-permission flow; the icon tints to primary while active. One source file plus the WAVELENGTH_CHANGES.md change log; no strings/schema/version/signing/dependency change. Branch recog-float-toggle off main e1c34bfc; PR opened for CI (no local Android SDK in Claude's workspace). Not merged or released — awaiting owner instruction. Released baseline remains 0.9.2.116.
+
+## Release 0.9.2.117 — 2026-11-25, Claude
+
+RECOG-FLOAT-TOGGLE (PR #37, merge afa592e3, run 45611402304). The Recognise song page now has a top-bar icon toggle (between Keep listening and History) to show/hide the floating recognise-song overlay from FLOATING-RECOGNIZER (0.9.2.116), reusing FloatingRecognitionService and its overlay-permission flow; the icon tints to primary while the overlay is active. One source file (RecognitionScreen.kt) + WAVELENGTH_CHANGES.md; no strings/schema/version/signing/dependency change. APK verified: com.rickevans86.wavelength, version code 280117, same cert. Latest baseline.
