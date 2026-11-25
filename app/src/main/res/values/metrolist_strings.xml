@@ -1731,4 +1731,14 @@
     <string name="audiobook_no_series">No series found in this library.</string>
     <string name="audiobook_series_server_only">Choose Audiobookshelf to browse series supplied by your server. Local books do not include series information.</string>
     <string name="radio_previous_station">Previous station</string>
+    <string name="floating_recognition_title">Floating recognise song button</string>
+    <string name="floating_recognition_description">Show a draggable button over other apps. Tap to recognise through the microphone; tap again to cancel. Results appear beside the button and in recognition history. Tap a result to open history. Use × or the notification to hide it. Requires Display over other apps permission; microphone permission is requested on first use. Enabling the button does not start listening. Re-enable it after an app or phone restart.</string>
+    <string name="floating_recognition_notification">Floating song recognition is available. Tap the bubble to listen.</string>
+    <string name="floating_recognition_tap">Recognise a song. Drag to move the button.</string>
+    <string name="floating_recognition_cancel">Cancel song recognition</string>
+    <string name="floating_recognition_hide">Hide floating button</string>
+    <string name="floating_recognition_permission_needed">Allow Display over other apps to show the floating button.</string>
+    <string name="floating_recognition_start_failed">Could not start the floating recogniser. Open Wavelength and check its permissions, then try again.</string>
+    <string name="floating_recognition_busy">Song recognition is already running.</string>
+    <string name="floating_recognition_mic_needed">Allow microphone access to recognise a song.</string>
 </resources>

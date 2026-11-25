@@ -246,6 +246,8 @@ fun FeaturesSettings(navController: NavController) {
         Spacer(Modifier.height(16.dp))
         RecognisedSongsSetting()
         Spacer(Modifier.height(16.dp))
+        FloatingRecognitionSetting()
+        Spacer(Modifier.height(16.dp))
         AudDFallbackSetting()
         Spacer(Modifier.height(16.dp))
         RadioSongsSetting()

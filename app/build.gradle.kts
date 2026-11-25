@@ -35,6 +35,7 @@ plugins {
 }
 
 android {
+    testOptions.unitTests.isIncludeAndroidResources = true
     namespace = "com.metrolist.music"
     compileSdk = 37
 

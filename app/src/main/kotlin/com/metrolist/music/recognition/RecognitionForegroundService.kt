@@ -62,6 +62,7 @@ class RecognitionForegroundService : Service() {
     private var pulseJob: Job? = null
     private var keepNotificationOnStop = false
     private var terminalStateHandled = false
+    private var floatingMode = false
 
     private val imageLoader by lazy { ImageLoader.Builder(this).build() }
 
@@ -79,26 +80,57 @@ class RecognitionForegroundService : Service() {
     ): Int {
         Timber.tag(TAG).d("onStartCommand: action=%s", intent?.action)
         when (intent?.action) {
+            ACTION_STOP_FLOATING -> {
+                if (floatingMode) {
+                    if (recognitionJob?.isActive == true) MusicRecognitionService.cancel()
+                    recognitionJob?.cancel()
+                    stopSelf()
+                }
+            }
+            ACTION_START_FLOATING -> {
+                if (recognitionJob?.isActive != true && !terminalStateHandled) {
+                    floatingMode = true
+                    if (startInForeground(widgetMode = false)) {
+                        if (recognitionBusy(MusicRecognitionService.recognitionStatus.value) || AutoRecognitionService.running.value) {
+                            android.widget.Toast.makeText(this, R.string.floating_recognition_busy, android.widget.Toast.LENGTH_SHORT).show()
+                            stopSelf()
+                        } else {
+                            _floatingRunning.value = true
+                            startRecognition()
+                            recognitionJob?.invokeOnCompletion { cause ->
+                                if (cause is CancellationException) android.os.Handler(mainLooper).post { stopSelf() }
+                            }
+                        }
+                    }
+                }
+            }
+
             ACTION_STOP_WIDGET_RECOGNITION -> {
                 stopWidgetRecognition()
             }
 
             ACTION_START_WIDGET_RECOGNITION -> {
-                if (recognitionJob?.isActive != true && startInForeground(widgetMode = true)) {
-                    startWidgetRecognition()
+                if (recognitionJob?.isActive != true && !terminalStateHandled) {
+                    floatingMode = false
+                    if (startInForeground(widgetMode = true)) startWidgetRecognition()
                 }
             }
 
             else -> {
-                if (recognitionJob?.isActive != true && startInForeground(widgetMode = false)) {
-                    startRecognition()
+                if (recognitionJob?.isActive != true && !terminalStateHandled) {
+                    floatingMode = false
+                    if (startInForeground(widgetMode = false)) startRecognition()
                 }
             }
+        }
+        intent?.let {
+            androidx.core.content.IntentCompat.getParcelableExtra(it, EXTRA_START_ACK, android.os.ResultReceiver::class.java)?.send(0, null)
         }
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
+        if (floatingMode) _floatingRunning.value = false
         recognitionJob?.cancel()
         statusJob?.cancel()
         pulseJob?.cancel()
@@ -109,12 +141,12 @@ class RecognitionForegroundService : Service() {
 
     private fun startInForeground(widgetMode: Boolean): Boolean {
         val stopIntent =
-            if (widgetMode) {
+            if (widgetMode || floatingMode) {
                 PendingIntent.getService(
                     this,
                     1,
                     Intent(this, RecognitionForegroundService::class.java).apply {
-                        action = ACTION_STOP_WIDGET_RECOGNITION
+                        action = if (floatingMode) ACTION_STOP_FLOATING else ACTION_STOP_WIDGET_RECOGNITION
                     },
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
@@ -260,6 +292,9 @@ class RecognitionForegroundService : Service() {
         )
 
         serviceScope.launch {
+            if (floatingMode) {
+                saveRecognitionHistory(result)
+            }
             val coverBitmap =
                 (result.coverArtHqUrl ?: result.coverArtUrl)?.let { url ->
                     withTimeoutOrNull(1_500L) { loadBitmap(url) }
@@ -341,6 +376,10 @@ class RecognitionForegroundService : Service() {
             .putInt(PREF_PULSE_FRAME, 0)
             .apply()
 
+        saveRecognitionHistory(result)
+    }
+
+    private suspend fun saveRecognitionHistory(result: RecognitionResult) = withContext(Dispatchers.IO) {
         runCatching {
             EntryPointAccessors
                 .fromApplication(
@@ -535,6 +574,12 @@ class RecognitionForegroundService : Service() {
     }
 
     companion object {
+        const val EXTRA_START_ACK = "recognition_start_ack"
+        const val ACTION_START_FLOATING = "com.metrolist.music.floating.RECOGNIZE"
+        const val ACTION_STOP_FLOATING = "com.metrolist.music.floating.CANCEL"
+        private val _floatingRunning = kotlinx.coroutines.flow.MutableStateFlow(false)
+        val floatingRunning: kotlinx.coroutines.flow.StateFlow<Boolean> = _floatingRunning
+
         const val EXTRA_RECOGNITION_TRACK_ID = "recognition_track_id"
         const val EXTRA_RECOGNITION_TITLE = "recognition_title"
         const val EXTRA_RECOGNITION_ARTIST = "recognition_artist"
