@@ -254,6 +254,7 @@ class MainActivity : FragmentActivity() {
         private const val ACTION_LIBRARY = "com.metrolist.music.action.LIBRARY"
         const val ACTION_RECOGNITION = "com.metrolist.music.action.RECOGNITION"
         const val ACTION_OPEN_WIDGET_TARGET = "com.metrolist.music.action.OPEN_WIDGET_TARGET"
+        const val EXTRA_OPEN_RECOGNITION_HISTORY = "open_recognition_history"
         const val EXTRA_AUTO_START_RECOGNITION = "auto_start_recognition"
         const val EXTRA_WIDGET_TARGET_TYPE = "widget_target_type"
         const val EXTRA_WIDGET_TARGET_ID = "widget_target_id"
@@ -1680,10 +1681,12 @@ class MainActivity : FragmentActivity() {
         navController: NavHostController,
     ) {
         if (intent.action != ACTION_RECOGNITION) return
+        val history = intent.getBooleanExtra(EXTRA_OPEN_RECOGNITION_HISTORY, false)
+        intent.removeExtra(EXTRA_OPEN_RECOGNITION_HISTORY)
         val autoStart = intent.getBooleanExtra(EXTRA_AUTO_START_RECOGNITION, false)
         intent.action = null
         intent.removeExtra(EXTRA_AUTO_START_RECOGNITION)
-        navController.navigate(if (autoStart) "recognition?autoStart=true" else "recognition") {
+        navController.navigate(if (history) "recognition_history" else if (autoStart) "recognition?autoStart=true" else "recognition") {
             launchSingleTop = true
         }
     }
