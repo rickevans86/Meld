@@ -479,6 +479,10 @@ fun NavGraphBuilder.navigationBuilder(
         StorageSettings(navController)
     }
 
+    composable("settings/download_queue") {
+        com.metrolist.music.ui.screens.settings.DownloadQueueScreen(navController)
+    }
+
     composable("settings/local_folders") {
         LocalMusicFoldersSettings(navController)
     }

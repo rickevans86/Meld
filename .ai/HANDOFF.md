@@ -375,3 +375,11 @@ Completed: top-bar toggle on the Recognise song page to show/hide the floating r
 Branch/PR: recog-float-toggle off main e1c34bfc; PR opened for CI. Not merged/released.
 Tests: no local Gradle build (no Android SDK); relying on PR CI (unit/build/lint). Pure Compose top-bar addition; no unit test added.
 Next action: owner reviews; on "merge/release", merge to main (auto signed release), then verify the published APK (id/cert/version) and record it. Physical phone check: icon pops out/hides the overlay, first-time overlay-permission prompt, active-state tint.
+
+## Handoff — DOWNLOAD-QUEUE-SETTINGS (Claude, 2026-11-26)
+
+Agent: Claude. Task: DOWNLOAD-QUEUE-SETTINGS (temporary ID; Issues disabled).
+Completed: max simultaneous downloads setting, pause/resume whole queue, and a Manage download queue screen with per-item pause/resume/cancel. DownloadUtil collectors + ops; new keys; new screen + route; English strings; changelog + .ai records.
+Branch/PR: download-queue-settings off main c416ae69; PR opened for CI. Not merged/released.
+Tests: no local Gradle build (no Android SDK); relying on PR CI (unit/build/lint). No unit test added (settings + UI screen).
+Next action: owner reviews; on "merge/release", merge to main (auto signed release), verify published APK (id/cert/version), record it. Physical phone check: concurrency change, pause/resume whole queue, per-item pause/resume/cancel, paused queue persists across restart.

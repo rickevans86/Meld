@@ -131,6 +131,16 @@ fun StorageSettings(
         key = com.metrolist.music.constants.DownloadWifiOnlyKey,
         defaultValue = false
     )
+    val (maxParallelDownloads, onMaxParallelDownloadsChange) = rememberPreference(
+        key = com.metrolist.music.constants.MaxParallelDownloadsKey,
+        defaultValue = 5
+    )
+    val (downloadQueuePaused, onDownloadQueuePausedChange) = rememberPreference(
+        key = com.metrolist.music.constants.DownloadQueuePausedKey,
+        defaultValue = false
+    )
+    val maxParallelChoices = listOf(1, 2, 3, 4, 5, 6, 8, 10)
+    var showMaxParallelDialog by remember { mutableStateOf(false) }
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
@@ -337,6 +347,48 @@ fun StorageSettings(
         )
     }
 
+    if (showMaxParallelDialog) {
+        AlertDialog(
+            onDismissRequest = { showMaxParallelDialog = false },
+            title = { Text(stringResource(R.string.max_parallel_downloads)) },
+            text = {
+                Column {
+                    maxParallelChoices.forEach { n ->
+                        TextButton(
+                            onClick = {
+                                onMaxParallelDownloadsChange(n)
+                                showMaxParallelDialog = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = n.toString(),
+                                color = if (n == maxParallelDownloads) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (n == maxParallelDownloads) {
+                                Icon(
+                                    painter = painterResource(R.drawable.check),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMaxParallelDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+
     Column(
         Modifier
             .windowInsetsPadding(
@@ -377,6 +429,48 @@ fun StorageSettings(
                             )
                         },
                         onClick = { onDownloadWifiOnlyChange(!downloadWifiOnly) }
+                    ),
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.tune),
+                        title = { Text(stringResource(R.string.max_parallel_downloads)) },
+                        description = {
+                            Text(
+                                text = stringResource(
+                                    R.string.max_parallel_downloads_desc,
+                                    maxParallelDownloads,
+                                ),
+                            )
+                        },
+                        onClick = { showMaxParallelDialog = true },
+                    ),
+                    Material3SettingsItem(
+                        icon = painterResource(
+                            if (downloadQueuePaused) R.drawable.play else R.drawable.pause
+                        ),
+                        title = { Text(stringResource(R.string.pause_download_queue)) },
+                        description = { Text(stringResource(R.string.pause_download_queue_desc)) },
+                        trailingContent = {
+                            Switch(
+                                checked = downloadQueuePaused,
+                                onCheckedChange = onDownloadQueuePausedChange,
+                                thumbContent = {
+                                    Icon(
+                                        painter = painterResource(
+                                            id = if (downloadQueuePaused) R.drawable.check else R.drawable.close
+                                        ),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        },
+                        onClick = { onDownloadQueuePausedChange(!downloadQueuePaused) },
+                    ),
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.queue_music),
+                        title = { Text(stringResource(R.string.manage_download_queue)) },
+                        description = { Text(stringResource(R.string.manage_download_queue_desc)) },
+                        onClick = { navController.navigate("settings/download_queue") },
                     ),
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.storage),

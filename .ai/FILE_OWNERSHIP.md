@@ -323,3 +323,7 @@ OFFLINE-LIBRARY-ACCESS completed/released 0.9.2.95, PR #16 / main b3c1911d, rele
 ## RECOG-FLOAT-TOGGLE (Claude, PR open; review reservation only)
 
 Branch recog-float-toggle off main. Touched: ui/screens/recognition/RecognitionScreen.kt (top-bar actions only) and WAVELENGTH_CHANGES.md, plus .ai records and tasks/RECOG-FLOAT-TOGGLE.md. No overlap with FloatingRecognitionService / FloatingRecognitionSetting internals (read-only reuse of the public API). No workflow/manifest/string/schema file reserved.
+
+## DOWNLOAD-QUEUE-SETTINGS (Claude, PR open; review reservation only)
+
+Branch download-queue-settings off main. Touched: constants/PreferenceKeys.kt (two keys), playback/DownloadUtil.kt (collectors + per-item ops), ui/screens/settings/StorageSettings.kt (three settings items + picker dialog), ui/screens/settings/DownloadQueueScreen.kt (new), ui/screens/NavigationBuilder.kt (route), res/values/metrolist_strings.xml, WAVELENGTH_CHANGES.md, .ai records + tasks/DOWNLOAD-QUEUE-SETTINGS.md. No workflow/manifest/schema file reserved.
