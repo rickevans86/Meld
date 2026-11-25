@@ -66,6 +66,9 @@ import java.util.concurrent.Executor
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** Wavelength: stop reason used when the user pauses a download (or the whole queue) by hand. */
+const val DOWNLOAD_STOP_REASON_PAUSE = 1
+
 @Singleton
 class DownloadUtil
 @Inject
@@ -96,6 +99,10 @@ constructor(
     private val downloadPreparations = Semaphore(3)
 
     val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
+
+    /** Wavelength: cached "whole queue paused" state, kept in sync with DownloadQueuePausedKey. */
+    @Volatile
+    private var queuePaused = false
 
     val exporter = DownloadExporter(context, database, downloadCache)
 
@@ -274,10 +281,22 @@ constructor(
                             songUrlCache.invalidate(download.request.id)
                         }
 
+                        // Wavelength: pause freshly-added downloads while the whole queue is paused,
+                        // without re-pausing an item the user has individually resumed (that one is
+                        // already in the map, so isNew is false).
+                        val isNew = !downloads.value.containsKey(download.request.id)
+
                         downloads.update { map ->
                             map.toMutableMap().apply {
                                 set(download.request.id, download)
                             }
+                        }
+
+                        if (queuePaused && isNew &&
+                            download.stopReason == Download.STOP_REASON_NONE &&
+                            download.state in intArrayOf(Download.STATE_QUEUED, Download.STATE_DOWNLOADING, Download.STATE_RESTARTING)
+                        ) {
+                            runCatching { downloadManager.setStopReason(download.request.id, DOWNLOAD_STOP_REASON_PAUSE) }
                         }
 
                         scope.launch {
@@ -335,6 +354,32 @@ constructor(
                         } else {
                             androidx.media3.exoplayer.scheduler.Requirements.NETWORK
                         },
+                    )
+                }
+        }
+
+        // Wavelength: how many downloads run at once (1–10), from Settings → Storage.
+        CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+            context.dataStore.data
+                .map { it[com.metrolist.music.constants.MaxParallelDownloadsKey] ?: 5 }
+                .distinctUntilChanged()
+                .collect { max ->
+                    downloadManager.maxParallelDownloads = max.coerceIn(1, 10)
+                }
+        }
+
+        // Wavelength: pause/resume the whole queue. Stop reasons persist in the download index,
+        // so a paused queue stays paused across restarts; new downloads are paused in the listener.
+        CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+            context.dataStore.data
+                .map { it[com.metrolist.music.constants.DownloadQueuePausedKey] ?: false }
+                .distinctUntilChanged()
+                .collect { paused ->
+                    queuePaused = paused
+                    // id = null applies the stop reason to every download in the queue.
+                    downloadManager.setStopReason(
+                        null,
+                        if (paused) DOWNLOAD_STOP_REASON_PAUSE else Download.STOP_REASON_NONE,
                     )
                 }
         }
@@ -456,6 +501,21 @@ constructor(
 
     suspend fun removeInBackground(songId: String) {
         withContext(Dispatchers.Main) { downloadManager.removeDownload(songId) }
+    }
+
+    /** Wavelength: pause one queued/active download (keeps it in the queue). */
+    fun pauseDownload(songId: String) {
+        runCatching { downloadManager.setStopReason(songId, DOWNLOAD_STOP_REASON_PAUSE) }
+    }
+
+    /** Wavelength: resume one paused download. */
+    fun resumeDownload(songId: String) {
+        runCatching { downloadManager.setStopReason(songId, Download.STOP_REASON_NONE) }
+    }
+
+    /** Wavelength: remove one download from the queue (cancels it; any partial data is dropped). */
+    fun cancelDownload(songId: String) {
+        runCatching { downloadManager.removeDownload(songId) }
     }
 
     fun download(songId: String) {

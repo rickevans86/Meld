@@ -172,6 +172,12 @@ val PreCacheOnlyWifiKey = booleanPreferencesKey("preCacheOnlyWifi")
 /** Wavelength: only download over Wi-Fi; downloads pause off Wi-Fi and resume when it's back. */
 val DownloadWifiOnlyKey = booleanPreferencesKey("downloadWifiOnly")
 
+/** Wavelength: how many downloads run at once (DownloadManager.maxParallelDownloads). Default 5. */
+val MaxParallelDownloadsKey = intPreferencesKey("maxParallelDownloads")
+
+/** Wavelength: when on, the whole download queue is paused (all downloads stopped, kept in the queue). */
+val DownloadQueuePausedKey = booleanPreferencesKey("downloadQueuePaused")
+
 val PauseListenHistoryKey = booleanPreferencesKey("pauseListenHistory")
 val PauseSearchHistoryKey = booleanPreferencesKey("pauseSearchHistory")
 val DisableScreenshotKey = booleanPreferencesKey("disableScreenshot")
