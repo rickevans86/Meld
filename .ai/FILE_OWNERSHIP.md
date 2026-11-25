@@ -319,3 +319,7 @@ PHONE-PODCAST-FAVOURITES completed/released 0.9.2.94, PR #15 / main 650649af7175
 Branch fix/offline-library-access from main 93204481. Local implementation of user-reported ABS offline bug and broader airplane-mode download access. Scope: AbsRepository; AudiobookshelfViewModel/Content; MusicService/cache helper; offline downloads UI; HomeScreen/SubsonicScreen/MediaServerScreen; default English strings; tests; AI records. Continuing the user’s standing main/build/release workflow. No overlapping PR found; Issues disabled.
 
 OFFLINE-LIBRARY-ACCESS completed/released 0.9.2.95, PR #16 / main b3c1911d, release run 43999649417. No active reservation remains. Final scope and verification are in the task record.
+
+## RECOG-FLOAT-TOGGLE (Claude, PR open; review reservation only)
+
+Branch recog-float-toggle off main. Touched: ui/screens/recognition/RecognitionScreen.kt (top-bar actions only) and WAVELENGTH_CHANGES.md, plus .ai records and tasks/RECOG-FLOAT-TOGGLE.md. No overlap with FloatingRecognitionService / FloatingRecognitionSetting internals (read-only reuse of the public API). No workflow/manifest/string/schema file reserved.

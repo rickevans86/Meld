@@ -334,3 +334,5 @@ PODCAST-FF-AUTO — Claude — released in 0.9.2.92 from main, owner-verified in
 ## Implementation history — PHONE-PODCAST-FAVOURITES, Codex, 2026-11-17
 
 PHONE-PODCAST-FAVOURITES — Codex — implemented/locally verified, PR CI pending; main/release authorized by owner. Scope: shared phone/Auto favourites, safe pin migration, podcast music-home exclusions. Nine selected tests/build passed. No Issue claim: Issues disabled.
+
+RECOG-FLOAT-TOGGLE — Claude — implemented, PR open for CI (not merged/released). Adds a top-bar icon toggle on the Recognise song page to show/hide the floating recognise-song overlay (FLOATING-RECOGNIZER / 0.9.2.116), reusing FloatingRecognitionService and its overlay-permission flow. One file (RecognitionScreen.kt) + changelog; no strings/schema/version change. See tasks/RECOG-FLOAT-TOGGLE.md. Issues disabled → temporary ID.
