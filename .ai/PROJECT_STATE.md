@@ -396,3 +396,7 @@ Owner asked for the floating recognise-song button to be reachable from the Reco
 ## Release 0.9.2.117 — 2026-11-25, Claude
 
 RECOG-FLOAT-TOGGLE (PR #37, merge afa592e3, run 45611402304). The Recognise song page now has a top-bar icon toggle (between Keep listening and History) to show/hide the floating recognise-song overlay from FLOATING-RECOGNIZER (0.9.2.116), reusing FloatingRecognitionService and its overlay-permission flow; the icon tints to primary while the overlay is active. One source file (RecognitionScreen.kt) + WAVELENGTH_CHANGES.md; no strings/schema/version/signing/dependency change. APK verified: com.rickevans86.wavelength, version code 280117, same cert. Latest baseline.
+
+## Release 0.9.2.118 — 2026-11-26, Claude
+
+DOWNLOAD-QUEUE-SETTINGS (PR #38, merge 54e31564, run 45692585499). Settings → Storage/Download now has: Maximum simultaneous downloads (1–10 picker, was hard-coded 5, feeds DownloadManager.maxParallelDownloads), Pause downloads (pauses/resumes the whole queue via setStopReason, persists across restarts), and a Manage download queue screen (DownloadQueueScreen, route settings/download_queue) with per-item pause/resume/cancel. New keys MaxParallelDownloadsKey/DownloadQueuePausedKey; new DownloadUtil pause/resume/cancel ops. APK verified: com.rickevans86.wavelength, version code 280118, same cert. Latest baseline.
