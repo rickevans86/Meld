@@ -388,3 +388,7 @@ Owner-verified in-car on 2026-11-16 (released 0.9.2.92 build): the 15/30 seek bu
 ## Implementation history — PHONE-PODCAST-FAVOURITES, Codex, 2026-11-17
 
 PHONE-PODCAST-FAVOURITES (Codex) is locally implemented on fix/shared-podcast-favourites; nine selected tests and FOSS debug APK passed. Full CI and authorized main/release publication pending. Baseline remains 0.9.2.93. See tasks/PHONE-PODCAST-FAVOURITES.md.
+
+## In progress — RECOG-FLOAT-TOGGLE, Claude, 2026-11-25
+
+Owner asked for the floating recognise-song button to be reachable from the Recognise song page. Claude added a top-bar icon toggle (RecognitionScreen actions, between Keep listening and History) that shows/hides the FloatingRecognitionService overlay and reuses its overlay-permission flow; the icon tints to primary while active. One source file plus the WAVELENGTH_CHANGES.md change log; no strings/schema/version/signing/dependency change. Branch recog-float-toggle off main e1c34bfc; PR opened for CI (no local Android SDK in Claude's workspace). Not merged or released — awaiting owner instruction. Released baseline remains 0.9.2.116.

@@ -10,8 +10,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.collectAsState
 import com.metrolist.music.recognition.MusicRecognitionService
 import com.metrolist.music.recognition.AutoRecognitionService
+import com.metrolist.music.recognition.FloatingRecognitionService
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import android.widget.Toast
+import androidx.compose.material3.LocalContentColor
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -234,6 +240,46 @@ fun RecognitionScreen(
                         },
                         label = { Text(stringResource(R.string.auto_recognise_toggle)) },
                     )
+                    // Floating recognise button: pop out the draggable overlay straight from here,
+                    // reusing the same service and overlay-permission flow as the Settings switch.
+                    val floatingRunning by FloatingRecognitionService.running.collectAsState()
+                    val floatingContext = LocalContext.current
+                    val floatingFailed = stringResource(R.string.floating_recognition_start_failed)
+                    val floatingNeedsPermission = stringResource(R.string.floating_recognition_permission_needed)
+                    fun startFloating() {
+                        if (!FloatingRecognitionService.show(floatingContext)) {
+                            Toast.makeText(floatingContext, floatingFailed, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                    val floatingOverlayPermission =
+                        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                            if (Settings.canDrawOverlays(floatingContext)) startFloating()
+                            else Toast.makeText(floatingContext, floatingNeedsPermission, Toast.LENGTH_LONG).show()
+                        }
+                    IconButton(
+                        onClick = {
+                            when {
+                                floatingRunning -> FloatingRecognitionService.hide(floatingContext)
+                                Settings.canDrawOverlays(floatingContext) -> startFloating()
+                                else -> runCatching {
+                                    floatingOverlayPermission.launch(
+                                        Intent(
+                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:${floatingContext.packageName}"),
+                                        ),
+                                    )
+                                }.onFailure {
+                                    Toast.makeText(floatingContext, floatingFailed, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.open_in_new),
+                            contentDescription = stringResource(R.string.floating_recognition_title),
+                            tint = if (floatingRunning) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                        )
+                    }
                     IconButton(onClick = { navController.navigate("recognition_history") }) {
                         Icon(
                             painter = painterResource(R.drawable.history),

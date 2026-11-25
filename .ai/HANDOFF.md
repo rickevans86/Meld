@@ -367,3 +367,11 @@ Remote synchronization: main was 4b1e9295; release 0.9.2.81 remains the publishe
 ## Implementation history — PHONE-PODCAST-FAVOURITES, Codex, 2026-11-17
 
 Codex / PHONE-PODCAST-FAVOURITES: implementation and nine selected tests/FOSS debug build complete. Branch fix/shared-podcast-favourites. Next: full PR CI, authorized main merge/release, APK identity/cert/version comparison, final shared-record update. No physical phone/car or live authenticated YouTube test claimed.
+
+## Handoff — RECOG-FLOAT-TOGGLE (Claude, 2026-11-25)
+
+Agent: Claude. Task: RECOG-FLOAT-TOGGLE (temporary ID; Issues disabled).
+Completed: top-bar toggle on the Recognise song page to show/hide the floating recognise-song overlay, reusing FloatingRecognitionService + overlay-permission flow; changelog + .ai records.
+Branch/PR: recog-float-toggle off main e1c34bfc; PR opened for CI. Not merged/released.
+Tests: no local Gradle build (no Android SDK); relying on PR CI (unit/build/lint). Pure Compose top-bar addition; no unit test added.
+Next action: owner reviews; on "merge/release", merge to main (auto signed release), then verify the published APK (id/cert/version) and record it. Physical phone check: icon pops out/hides the overlay, first-time overlay-permission prompt, active-state tint.
