@@ -1375,6 +1375,15 @@
     <string name="cancel_download">Cancel</string>
     <string name="pause_all_downloads">Pause all</string>
     <string name="resume_all_downloads">Resume all</string>
+    <string name="downloading_playlists">Downloading playlists</string>
+    <string name="downloaded_playlists">Downloaded playlists</string>
+    <string name="individual_songs">Individual songs</string>
+    <string name="playlist_downloading_status">%1$d of %2$d downloaded · %3$d downloading</string>
+    <string name="playlist_download_paused_status">Paused · %1$d of %2$d downloaded</string>
+    <string name="playlist_downloaded_status">%1$d songs downloaded</string>
+    <string name="redownload_playlist">Re-download</string>
+    <string name="spotify_playlist_label">Spotify playlist</string>
+    <string name="remove_playlist_download_confirm">Remove all downloaded files for \"%1$s\"? The playlist stays in your library.</string>
     <string name="home_spotify">Spotify</string>
     <string name="home_youtube">YouTube</string>
     <string name="home_spotify_sign_in">Sign in to Spotify to see your Spotify home. Tap here to open Spotify settings.</string>

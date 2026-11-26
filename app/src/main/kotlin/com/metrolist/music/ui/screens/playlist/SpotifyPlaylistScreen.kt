@@ -692,7 +692,11 @@ fun SpotifyPlaylistScreen(
                                             }
                                             resolved++
                                             Timber.d("SpotifyPlaylistDownload: queuing '${track.name}' -> yt:${metadata.id}")
-                                            downloadUtil.download(metadata, exportFolder = "Spotify - ${playlist?.name ?: "Playlist"}")
+                                            downloadUtil.download(
+                                                metadata,
+                                                exportFolder = "Spotify - ${playlist?.name ?: "Playlist"}",
+                                                sourcePlaylistId = playlist?.id?.let { "spotify:$it" },
+                                            )
                                         }
                                         Timber.d("SpotifyPlaylistDownload: done — $resolved queued, $skipped skipped")
                                     }
