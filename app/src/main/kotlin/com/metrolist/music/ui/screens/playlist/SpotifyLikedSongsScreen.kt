@@ -481,7 +481,7 @@ fun SpotifyLikedSongsScreen(
                                             }
                                             resolved++
                                             Timber.d("SpotifyLikedDownload: queuing '${track.name}' -> yt:${metadata.id}")
-                                            downloadUtil.download(metadata, exportFolder = "Spotify - Liked songs")
+                                            downloadUtil.download(metadata, exportFolder = "Spotify - Liked songs", sourcePlaylistId = "spotify:liked")
                                         }
                                         Timber.d("SpotifyLikedDownload: done — $resolved queued, $skipped skipped")
                                     }

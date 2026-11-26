@@ -74,6 +74,7 @@ fun DownloadQueueScreen(
     val (queuePaused, onQueuePausedChange) = rememberPreference(DownloadQueuePausedKey, defaultValue = false)
     val downloadingPlaylists by viewModel.downloadingPlaylists.collectAsState()
     val downloadedPlaylists by viewModel.downloadedPlaylists.collectAsState()
+    val autoDownloadPlaylists by viewModel.autoDownloadPlaylists.collectAsState()
 
     // Only the active queue: downloading, queued, restarting and paused/stopped items.
     val queue = remember(downloadsMap) {
@@ -122,7 +123,8 @@ fun DownloadQueueScreen(
         if (route != null) navController.navigate(route)
     }
 
-    val isEmpty = queue.isEmpty() && downloadingPlaylists.isEmpty() && downloadedPlaylists.isEmpty()
+    val isEmpty = queue.isEmpty() && downloadingPlaylists.isEmpty() &&
+        downloadedPlaylists.isEmpty() && autoDownloadPlaylists.isEmpty()
 
     Scaffold(
         topBar = {
@@ -189,9 +191,24 @@ fun DownloadQueueScreen(
                     }
                 }
 
+                if (autoDownloadPlaylists.isNotEmpty()) {
+                    item(key = "header_auto_download") {
+                        SectionHeader(stringResource(R.string.auto_download_playlists))
+                    }
+                    items(items = autoDownloadPlaylists, key = { "auto_${it.id}" }) { playlist ->
+                        AutoDownloadRow(
+                            playlist = playlist,
+                            onTurnOff = { viewModel.disableAutoDownload(playlist.id) },
+                            onOpen = { openPlaylist(playlist.openRoute) },
+                        )
+                    }
+                }
+
                 if (queue.isNotEmpty()) {
                     // Only label the song queue when playlist sections are also present.
-                    if (downloadingPlaylists.isNotEmpty() || downloadedPlaylists.isNotEmpty()) {
+                    if (downloadingPlaylists.isNotEmpty() || downloadedPlaylists.isNotEmpty() ||
+                        autoDownloadPlaylists.isNotEmpty()
+                    ) {
                         item(key = "header_songs") {
                             SectionHeader(stringResource(R.string.individual_songs))
                         }
@@ -338,6 +355,40 @@ private fun DownloadedPlaylistRow(
             Icon(
                 painter = painterResource(R.drawable.offline),
                 contentDescription = stringResource(R.string.remove_download),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AutoDownloadRow(
+    playlist: DownloadManagementViewModel.AutoDownloadPlaylist,
+    onTurnOff: () -> Unit,
+    onOpen: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        PlaylistArtwork(playlist.thumbnailUrl)
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(
+                text = playlist.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(R.string.auto_download_on),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(onClick = onTurnOff) {
+            Icon(
+                painter = painterResource(R.drawable.close),
+                contentDescription = stringResource(R.string.turn_off_auto_download),
             )
         }
     }

@@ -9,10 +9,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
 import com.metrolist.music.R
-import com.metrolist.music.constants.PlaylistSortType
-import com.metrolist.music.constants.SongSortType
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.playback.DownloadUtil
+import com.metrolist.music.playback.PlaylistAutoDownload
 import com.metrolist.music.utils.dataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -29,11 +29,13 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
- * Wavelength: backs the playlist sections of the Manage download queue screen. Combines the saved
- * playlists (local + pinned YouTube in the playlist table), Liked songs, and Spotify playlists
- * (grouped from the per-download source tag, since Spotify track lists aren't stored locally) with
- * the live download states, to list playlists that are currently downloading and playlists that are
- * fully downloaded, and exposes whole-playlist actions that fan out to the member songs.
+ * Wavelength: backs the playlist sections of the Manage download queue screen.
+ *
+ * Downloads are grouped by the playlist they were downloaded *from* (the per-download "source" tag
+ * recorded in [com.metrolist.music.playback.DownloadExporter]), not by playlist membership — so a
+ * song that lives in several playlists only counts toward the playlist that was actually set to
+ * download, instead of making every playlist that contains it look like it's downloading. Also lists
+ * the playlists set to auto-download.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -54,10 +56,16 @@ class DownloadManagementViewModel @Inject constructor(
         val active: Int,
         val paused: Int,
     ) {
-        /** Progress as finished songs over total, 0f..1f. */
         val fraction: Float get() = if (total > 0) completed.toFloat() / total else 0f
         val anyPaused: Boolean get() = paused > 0 && active == 0
     }
+
+    data class AutoDownloadPlaylist(
+        val id: String,
+        val name: String,
+        val thumbnailUrl: String?,
+        val openRoute: String?,
+    )
 
     private fun aggregate(
         key: String,
@@ -85,69 +93,74 @@ class DownloadManagementViewModel @Inject constructor(
         return PlaylistDownload(key, name, thumbnailUrl, openRoute, ids, ids.size, completed, active, paused)
     }
 
+    /** Resolve a source/auto-download id to a display name, thumbnail and open route. */
+    private suspend fun resolveSource(id: String, storedName: String?): Triple<String, String?, String?> {
+        fun clean(n: String?): String? =
+            n?.removePrefix("YouTube - ")?.removePrefix("Spotify - ")?.trim()?.ifBlank { null }
+        return when {
+            id == PlaylistAutoDownload.LIKED_ID ->
+                Triple(context.getString(R.string.liked), null, "auto_playlist/liked")
+
+            id.startsWith(PlaylistAutoDownload.SPOTIFY_PREFIX) ->
+                Triple(
+                    clean(storedName) ?: context.getString(R.string.spotify_playlist_label),
+                    null,
+                    "spotify_playlist/${id.removePrefix(PlaylistAutoDownload.SPOTIFY_PREFIX)}",
+                )
+
+            id.startsWith(PlaylistAutoDownload.YOUTUBE_PREFIX) -> {
+                val remote = id.removePrefix(PlaylistAutoDownload.YOUTUBE_PREFIX).removePrefix("VL")
+                val playlist = database.playlistByBrowseId(remote).first()
+                    ?: database.playlistByBrowseId("VL$remote").first()
+                Triple(
+                    playlist?.playlist?.name ?: clean(storedName) ?: id,
+                    playlist?.thumbnails?.firstOrNull(),
+                    "online_playlist/$remote",
+                )
+            }
+
+            else -> {
+                val playlist = database.playlist(id).first()
+                Triple(
+                    playlist?.playlist?.name ?: clean(storedName) ?: id,
+                    playlist?.thumbnails?.firstOrNull(),
+                    playlist?.playlist?.browseId?.let { "online_playlist/$it" } ?: "local_playlist/$id",
+                )
+            }
+        }
+    }
+
+    private val autoIdsFlow =
+        context.dataStore.data
+            .map { it[PlaylistAutoDownload.AutoDownloadPlaylistsKey].orEmpty() }
+            .distinctUntilChanged()
+
     private val computed =
-        combine(
-            database.playlists(PlaylistSortType.NAME, false),
-            database.likedSongs(SongSortType.CREATE_DATE, true),
-            downloadUtil.downloads,
-        ) { playlists, liked, downloads -> Triple(playlists, liked, downloads) }
-            .mapLatest { (playlists, liked, downloads) ->
+        combine(downloadUtil.downloads, autoIdsFlow) { downloads, autoIds -> downloads to autoIds }
+            .mapLatest { (downloads, autoIds) ->
                 withContext(Dispatchers.IO) {
-                    val items = mutableListOf<PlaylistDownload>()
-
-                    // Local + pinned YouTube playlists (reliable membership from the DB).
-                    for (playlist in playlists) {
-                        val ids = database.playlistSongIds(playlist.id)
-                        aggregate(
-                            key = "pl:${playlist.id}",
-                            name = playlist.playlist.name,
-                            thumbnailUrl = playlist.thumbnails.firstOrNull(),
-                            openRoute = playlist.playlist.browseId?.let { "online_playlist/$it" }
-                                ?: "local_playlist/${playlist.id}",
-                            ids = ids,
-                            downloads = downloads,
-                        )?.let { items += it }
-                    }
-
-                    // Liked songs.
-                    aggregate(
-                        key = "liked",
-                        name = context.getString(R.string.liked),
-                        thumbnailUrl = null,
-                        openRoute = "auto_playlist/liked",
-                        ids = liked.map { it.id },
-                        downloads = downloads,
-                    )?.let { items += it }
-
-                    // Spotify playlists, grouped from the per-download source tags.
                     val prefs = context.dataStore.data.first()
-                    val groups = LinkedHashMap<String, MutableList<String>>()
-                    val names = HashMap<String, String>()
+                    val songToSource = HashMap<String, String>()
+                    val sourceNames = HashMap<String, String>()
                     for ((prefKey, value) in prefs.asMap()) {
                         val name = prefKey.name
                         when {
-                            name.startsWith("downloadSource:") -> {
-                                val source = value as? String ?: continue
-                                if (source.startsWith("spotify:")) {
-                                    groups.getOrPut(source) { mutableListOf() }
-                                        .add(name.removePrefix("downloadSource:"))
-                                }
-                            }
+                            name.startsWith("downloadSource:") ->
+                                (value as? String)?.let { songToSource[name.removePrefix("downloadSource:")] = it }
                             name.startsWith("downloadSourceName:") ->
-                                (value as? String)?.let { names[name.removePrefix("downloadSourceName:")] = it }
+                                (value as? String)?.let { sourceNames[name.removePrefix("downloadSourceName:")] = it }
                         }
                     }
+
+                    val groups = LinkedHashMap<String, MutableList<String>>()
+                    for ((songId, source) in songToSource) {
+                        groups.getOrPut(source) { mutableListOf() }.add(songId)
+                    }
+
+                    val items = mutableListOf<PlaylistDownload>()
                     for ((source, ids) in groups) {
-                        val display = names[source]?.removePrefix("Spotify - ")?.ifBlank { null }
-                            ?: context.getString(R.string.spotify_playlist_label)
-                        aggregate(
-                            key = source,
-                            name = display,
-                            thumbnailUrl = null,
-                            openRoute = "spotify_playlist/${source.removePrefix("spotify:")}",
-                            ids = ids.distinct(),
-                            downloads = downloads,
-                        )?.let { items += it }
+                        val (name, thumb, route) = resolveSource(source, sourceNames[source])
+                        aggregate(source, name, thumb, route, ids.distinct(), downloads)?.let { items += it }
                     }
 
                     val downloading = items
@@ -156,22 +169,29 @@ class DownloadManagementViewModel @Inject constructor(
                     val downloaded = items
                         .filter { it.active == 0 && it.paused == 0 && it.completed == it.total && it.total > 0 }
                         .sortedBy { it.name.lowercase() }
-                    downloading to downloaded
+
+                    val auto = autoIds.map { id ->
+                        val (name, thumb, route) = resolveSource(id, sourceNames[id])
+                        AutoDownloadPlaylist(id, name, thumb, route)
+                    }.sortedBy { it.name.lowercase() }
+
+                    Triple(downloading, downloaded, auto)
                 }
             }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5_000),
-                emptyList<PlaylistDownload>() to emptyList(),
+                Triple(emptyList<PlaylistDownload>(), emptyList<PlaylistDownload>(), emptyList<AutoDownloadPlaylist>()),
             )
 
     val downloadingPlaylists =
-        computed.map { it.first }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        computed.map { it.first }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val downloadedPlaylists =
-        computed.map { it.second }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        computed.map { it.second }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val autoDownloadPlaylists =
+        computed.map { it.third }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun pausePlaylist(item: PlaylistDownload) =
         viewModelScope.launch { item.memberIds.forEach(downloadUtil::pauseDownload) }
@@ -189,4 +209,8 @@ class DownloadManagementViewModel @Inject constructor(
     /** Re-queue every song in the playlist to download again. */
     fun redownloadPlaylist(item: PlaylistDownload) =
         viewModelScope.launch { item.memberIds.forEach(downloadUtil::download) }
+
+    /** Turn off auto-download for a playlist. */
+    fun disableAutoDownload(id: String) =
+        viewModelScope.launch { PlaylistAutoDownload.setEnabled(context, id, false) }
 }
