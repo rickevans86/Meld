@@ -150,8 +150,17 @@ class DownloadManagementViewModel @Inject constructor(
                         )?.let { items += it }
                     }
 
+                    // A playlist is "downloading" only when the whole playlist is enqueued — every
+                    // song is completed, in-flight or paused (none still un-queued), matching the
+                    // playlist screen's own aggregate state. This keeps playlists that merely share a
+                    // few queued songs with another download (or are only partly enqueued) out of the
+                    // list, so it shows just the playlists actually being downloaded.
                     val downloading = items
-                        .filter { it.active > 0 || it.paused > 0 }
+                        .filter {
+                            it.completed + it.active + it.paused == it.total &&
+                                it.completed < it.total &&
+                                (it.active > 0 || it.paused > 0)
+                        }
                         .sortedBy { it.name.lowercase() }
                     val downloaded = items
                         .filter { it.active == 0 && it.paused == 0 && it.completed == it.total && it.total > 0 }
