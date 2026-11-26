@@ -9,7 +9,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
 import com.metrolist.music.R
+import com.metrolist.music.constants.PlaylistSortType
+import com.metrolist.music.constants.SongSortType
 import com.metrolist.music.db.MusicDatabase
+import com.metrolist.music.db.entities.Playlist
+import com.metrolist.music.db.entities.Song
 import com.metrolist.music.playback.DownloadUtil
 import com.metrolist.music.playback.PlaylistAutoDownload
 import com.metrolist.music.utils.dataStore
@@ -31,11 +35,12 @@ import javax.inject.Inject
 /**
  * Wavelength: backs the playlist sections of the Manage download queue screen.
  *
- * Downloads are grouped by the playlist they were downloaded *from* (the per-download "source" tag
- * recorded in [com.metrolist.music.playback.DownloadExporter]), not by playlist membership — so a
- * song that lives in several playlists only counts toward the playlist that was actually set to
- * download, instead of making every playlist that contains it look like it's downloading. Also lists
- * the playlists set to auto-download.
+ * "Downloaded" and "downloading" are membership questions — is every song on the device, or is the
+ * whole playlist enqueued — so local playlists (including Radio/Recognised, which are real playlists)
+ * and Liked are classified from their actual song lists. A song shared across playlists therefore
+ * counts toward each playlist that is genuinely fully on-device or fully enqueued, and a playlist that
+ * only shares a few queued songs with another download is not shown as downloading. Spotify playlists,
+ * whose track lists aren't stored offline, are grouped from the per-download source tag instead.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -58,6 +63,13 @@ class DownloadManagementViewModel @Inject constructor(
     ) {
         val fraction: Float get() = if (total > 0) completed.toFloat() / total else 0f
         val anyPaused: Boolean get() = paused > 0 && active == 0
+
+        /** Every song is on the device. */
+        val isDownloaded: Boolean get() = total > 0 && completed == total
+
+        /** The whole playlist is enqueued (nothing left un-queued) and something is still in flight. */
+        val isDownloading: Boolean
+            get() = total > 0 && completed + active + paused == total && completed < total && (active > 0 || paused > 0)
     }
 
     data class AutoDownloadPlaylist(
@@ -130,47 +142,82 @@ class DownloadManagementViewModel @Inject constructor(
         }
     }
 
+    private fun openRouteFor(playlist: Playlist): String =
+        playlist.playlist.browseId?.let { "online_playlist/$it" } ?: "local_playlist/${playlist.id}"
+
     private val autoIdsFlow =
         context.dataStore.data
             .map { it[PlaylistAutoDownload.AutoDownloadPlaylistsKey].orEmpty() }
             .distinctUntilChanged()
 
+    private data class Inputs(
+        val playlists: List<Playlist>,
+        val liked: List<Song>,
+        val downloads: Map<String, Download>,
+        val autoIds: Set<String>,
+    )
+
     private val computed =
-        combine(downloadUtil.downloads, autoIdsFlow) { downloads, autoIds -> downloads to autoIds }
-            .mapLatest { (downloads, autoIds) ->
+        combine(
+            database.playlists(PlaylistSortType.NAME, false),
+            database.likedSongs(SongSortType.CREATE_DATE, true),
+            downloadUtil.downloads,
+            autoIdsFlow,
+        ) { playlists, liked, downloads, autoIds -> Inputs(playlists, liked, downloads, autoIds) }
+            .mapLatest { input ->
                 withContext(Dispatchers.IO) {
+                    val items = mutableListOf<PlaylistDownload>()
+
+                    // Local + pinned YouTube playlists (includes Radio/Recognised, which are real playlists).
+                    for (playlist in input.playlists) {
+                        val ids = database.playlistSongIds(playlist.id)
+                        aggregate(
+                            key = "pl:${playlist.id}",
+                            name = playlist.playlist.name,
+                            thumbnailUrl = playlist.thumbnails.firstOrNull(),
+                            openRoute = openRouteFor(playlist),
+                            ids = ids,
+                            downloads = input.downloads,
+                        )?.let { items += it }
+                    }
+
+                    // Liked songs.
+                    aggregate(
+                        key = "liked",
+                        name = context.getString(R.string.liked),
+                        thumbnailUrl = null,
+                        openRoute = "auto_playlist/liked",
+                        ids = input.liked.map { it.id },
+                        downloads = input.downloads,
+                    )?.let { items += it }
+
+                    // Spotify playlists, grouped from the per-download source tags (no offline track list).
                     val prefs = context.dataStore.data.first()
-                    val songToSource = HashMap<String, String>()
+                    val groups = LinkedHashMap<String, MutableList<String>>()
                     val sourceNames = HashMap<String, String>()
                     for ((prefKey, value) in prefs.asMap()) {
                         val name = prefKey.name
                         when {
-                            name.startsWith("downloadSource:") ->
-                                (value as? String)?.let { songToSource[name.removePrefix("downloadSource:")] = it }
+                            name.startsWith("downloadSource:") -> {
+                                val source = value as? String ?: continue
+                                if (source.startsWith(PlaylistAutoDownload.SPOTIFY_PREFIX)) {
+                                    groups.getOrPut(source) { mutableListOf() }
+                                        .add(name.removePrefix("downloadSource:"))
+                                }
+                            }
                             name.startsWith("downloadSourceName:") ->
                                 (value as? String)?.let { sourceNames[name.removePrefix("downloadSourceName:")] = it }
                         }
                     }
-
-                    val groups = LinkedHashMap<String, MutableList<String>>()
-                    for ((songId, source) in songToSource) {
-                        groups.getOrPut(source) { mutableListOf() }.add(songId)
-                    }
-
-                    val items = mutableListOf<PlaylistDownload>()
                     for ((source, ids) in groups) {
                         val (name, thumb, route) = resolveSource(source, sourceNames[source])
-                        aggregate(source, name, thumb, route, ids.distinct(), downloads)?.let { items += it }
+                        aggregate(source, name, thumb, route, ids.distinct(), input.downloads)?.let { items += it }
                     }
 
-                    val downloading = items
-                        .filter { it.active > 0 || it.paused > 0 }
-                        .sortedBy { it.name.lowercase() }
-                    val downloaded = items
-                        .filter { it.active == 0 && it.paused == 0 && it.completed == it.total && it.total > 0 }
-                        .sortedBy { it.name.lowercase() }
+                    val downloading = items.filter { it.isDownloading }.sortedBy { it.name.lowercase() }
+                    val downloaded = items.filter { it.isDownloaded }.sortedBy { it.name.lowercase() }
 
-                    val auto = autoIds.map { id ->
+                    val auto = input.autoIds.map { id ->
                         val (name, thumb, route) = resolveSource(id, sourceNames[id])
                         AutoDownloadPlaylist(id, name, thumb, route)
                     }.sortedBy { it.name.lowercase() }
