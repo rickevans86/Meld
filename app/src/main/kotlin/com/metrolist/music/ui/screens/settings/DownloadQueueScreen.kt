@@ -162,7 +162,7 @@ fun DownloadQueueScreen(
                     item(key = "header_downloading_playlists") {
                         SectionHeader(stringResource(R.string.downloading_playlists))
                     }
-                    items(items = downloadingPlaylists, key = { "dlp_${it.id}" }) { playlist ->
+                    items(items = downloadingPlaylists, key = { "dlp_${it.key}" }) { playlist ->
                         DownloadingPlaylistRow(
                             playlist = playlist,
                             onPauseResume = {
@@ -179,7 +179,7 @@ fun DownloadQueueScreen(
                     item(key = "header_downloaded_playlists") {
                         SectionHeader(stringResource(R.string.downloaded_playlists))
                     }
-                    items(items = downloadedPlaylists, key = { "ddp_${it.id}" }) { playlist ->
+                    items(items = downloadedPlaylists, key = { "ddp_${it.key}" }) { playlist ->
                         DownloadedPlaylistRow(
                             playlist = playlist,
                             onRedownload = { viewModel.redownloadPlaylist(playlist) },
