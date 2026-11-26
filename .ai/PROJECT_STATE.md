@@ -400,3 +400,7 @@ RECOG-FLOAT-TOGGLE (PR #37, merge afa592e3, run 45611402304). The Recognise song
 ## Release 0.9.2.118 — 2026-11-26, Claude
 
 DOWNLOAD-QUEUE-SETTINGS (PR #38, merge 54e31564, run 45692585499). Settings → Storage/Download now has: Maximum simultaneous downloads (1–10 picker, was hard-coded 5, feeds DownloadManager.maxParallelDownloads), Pause downloads (pauses/resumes the whole queue via setStopReason, persists across restarts), and a Manage download queue screen (DownloadQueueScreen, route settings/download_queue) with per-item pause/resume/cancel. New keys MaxParallelDownloadsKey/DownloadQueuePausedKey; new DownloadUtil pause/resume/cancel ops. APK verified: com.rickevans86.wavelength, version code 280118, same cert. Latest baseline.
+
+## Release 0.9.2.119 — 2026-11-27, Claude
+
+DOWNLOAD-PLAYLIST-MGMT (PR #39, merge 3637de10, run 45886452385). The Manage download queue screen now has Downloading playlists and Downloaded playlists sections over the Individual songs queue, covering local, pinned YouTube, Liked and Spotify playlists. Whole-playlist pause/resume/cancel, re-download, remove (confirm) and open; members resolved per kind (DB for local/YouTube, library for Liked, a new per-download DataStore source tag for Spotify since Spotify track lists aren't stored offline). Spotify grouping is forward-looking (only downloads tagged on 0.9.2.119+). New DownloadManagementViewModel; DownloadExporter persists downloadSource/downloadSourceName; no Room schema change. APK verified: com.rickevans86.wavelength, version code 280119, same cert. Latest baseline.
