@@ -2132,6 +2132,10 @@ interface DatabaseDao {
     @Query("SELECT * FROM playlist_song_map WHERE songId = :songId")
     fun playlistSongMaps(songId: String): List<PlaylistSongMap>
 
+    /** Wavelength: just the song ids in a playlist, for cheap download-state aggregation. */
+    @Query("SELECT songId FROM playlist_song_map WHERE playlistId = :playlistId ORDER BY position")
+    suspend fun playlistSongIds(playlistId: String): List<String>
+
     @Transaction
     @Query("SELECT * FROM playlist_song_map WHERE playlistId = :playlistId AND position >= :from ORDER BY position")
     fun playlistSongMaps(
