@@ -106,7 +106,7 @@ fun DownloadQueueScreen(
             text = { Text(stringResource(R.string.remove_playlist_download_confirm, target.name)) },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.removePlaylistDownload(target.id)
+                    viewModel.removePlaylistDownload(target)
                     removeTarget = null
                 }) { Text(stringResource(R.string.remove_download)) }
             },
@@ -118,9 +118,8 @@ fun DownloadQueueScreen(
         )
     }
 
-    fun openPlaylist(browseId: String?, id: String) {
-        if (browseId != null) navController.navigate("online_playlist/$browseId")
-        else navController.navigate("local_playlist/$id")
+    fun openPlaylist(route: String?) {
+        if (route != null) navController.navigate(route)
     }
 
     val isEmpty = queue.isEmpty() && downloadingPlaylists.isEmpty() && downloadedPlaylists.isEmpty()
@@ -167,11 +166,11 @@ fun DownloadQueueScreen(
                         DownloadingPlaylistRow(
                             playlist = playlist,
                             onPauseResume = {
-                                if (playlist.anyPaused) viewModel.resumePlaylist(playlist.id)
-                                else viewModel.pausePlaylist(playlist.id)
+                                if (playlist.anyPaused) viewModel.resumePlaylist(playlist)
+                                else viewModel.pausePlaylist(playlist)
                             },
-                            onCancel = { viewModel.cancelPlaylist(playlist.id) },
-                            onOpen = { openPlaylist(playlist.browseId, playlist.id) },
+                            onCancel = { viewModel.cancelPlaylist(playlist) },
+                            onOpen = { openPlaylist(playlist.openRoute) },
                         )
                     }
                 }
@@ -183,9 +182,9 @@ fun DownloadQueueScreen(
                     items(items = downloadedPlaylists, key = { "ddp_${it.id}" }) { playlist ->
                         DownloadedPlaylistRow(
                             playlist = playlist,
-                            onRedownload = { viewModel.redownloadPlaylist(playlist.id) },
+                            onRedownload = { viewModel.redownloadPlaylist(playlist) },
                             onRemove = { removeTarget = playlist },
-                            onOpen = { openPlaylist(playlist.browseId, playlist.id) },
+                            onOpen = { openPlaylist(playlist.openRoute) },
                         )
                     }
                 }

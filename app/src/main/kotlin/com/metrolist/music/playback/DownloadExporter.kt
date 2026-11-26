@@ -10,6 +10,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.media3.datasource.DataSourceInputStream
 import androidx.media3.datasource.DataSpec
@@ -58,8 +59,18 @@ class DownloadExporter(
         context.dataStore.edit { prefs ->
             val key = targetsKey(songId)
             prefs[key] = prefs[key].orEmpty() + destination
+            // Wavelength: remember which playlist a download came from, so the download-management
+            // screen can group downloads by playlist even for Spotify (whose track lists aren't
+            // stored locally). Keyed by song; the source's display name is kept alongside.
+            if (sourcePlaylistId != null) {
+                prefs[sourceKey(songId)] = sourcePlaylistId
+                if (!folder.isNullOrBlank()) prefs[sourceNameKey(sourcePlaylistId)] = folder
+            }
         }
     }
+
+    private fun sourceKey(songId: String) = stringPreferencesKey("downloadSource:$songId")
+    private fun sourceNameKey(sourceId: String) = stringPreferencesKey("downloadSourceName:$sourceId")
 
     suspend fun export(songId: String): Boolean = withContext(Dispatchers.IO) {
         val treeUri = folderUri() ?: return@withContext false
