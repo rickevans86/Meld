@@ -408,3 +408,7 @@ DOWNLOAD-PLAYLIST-MGMT (PR #39, merge 3637de10, run 45886452385). The Manage dow
 ## Release 0.9.2.120 — 2026-11-27, Claude
 
 DOWNLOAD-PLAYLIST-MGMT fix v2 (PR #40, merge 289a530b, run 45911330597). Playlist download sections now group by the per-download source tag instead of membership, so a song in several playlists only counts toward the playlist it was downloaded from (fixes the over-listing the owner reported). Tagged the Liked and Spotify-liked download paths. Added an Auto-download playlists section (from PlaylistAutoDownload.AutoDownloadPlaylistsKey) with tap-to-open and a turn-off button. Forward-looking (tag-based; older downloads group after re-download). No Room schema change (DataStore tags). APK verified: com.rickevans86.wavelength, version code 280120, same cert. Latest baseline.
+
+## Release 0.9.2.121 — 2026-11-27, Claude
+
+DOWNLOAD-PLAYLIST-MGMT fix v3 (PR #41, merge 13682c61, run 45920915650). Downloaded/downloading playlist sections are now decided by membership — all member songs on device (downloaded) or whole playlist enqueued (downloading) — for local playlists (incl. Radio/Recognised) and Liked, with tag-based grouping kept only for Spotify (no offline track list). Fixes a fully-downloaded local playlist whose songs are also Liked showing only under Auto-download, not Downloaded. One-file ViewModel change; no schema change. APK verified: com.rickevans86.wavelength, version code 280121, same cert. Latest baseline.
